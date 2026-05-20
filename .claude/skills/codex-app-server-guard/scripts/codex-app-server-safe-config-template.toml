@@ -1,0 +1,7 @@
+# Redirect stub.
+#
+# The canonical app-server safe config template lives at:
+# ../references/codex-safe-config-template.toml
+#
+# Keep this legacy path for older prompts and README references, but do not
+# maintain a second TOML baseline here.

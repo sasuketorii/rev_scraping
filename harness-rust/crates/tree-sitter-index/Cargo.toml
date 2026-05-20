@@ -1,0 +1,40 @@
+[package]
+name = "tree-sitter-index"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Tree-sitter based symbol indexing and impact analysis for agent_base"
+
+[dependencies]
+shared = { path = "../shared" }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+tree-sitter = { workspace = true }
+tree-sitter-rust = { workspace = true, optional = true }
+tree-sitter-typescript = { workspace = true, optional = true }
+tree-sitter-javascript = { workspace = true, optional = true }
+tree-sitter-python = { workspace = true, optional = true }
+tree-sitter-go = { workspace = true, optional = true }
+tree-sitter-bash = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = { workspace = true }
+
+[features]
+default = ["lang-rust", "lang-typescript", "lang-python"]
+lang-rust = ["dep:tree-sitter-rust"]
+lang-typescript = ["dep:tree-sitter-typescript", "dep:tree-sitter-javascript"]
+lang-python = ["dep:tree-sitter-python"]
+lang-go = ["dep:tree-sitter-go"]
+lang-shell = ["dep:tree-sitter-bash"]
+all-languages = ["lang-rust", "lang-typescript", "lang-python", "lang-go", "lang-shell"]
+
+[[bench]]
+name = "index_files"
+harness = false

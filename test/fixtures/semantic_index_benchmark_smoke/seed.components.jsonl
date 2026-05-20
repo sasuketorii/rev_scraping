@@ -1,0 +1,3 @@
+{"project_id":"benchmark-project","semantic_id":"core:UserService","name":"UserService","module":"core","file_path":"src/core/user-service.ts","kind":"class","hash":"hash-user","status":"active","idem":"idem-user","updated_at":"2026-04-24T00:00:03Z"}
+{"project_id":"benchmark-project","semantic_id":"core:UserServiceHelper","name":"UserServiceHelper","module":"core","file_path":"src/core/user-service-helper.ts","kind":"class","hash":"hash-helper","status":"active","idem":"idem-helper","updated_at":"2026-04-24T00:00:02Z"}
+{"project_id":"benchmark-project","semantic_id":"core:AuditService","name":"AuditService","module":"core","file_path":"src/core/audit-service.ts","kind":"class","hash":"hash-audit","status":"active","idem":"idem-audit","updated_at":"2026-04-24T00:00:01Z"}

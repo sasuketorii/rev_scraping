@@ -1,0 +1,55 @@
+sandbox_mode = "workspace-write"
+approval_policy = "never"
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+
+web_search = "cached"
+
+[mcp_servers.semantic]
+command = "./scripts/launch-semantic-mcp.sh"
+
+# Chrome DevTools MCP — optional per-project opt-in, not in baseline release.
+# [mcp_servers.chrome_devtools]
+# command = "npx chrome-devtools-mcp@<pin>"
+
+[features]
+multi_agent = true
+
+[agents.coder]
+description = "実装担当。設計に基づいてコード変更と検証を行う。"
+config_file = "agents/coder.toml"
+
+[agents.system_planner]
+description = "システム設計プランナー。要件整理と実装計画を作成する。"
+config_file = "agents/system_planner.toml"
+
+[agents.plan_reviewer]
+description = "プランレビュワー。計画の抜け漏れと実行可能性を検証する。"
+config_file = "agents/plan_reviewer.toml"
+
+[agents.security_reviewer]
+description = "セキュリティレビュワー。脆弱性と攻撃面を重点レビューする。"
+config_file = "agents/security_reviewer.toml"
+
+[agents.performance_reviewer]
+description = "パフォーマンスレビュワー。速度・負荷・スケーラビリティを評価する。"
+config_file = "agents/performance_reviewer.toml"
+
+[agents.consistency_reviewer]
+description = "整合性レビュワー。仕様・設計・実装・テスト間の一貫性を検証する。"
+config_file = "agents/consistency_reviewer.toml"
+
+[agents.alternative_reviewer]
+description = "代替案レビュワー。より良い実装手段を比較して提案する。"
+config_file = "agents/alternative_reviewer.toml"
+
+[agents.stack_upgrade_researcher]
+description = "技術スタック更新調査。最新安定版へのアップデート方針を調査する。"
+config_file = "agents/stack_upgrade_researcher.toml"
+
+[agents.stack_upgrade_reviewer]
+description = "技術スタック更新レビュー。更新計画の妥当性とリスクを検証する。"
+config_file = "agents/stack_upgrade_reviewer.toml"
+
+[sandbox_workspace_write]
+network_access = true

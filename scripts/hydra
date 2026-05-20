@@ -1,0 +1,1495 @@
+#!/bin/bash
+
+# Hydra: The Multi-Headed Development Tool for Git Worktrees
+# Usage: ./scripts/hydra [new|close|list] [task_name]
+
+COMMAND=$1
+TASK_NAME=$2
+FORCE_FLAG=""
+SAFE_TASK_NAME=""
+WORKSPACE_DIR="workspace"
+SHARED_DIR=".shared"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+function show_usage {
+    echo "Usage: ./scripts/hydra [command] [task_name]"
+    echo "Commands:"
+    echo "  new <task>            Create a new worktree and branch for a task"
+    echo "  close <task> [--force] Push changes, create a PR via gh, and remove the worktree"
+    echo "  list                  List active worktrees"
+    echo "  preflight <task>      Check for merge conflicts with base branch"
+    echo "  rollback [options]    Rollback a merged PR or commit"
+    echo "  merge-order [options] Analyze worktree dependencies for merge ordering"
+    echo ""
+    echo "For rollback options, run: ./scripts/hydra rollback --help"
+    echo "For merge-order options, run: ./scripts/hydra merge-order --help"
+}
+
+function check_gh_cli {
+    if ! command -v gh &> /dev/null; then
+        echo -e "${RED}Error: GitHub CLI (gh) is not installed.${NC}"
+        echo "Please install it: brew install gh"
+        exit 1
+    fi
+}
+
+function parse_close_flags {
+    local _cmd="$1"
+    local arg1="$2"
+    local arg2="$3"
+
+    if [ "$arg1" = "--force" ]; then
+        FORCE_FLAG="--force"
+        TASK_NAME="$arg2"
+    elif [ "$arg2" = "--force" ]; then
+        FORCE_FLAG="--force"
+        TASK_NAME="$arg1"
+    else
+        TASK_NAME="$arg1"
+    fi
+
+    if [ -n "$TASK_NAME" ]; then
+        SAFE_TASK_NAME="${TASK_NAME//\//-}"
+    fi
+}
+
+function get_default_branch {
+    local ref
+    ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+    if [ -n "$ref" ]; then
+        echo "${ref#origin/}"
+        return
+    fi
+    if git show-ref --verify --quiet refs/heads/main; then
+        echo "main"
+        return
+    fi
+    if git show-ref --verify --quiet refs/heads/master; then
+        echo "master"
+        return
+    fi
+    if git show-ref --verify --quiet refs/heads/develop; then
+        echo "develop"
+        return
+    fi
+    ref=$(git branch --show-current 2>/dev/null || true)
+    if [ -n "$ref" ]; then
+        echo "$ref"
+        return
+    fi
+    echo "main"
+}
+
+function resolve_base_ref {
+    local base_branch=$1
+    if git show-ref --verify --quiet "refs/heads/$base_branch"; then
+        echo "$base_branch"
+        return
+    fi
+    if git show-ref --verify --quiet "refs/remotes/origin/$base_branch"; then
+        echo "origin/$base_branch"
+        return
+    fi
+    echo "$base_branch"
+}
+
+function pre_close_checks {
+    local target_dir=$1
+    local task_name=$2
+    local safe_task_name=$3
+    local status
+
+    status=$(cd "$target_dir" && git status --porcelain)
+    if [ -n "$status" ]; then
+        echo -e "${RED}Error: Uncommitted changes detected. Commit or stash before closing.${NC}"
+        return 1
+    fi
+
+    local sow_dir="$target_dir/.agent/active/sow"
+    local handover_dir="$target_dir/.agent/active/prompts"
+    local sow_match
+    local handover_match
+
+    if [ ! -d "$sow_dir" ]; then
+        echo -e "${RED}Error: SOW directory missing: $sow_dir${NC}"
+        return 1
+    fi
+    sow_match=$(find "$sow_dir" -maxdepth 1 -type f -name "*${safe_task_name}*.md" -print -quit)
+    if [ -z "$sow_match" ]; then
+        echo -e "${RED}Error: SOW not found for task \"$task_name\" in $sow_dir${NC}"
+        echo "Expected a file name containing: $safe_task_name"
+        return 1
+    fi
+
+    if [ ! -d "$handover_dir" ]; then
+        echo -e "${RED}Error: Handover directory missing: $handover_dir${NC}"
+        return 1
+    fi
+    handover_match=$(find "$handover_dir" -maxdepth 1 -type f -name "*${safe_task_name}*.md" -print -quit)
+    if [ -z "$handover_match" ]; then
+        echo -e "${RED}Error: Handover prompt not found for task \"$task_name\" in $handover_dir${NC}"
+        echo "Expected a file name containing: $safe_task_name"
+        return 1
+    fi
+}
+
+function cmd_new {
+    if [ -z "$TASK_NAME" ]; then
+        echo -e "${RED}Error: Task name required.${NC}"
+        exit 1
+    fi
+
+    BRANCH_NAME="feat/$TASK_NAME"
+    SAFE_TASK_NAME="${TASK_NAME//\//-}"
+    TARGET_DIR="$WORKSPACE_DIR/$TASK_NAME"
+    BASE_BRANCH=$(get_default_branch)
+    BASE_REF=$(resolve_base_ref "$BASE_BRANCH")
+    PLAN_TEMPLATE=".agent/EXECPLAN_TEMPLATE.md"
+    PLAN_DIR="$TARGET_DIR/.agent/active"
+    PLAN_FILE="$PLAN_DIR/plan_$(date +%Y%m%d_%H%M)_${SAFE_TASK_NAME}.md"
+
+    echo -e "${BLUE}>>> Spawning new head: $TASK_NAME${NC}"
+
+    # 1. Create Worktree
+    if [ -d "$TARGET_DIR" ]; then
+        echo -e "${RED}Error: Directory $TARGET_DIR already exists.${NC}"
+        exit 1
+    fi
+
+    mkdir -p "$WORKSPACE_DIR"
+    
+    # Check if branch exists
+    if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+        echo "Branch $BRANCH_NAME already exists. Checking it out..."
+        git worktree add "$TARGET_DIR" "$BRANCH_NAME"
+    else
+        echo "Creating new branch $BRANCH_NAME from $BASE_REF..."
+        git worktree add -b "$BRANCH_NAME" "$TARGET_DIR" "$BASE_REF"
+    fi
+
+    # 2. Symlink Shared Resources (e.g., node_modules)
+    if [ -d "$SHARED_DIR/node_modules" ]; then
+        echo "Linking node_modules..."
+        local shared_root
+        shared_root="$(git rev-parse --show-toplevel)/$SHARED_DIR/node_modules"
+        ln -s "$shared_root" "$TARGET_DIR/node_modules"
+    fi
+
+    # 3. Copy Template Plan (if exists)
+    if [ -f "$PLAN_TEMPLATE" ]; then
+        mkdir -p "$PLAN_DIR"
+        cp "$PLAN_TEMPLATE" "$PLAN_FILE"
+        echo "ExecPlan template created: $PLAN_FILE"
+    fi
+
+    echo -e "${GREEN}>>> Hydra head spawned at $TARGET_DIR${NC}"
+    echo -e "To begin:\n  cd $TARGET_DIR"
+}
+
+function cmd_close {
+    parse_close_flags "$@"
+    if [ -z "$TASK_NAME" ]; then
+        echo -e "${RED}Error: Task name required.${NC}"
+        exit 1
+    fi
+
+    TARGET_DIR="$WORKSPACE_DIR/$TASK_NAME"
+    BRANCH_NAME="feat/$TASK_NAME"
+    BASE_BRANCH=$(get_default_branch)
+
+    if [ ! -d "$TARGET_DIR" ]; then
+        echo -e "${RED}Error: Worktree $TARGET_DIR does not exist.${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}>>> Closing head: $TASK_NAME${NC}"
+
+    # Safety checks (SOW, handover, uncommitted changes)
+    if [ "$FORCE_FLAG" != "--force" ]; then
+        pre_close_checks "$TARGET_DIR" "$TASK_NAME" "$SAFE_TASK_NAME" || exit 1
+    else
+        echo -e "${BLUE}>>> Skipping safety checks (--force)${NC}"
+    fi
+
+    # HY-2: preflight is mandatory before close (even with --force)
+    echo -e "${BLUE}>>> Running required preflight: $TASK_NAME -> $BASE_BRANCH${NC}"
+    if ! cmd_preflight preflight "$TASK_NAME" --base="$BASE_BRANCH"; then
+        echo -e "${RED}Error: Preflight failed. hydra close is blocked.${NC}"
+        echo "Resolve conflicts/reconcile issues and rerun:"
+        echo "  ./scripts/hydra preflight $TASK_NAME --base=$BASE_BRANCH"
+        exit 1
+    fi
+
+    check_gh_cli
+
+    # 1. Push
+    echo "Pushing branch $BRANCH_NAME..."
+    # Execute git command inside the worktree
+    (cd "$TARGET_DIR" && git push origin "$BRANCH_NAME") || {
+        echo -e "${RED}Error: Push failed. Worktree was not removed.${NC}"
+        exit 1
+    }
+
+    # 2. Create PR
+    echo "Creating Pull Request..."
+    PR_URL=$(gh pr create --repo "$(gh repo view --json nameWithOwner -q .nameWithOwner)" --head "$BRANCH_NAME" --base "$BASE_BRANCH" --title "feat: $TASK_NAME" --body "Generated by Hydra Flow" --web) || {
+        echo -e "${RED}Error: PR creation failed. Worktree was not removed.${NC}"
+        exit 1
+    }
+    
+    echo -e "${GREEN}PR Created: $PR_URL${NC}"
+
+    # 3. Remove Worktree
+    echo "Removing worktree..."
+    git worktree remove --force "$TARGET_DIR"
+
+    echo -e "${GREEN}>>> Head closed. Good job.${NC}"
+}
+
+function cmd_list {
+    echo -e "${BLUE}>>> Active Hydra Heads (Worktrees)${NC}"
+    git worktree list
+}
+
+function show_preflight_help {
+    echo "Usage: ./scripts/hydra preflight <task-name> [options]"
+    echo ""
+    echo "Check for merge conflicts between a task branch and the base branch."
+    echo ""
+    echo "Options:"
+    echo "  --base=<branch>    Base branch to check against (default: main)"
+    echo "  --all              Check all active worktrees"
+    echo "  --report           Output to file (.claude/tmp/preflight_<task>.md)"
+    echo "  --format=json      Output in JSON format"
+    echo "  --help             Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  ./scripts/hydra preflight feat-auth"
+    echo "  ./scripts/hydra preflight feat-auth --base=develop"
+    echo "  ./scripts/hydra preflight --all"
+    echo "  ./scripts/hydra preflight feat-auth --format=json"
+    echo ""
+    echo "Exit codes:"
+    echo "  0    PASS"
+    echo "  1    BLOCK (conflicts/reconcile required/error)"
+}
+
+# Global variables for preflight results
+PREFLIGHT_SHARED_FILES=""
+PREFLIGHT_DEPS=""
+PREFLIGHT_RECONCILE_REQUIRED="false"
+PREFLIGHT_RECONCILE_CONFLICTS=""
+PREFLIGHT_RECONCILE_CONFLICTS_JSON="[]"
+
+# Check for shared files between worktrees
+function preflight_check_shared_files {
+    local task_name="$1"
+    local worktree_path="$WORKSPACE_DIR/$task_name"
+    local base_branch="${2:-main}"
+    local conflicts=()
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📁 Shared File Analysis"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    # Resolve base ref (prefer remote, fallback to local)
+    local base_ref=""
+    if git show-ref --verify --quiet "refs/remotes/origin/$base_branch"; then
+        base_ref="origin/$base_branch"
+    elif git show-ref --verify --quiet "refs/heads/$base_branch"; then
+        base_ref="$base_branch"
+    else
+        echo -e "${RED}Error: Base branch '$base_branch' not found (remote or local)${NC}"
+        return 1
+    fi
+
+    # Get changed files in target worktree
+    local changed_files
+    changed_files=$(cd "$worktree_path" && git diff --name-only "$base_ref"..HEAD 2>/dev/null)
+
+    if [ -z "$changed_files" ]; then
+        echo "No changed files detected in $task_name"
+        PREFLIGHT_SHARED_FILES=""
+        return 0
+    fi
+
+    # Compare with other worktrees
+    while IFS= read -r line; do
+        local wt_path
+        wt_path=$(echo "$line" | awk '{print $1}')
+
+        # Skip self and non-workspace worktrees
+        if [[ "$wt_path" == *"/$task_name" ]] || [[ "$wt_path" != *"/workspace/"* ]]; then
+            continue
+        fi
+
+        local other_name
+        other_name=$(basename "$wt_path")
+        local other_changes
+        other_changes=$(cd "$wt_path" && git diff --name-only "$base_ref"..HEAD 2>/dev/null)
+
+        # Check for overlapping files
+        while IFS= read -r file; do
+            if [ -n "$file" ] && echo "$other_changes" | grep -Fxq "$file"; then
+                conflicts+=("$file: also modified in $other_name")
+            fi
+        done <<< "$changed_files"
+    done < <(git worktree list)
+
+    if [ ${#conflicts[@]} -gt 0 ]; then
+        echo -e "${RED}❌ Shared file conflicts detected (BLOCK):${NC}"
+        for conflict in "${conflicts[@]}"; do
+            echo "   - $conflict"
+        done
+        PREFLIGHT_SHARED_FILES=$(printf '%s\n' "${conflicts[@]}")
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ No shared file conflicts detected${NC}"
+    PREFLIGHT_SHARED_FILES=""
+    return 0
+}
+
+# Analyze dependencies from import/require statements
+function preflight_analyze_dependencies {
+    local task_name="$1"
+    local worktree_path="$WORKSPACE_DIR/$task_name"
+    local deps=""
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🔗 Dependency Analysis"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    # Search for import/require statements referencing other feat-* branches
+    local imports
+    imports=$(grep -rE "from ['\"].*feat-|require\(['\"].*feat-|import.*feat-" "$worktree_path" \
+        --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=vendor --exclude-dir=dist --exclude-dir=build \
+        2>/dev/null || true)
+
+    # Extract feat-xxx references
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            local dep
+            dep=$(echo "$line" | grep -oE "feat-[a-zA-Z0-9_-]+" | head -1)
+            if [ -n "$dep" ] && [ "$dep" != "feat-$task_name" ] && [ "$dep" != "$task_name" ]; then
+                if [ -z "$deps" ]; then
+                    deps="$dep"
+                elif ! printf '%s\n' "$deps" | tr ',' '\n' | tr -d ' ' | grep -Fxq "$dep"; then
+                    deps="$deps, $dep"
+                fi
+            fi
+        fi
+    done <<< "$imports"
+
+    PREFLIGHT_DEPS="$deps"
+
+    if [ -z "$deps" ]; then
+        echo -e "${GREEN}✅ No blocking dependencies detected${NC}"
+        echo ""
+        echo -e "ℹ️  Recommended merge order:"
+        echo "   1. $task_name (no dependencies)"
+    else
+        echo -e "${YELLOW}⚠️  Dependencies detected: $deps${NC}"
+        echo "   Ensure these branches are merged first."
+        echo ""
+        echo -e "ℹ️  Recommended merge order:"
+        local i=1
+        for dep in $(echo "$deps" | tr ',' '\n' | tr -d ' '); do
+            echo "   $i. $dep"
+            ((i++))
+        done
+        echo "   $i. $task_name (depends on: $deps)"
+    fi
+}
+
+# Check registry reconcile gate (cross-worktree consistency)
+function preflight_run_reconcile_gate {
+    local task_name="$1"
+    local base_branch="$2"
+    local worktree_path="$WORKSPACE_DIR/$task_name"
+
+    PREFLIGHT_RECONCILE_REQUIRED="false"
+    PREFLIGHT_RECONCILE_CONFLICTS=""
+    PREFLIGHT_RECONCILE_CONFLICTS_JSON="[]"
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🧩 Reconcile Gate"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    local repo_root
+    repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+    local context_script="$repo_root/.claude/commands/lib/context_analysis.sh"
+    if [ ! -f "$context_script" ]; then
+        echo -e "${YELLOW}ℹ️  Reconcile gate skipped (context_analysis.sh not found)${NC}"
+        return 0
+    fi
+
+    local gate_output=""
+    if ! gate_output=$(bash "$context_script" check-merge-gate "$worktree_path" "$base_branch" 2>/dev/null); then
+        echo -e "${RED}❌ Reconcile gate check failed (BLOCK)${NC}"
+        echo "   Action: run registry reconcile/sync and retry preflight."
+        PREFLIGHT_RECONCILE_REQUIRED="true"
+        PREFLIGHT_RECONCILE_CONFLICTS="registry gate command failed"
+        PREFLIGHT_RECONCILE_CONFLICTS_JSON='[{"component":"unknown","external_scope":"unknown","winning_scope":"unknown","reason":"check-merge-gate command failed"}]'
+        return 1
+    fi
+
+    local gate
+    local reconcile_required
+    local conflicts_json
+    gate=$(echo "$gate_output" | jq -r '.gate // "block"' 2>/dev/null || echo "block")
+    reconcile_required=$(echo "$gate_output" | jq -r '.reconcile_required // false' 2>/dev/null || echo "true")
+    conflicts_json=$(echo "$gate_output" | jq -c '.conflicts // []' 2>/dev/null || echo "[]")
+
+    PREFLIGHT_RECONCILE_REQUIRED="$reconcile_required"
+    PREFLIGHT_RECONCILE_CONFLICTS_JSON="$conflicts_json"
+
+    local conflict_lines=""
+    conflict_lines=$(echo "$gate_output" | jq -r '
+        .conflicts[]?
+        | (.component // "unknown") as $component
+        | (.external_scope // "unknown") as $scope
+        | (.winning_scope // "unknown") as $winner
+        | $component + " (external=" + $scope + ", winner=" + $winner + ")"
+    ' 2>/dev/null || true)
+    PREFLIGHT_RECONCILE_CONFLICTS="$conflict_lines"
+
+    if [ "$gate" = "block" ] || [ "$reconcile_required" = "true" ]; then
+        echo -e "${RED}❌ Reconcile required (state=reconcile_pending)${NC}"
+        if [ -n "$PREFLIGHT_RECONCILE_CONFLICTS" ]; then
+            while IFS= read -r line; do
+                [ -n "$line" ] && echo "   - $line"
+            done <<< "$PREFLIGHT_RECONCILE_CONFLICTS"
+        else
+            echo "   - registry conflicts detected"
+        fi
+        echo "   Action: run registry reconcile/sync and retry preflight."
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ Reconcile gate passed${NC}"
+    return 0
+}
+
+# Generate summary for preflight check
+function preflight_generate_summary {
+    local task_name="$1"
+    local conflict_result=$2
+    local shared_result=$3
+    local gate_result=$4
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📊 Summary"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    if [ "$conflict_result" -ne 0 ] || [ "$shared_result" -ne 0 ] || [ "$gate_result" -ne 0 ]; then
+        echo -e "Status: ${RED}❌ BLOCK${NC}"
+        echo "Action: Resolve all BLOCK items and rerun preflight"
+        return 1
+    else
+        echo -e "Status: ${GREEN}✅ PASS${NC}"
+        echo "Ready for: hydra close $task_name"
+        return 0
+    fi
+}
+
+# Output preflight results in JSON format
+function preflight_output_json {
+    local task_name="$1"
+    local conflict_result=$2
+    local shared_result=$3
+    local gate_result=$4
+    local shared_files="$5"
+    local deps="$6"
+    local reconcile_required="${7:-false}"
+    local reconcile_conflicts_json="${8:-[]}"
+
+    local status="pass"
+    if [ "$conflict_result" -ne 0 ] || [ "$shared_result" -ne 0 ] || [ "$gate_result" -ne 0 ]; then
+        status="block"
+    fi
+
+    local task_json
+    local status_json
+    local shared_json
+    local deps_json
+
+    task_json=$(printf '%s' "$task_name" | jq -Rs .)
+    status_json=$(printf '%s' "$status" | jq -Rs .)
+    shared_json=$(printf '%s' "$shared_files" | jq -Rs 'split("\n") | map(select(length>0))')
+    deps_json=$(printf '%s' "$deps" | jq -Rs 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0))')
+
+    cat <<EOF
+{
+  "task": $task_json,
+  "status": $status_json,
+  "conflict": $([ "$conflict_result" -eq 0 ] && echo "false" || echo "true"),
+  "shared_file_conflict": $([ "$shared_result" -eq 0 ] && echo "false" || echo "true"),
+  "reconcile_gate_block": $([ "$gate_result" -eq 0 ] && echo "false" || echo "true"),
+  "reconcile_required": $([ "$reconcile_required" = "true" ] && echo "true" || echo "false"),
+  "reconcile_conflicts": $reconcile_conflicts_json,
+  "shared_files": $shared_json,
+  "dependencies": $deps_json
+}
+EOF
+}
+
+# Write preflight report to file
+function preflight_write_report {
+    local task_name="$1"
+    local conflict_result=$2
+    local shared_result=$3
+    local gate_result=$4
+    local base_branch="$5"
+
+    local report_dir=".claude/tmp"
+    local report_file="$report_dir/preflight_${task_name}.md"
+
+    mkdir -p "$report_dir"
+
+    local status_text="PASS"
+    if [ "$conflict_result" -ne 0 ] || [ "$shared_result" -ne 0 ] || [ "$gate_result" -ne 0 ]; then
+        status_text="BLOCK"
+    fi
+
+    cat > "$report_file" <<EOF
+# Preflight Report: $task_name
+
+**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+**Base Branch:** $base_branch
+
+## Conflict Check
+$([ "$conflict_result" -eq 0 ] && echo "PASS - No conflicts" || echo "BLOCK - Conflicts detected")
+
+## Shared Files
+$([ "$shared_result" -eq 0 ] && echo "PASS - No shared files" || echo "BLOCK - Shared file conflicts detected")
+$PREFLIGHT_SHARED_FILES
+
+## Reconcile Gate
+$([ "$gate_result" -eq 0 ] && echo "PASS - Registry consistency check passed" || echo "BLOCK - reconcile_required=true")
+$PREFLIGHT_RECONCILE_CONFLICTS
+
+## Dependencies
+$([ -z "$PREFLIGHT_DEPS" ] && echo "None detected" || echo "$PREFLIGHT_DEPS")
+
+## Summary
+$status_text
+EOF
+
+    echo ""
+    echo -e "${GREEN}Report written to: $report_file${NC}"
+}
+
+# Run conflict check (returns exit code for subshell)
+function preflight_run_conflict_check {
+    local task_name="$1"
+    local base_branch="$2"
+    local worktree_path="$WORKSPACE_DIR/$task_name"
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🔀 Conflict Check: $task_name vs $base_branch"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    # Execute conflict check in worktree subshell
+    (
+        cd "$worktree_path" || exit 1
+
+        # Safety check: ensure working tree is clean before merge attempt
+        if [ -n "$(git status --porcelain)" ]; then
+            echo -e "${RED}Error: Working tree is not clean.${NC}"
+            echo "   Please commit or stash your changes before running preflight."
+            echo ""
+            git status --short
+            exit 2
+        fi
+
+        # Determine merge target: prefer origin/<base>, fallback to local <base>
+        local merge_target=""
+        if git fetch origin "$base_branch" 2>/dev/null; then
+            merge_target="origin/$base_branch"
+            echo "Using remote: origin/$base_branch"
+        elif git rev-parse --verify "$base_branch" >/dev/null 2>&1; then
+            merge_target="$base_branch"
+            echo "Using local branch: $base_branch (no remote found)"
+        else
+            echo -e "${RED}Error: Branch '$base_branch' not found (remote or local)${NC}"
+            exit 1
+        fi
+
+        # Attempt dry-run merge
+        echo "Checking for conflicts..."
+        echo ""
+
+        if ! git merge --no-commit --no-ff "$merge_target" 2>/dev/null; then
+            # Conflict detected
+            echo -e "${RED}❌ Conflicts detected with $base_branch${NC}"
+            echo "   Conflicting files:"
+
+            # List conflicting files
+            local conflict_files
+            conflict_files=$(git diff --name-only --diff-filter=U 2>/dev/null)
+            if [ -n "$conflict_files" ]; then
+                echo "$conflict_files" | sed 's/^/   - /'
+            else
+                git status --porcelain 2>/dev/null | grep "^UU\|^AA\|^DD" | awk '{print $2}' | sed 's/^/   - /'
+            fi
+
+            # Abort the merge attempt
+            git merge --abort 2>/dev/null || true
+            exit 1
+        fi
+
+        # No conflict - abort the successful merge attempt
+        git merge --abort 2>/dev/null || true
+
+        echo -e "${GREEN}✅ No conflicts detected with $base_branch${NC}"
+        exit 0
+    )
+    return $?
+}
+
+# Preflight all worktrees
+function cmd_preflight_all {
+    local base_branch="${1:-main}"
+    local json_format="${2:-false}"
+    local all_pass=true
+
+    echo -e "${BLUE}🔍 Preflight Check: All Worktrees${NC}"
+    echo ""
+
+    if [ "$json_format" = "true" ]; then
+        echo "["
+        local first=true
+    fi
+
+    while IFS= read -r line; do
+        local wt_path
+        wt_path=$(echo "$line" | awk '{print $1}')
+
+        if [[ "$wt_path" == *"/workspace/"* ]]; then
+            local wt_name
+            wt_name=$(basename "$wt_path")
+
+            if [ "$json_format" = "true" ]; then
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    echo ","
+                fi
+
+                # Run checks silently
+                preflight_run_conflict_check "$wt_name" "$base_branch" > /dev/null 2>&1
+                local conflict_result=$?
+                preflight_check_shared_files "$wt_name" "$base_branch" > /dev/null 2>&1
+                local shared_result=$?
+                preflight_analyze_dependencies "$wt_name" > /dev/null 2>&1
+                preflight_run_reconcile_gate "$wt_name" "$base_branch" > /dev/null 2>&1
+                local gate_result=$?
+
+                preflight_output_json "$wt_name" "$conflict_result" "$shared_result" "$gate_result" "$PREFLIGHT_SHARED_FILES" "$PREFLIGHT_DEPS" "$PREFLIGHT_RECONCILE_REQUIRED" "$PREFLIGHT_RECONCILE_CONFLICTS_JSON"
+
+                if [ "$conflict_result" -ne 0 ] || [ "$shared_result" -ne 0 ] || [ "$gate_result" -ne 0 ]; then
+                    all_pass=false
+                fi
+            else
+                echo "━━━ $wt_name ━━━"
+
+                preflight_run_conflict_check "$wt_name" "$base_branch"
+                local conflict_result=$?
+                preflight_check_shared_files "$wt_name" "$base_branch"
+                local shared_result=$?
+                preflight_analyze_dependencies "$wt_name"
+                preflight_run_reconcile_gate "$wt_name" "$base_branch"
+                local gate_result=$?
+                preflight_generate_summary "$wt_name" "$conflict_result" "$shared_result" "$gate_result"
+
+                if [ "$conflict_result" -ne 0 ] || [ "$shared_result" -ne 0 ] || [ "$gate_result" -ne 0 ]; then
+                    all_pass=false
+                fi
+                echo ""
+            fi
+        fi
+    done < <(git worktree list)
+
+    if [ "$json_format" = "true" ]; then
+        echo "]"
+    else
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        if [ "$all_pass" = true ]; then
+            echo -e "${GREEN}✅ All worktrees passed preflight${NC}"
+        else
+            echo -e "${RED}❌ Some worktrees have issues${NC}"
+        fi
+    fi
+
+    if [ "$all_pass" = true ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function cmd_preflight {
+    local task_name=""
+    local base_branch="main"
+    local all_mode=false
+    local report_mode=false
+    local json_format=false
+
+    # Parse arguments (starting from $2 since $1 is 'preflight')
+    shift  # Remove 'preflight' command
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --base=*)
+                base_branch="${1#*=}"
+                shift
+                ;;
+            --all)
+                all_mode=true
+                shift
+                ;;
+            --report)
+                report_mode=true
+                shift
+                ;;
+            --format=json)
+                json_format=true
+                shift
+                ;;
+            --help)
+                show_preflight_help
+                return 0
+                ;;
+            -*)
+                echo -e "${RED}Error: Unknown option: $1${NC}"
+                show_preflight_help
+                return 1
+                ;;
+            *)
+                if [ -z "$task_name" ]; then
+                    task_name="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Handle --all mode
+    if [ "$all_mode" = true ]; then
+        cmd_preflight_all "$base_branch" "$json_format"
+        return $?
+    fi
+
+    # Validate task name
+    if [ -z "$task_name" ]; then
+        echo -e "${RED}Error: Task name required.${NC}"
+        echo ""
+        show_preflight_help
+        return 1
+    fi
+
+    local worktree_path="$WORKSPACE_DIR/$task_name"
+
+    # Validate worktree exists
+    if [ ! -d "$worktree_path" ]; then
+        echo -e "${RED}Error: Worktree $worktree_path does not exist.${NC}"
+        echo "Use './scripts/hydra list' to see active worktrees."
+        return 1
+    fi
+
+    # JSON format mode
+    if [ "$json_format" = true ]; then
+        preflight_run_conflict_check "$task_name" "$base_branch" > /dev/null 2>&1
+        local conflict_result=$?
+        preflight_check_shared_files "$task_name" "$base_branch" > /dev/null 2>&1
+        local shared_result=$?
+        preflight_analyze_dependencies "$task_name" > /dev/null 2>&1
+        preflight_run_reconcile_gate "$task_name" "$base_branch" > /dev/null 2>&1
+        local gate_result=$?
+
+        preflight_output_json "$task_name" "$conflict_result" "$shared_result" "$gate_result" "$PREFLIGHT_SHARED_FILES" "$PREFLIGHT_DEPS" "$PREFLIGHT_RECONCILE_REQUIRED" "$PREFLIGHT_RECONCILE_CONFLICTS_JSON"
+        if [ "$conflict_result" -eq 0 ] && [ "$shared_result" -eq 0 ] && [ "$gate_result" -eq 0 ]; then
+            return 0
+        fi
+        return 1
+    fi
+
+    # Display header
+    echo -e "${BLUE}🔍 Preflight Check: $task_name → $base_branch${NC}"
+
+    # Run conflict check
+    preflight_run_conflict_check "$task_name" "$base_branch"
+    local conflict_result=$?
+
+    # Run shared file check
+    preflight_check_shared_files "$task_name" "$base_branch"
+    local shared_result=$?
+
+    # Run dependency analysis
+    preflight_analyze_dependencies "$task_name"
+
+    # Run reconcile gate
+    preflight_run_reconcile_gate "$task_name" "$base_branch"
+    local gate_result=$?
+
+    # Generate summary
+    preflight_generate_summary "$task_name" "$conflict_result" "$shared_result" "$gate_result"
+    local final_result=$?
+
+    # Write report if requested
+    if [ "$report_mode" = true ]; then
+        preflight_write_report "$task_name" "$conflict_result" "$shared_result" "$gate_result" "$base_branch"
+    fi
+
+    return $final_result
+}
+
+# ============================================================================
+# Rollback Command
+# ============================================================================
+
+function show_rollback_help {
+    echo "Usage: ./scripts/hydra rollback [options]"
+    echo ""
+    echo "Options:"
+    echo "  --last             Rollback the most recent merge"
+    echo "  --pr=<number>      Rollback a specific PR by number"
+    echo "  --to=<commit>      Rollback to a specific commit (preview only)"
+    echo "  --dry-run          Preview the rollback without executing"
+    echo "  --help             Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  ./scripts/hydra rollback --last --dry-run"
+    echo "  ./scripts/hydra rollback --pr=123 --dry-run"
+    echo "  ./scripts/hydra rollback --last"
+}
+
+function rollback_last {
+    local dry_run=$1
+
+    # 直近のマージコミットを取得
+    local merge_commit
+    merge_commit=$(git log --merges -1 --format="%H" 2>/dev/null)
+    if [ -z "$merge_commit" ]; then
+        echo -e "${RED}Error: No merge commits found${NC}"
+        return 1
+    fi
+
+    local commit_short
+    local commit_subject
+    local commit_date
+    commit_short=$(git log -1 --format="%h" "$merge_commit")
+    commit_subject=$(git log -1 --format="%s" "$merge_commit")
+    commit_date=$(git log -1 --format="%ci" "$merge_commit")
+
+    # ブランチ名を抽出（マージコミットメッセージから）
+    local branch_name
+    branch_name=$(echo "$commit_subject" | sed -n "s/.*Merge.*'\([^']*\)'.*/\1/p" | head -1)
+    if [ -z "$branch_name" ]; then
+        branch_name=$(echo "$commit_subject" | sed -n 's/.*Merge branch \([^ ]*\).*/\1/p' | head -1)
+    fi
+    if [ -z "$branch_name" ]; then
+        branch_name="(unknown branch)"
+    fi
+
+    echo -e "${BLUE}🔄 Rollback Preview${NC}"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Target: $branch_name merged at $commit_date"
+    echo "Commit: $commit_short \"$commit_subject\""
+    echo ""
+    echo "Changes to revert:"
+    git diff --stat "${merge_commit}^..${merge_commit}" 2>/dev/null | sed 's/^/  /' || echo "  (unable to show diff)"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    if [ "$dry_run" = "true" ]; then
+        echo ""
+        echo "To execute: hydra rollback --last"
+        return 0
+    fi
+
+    # 実際のrevert実行
+    echo ""
+    echo "Creating revert commit..."
+
+    # マージコミットの場合は -m 1 オプションが必要
+    if git revert --no-commit -m 1 "$merge_commit" 2>/dev/null; then
+        git commit -m "Revert: $commit_subject"
+        echo -e "${GREEN}✅ Revert commit created${NC}"
+        echo "Push and create PR to complete rollback"
+    else
+        # マージコミットでない場合は通常のrevert
+        git revert --abort 2>/dev/null
+        if git revert --no-commit "$merge_commit" 2>/dev/null; then
+            git commit -m "Revert: $commit_subject"
+            echo -e "${GREEN}✅ Revert commit created${NC}"
+            echo "Push and create PR to complete rollback"
+        else
+            echo -e "${RED}Error: Revert failed${NC}"
+            git revert --abort 2>/dev/null
+            return 1
+        fi
+    fi
+}
+
+function rollback_pr {
+    local pr_number=$1
+    local dry_run=$2
+
+    # gh CLI チェック
+    check_gh_cli
+
+    # PR情報取得
+    local pr_info
+    pr_info=$(gh pr view "$pr_number" --json mergeCommit,title,mergedAt 2>/dev/null)
+    if [ -z "$pr_info" ] || [ "$pr_info" = "null" ]; then
+        echo -e "${RED}Error: PR #$pr_number not found or not merged${NC}"
+        return 1
+    fi
+
+    local merge_commit
+    merge_commit=$(echo "$pr_info" | jq -r '.mergeCommit.oid // empty')
+    if [ -z "$merge_commit" ]; then
+        echo -e "${RED}Error: PR #$pr_number is not merged${NC}"
+        return 1
+    fi
+
+    local title
+    local merged_at
+    title=$(echo "$pr_info" | jq -r '.title')
+    merged_at=$(echo "$pr_info" | jq -r '.mergedAt')
+
+    echo -e "${BLUE}🔄 Rollback Preview: PR #$pr_number${NC}"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Target: $title"
+    echo "Merged at: $merged_at"
+    echo "Commit: ${merge_commit:0:7}"
+    echo ""
+    echo "Changes to revert:"
+    git diff --stat "${merge_commit}^..${merge_commit}" 2>/dev/null | sed 's/^/  /' || echo "  (unable to show diff)"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    if [ "$dry_run" = "true" ]; then
+        echo ""
+        echo "To execute: hydra rollback --pr=$pr_number"
+        return 0
+    fi
+
+    # 実際のrevert実行
+    echo ""
+    echo "Creating revert commit..."
+
+    # マージコミットの場合は -m 1 オプションが必要
+    if git revert --no-commit -m 1 "$merge_commit" 2>/dev/null; then
+        git commit -m "Revert PR #$pr_number: $title"
+        echo -e "${GREEN}✅ Revert commit created${NC}"
+        echo "Push and create PR to complete rollback"
+    else
+        # マージコミットでない場合は通常のrevert（squash merge等）
+        git revert --abort 2>/dev/null
+        if git revert --no-commit "$merge_commit" 2>/dev/null; then
+            git commit -m "Revert PR #$pr_number: $title"
+            echo -e "${GREEN}✅ Revert commit created${NC}"
+            echo "Push and create PR to complete rollback"
+        else
+            echo -e "${RED}Error: Revert failed${NC}"
+            git revert --abort 2>/dev/null
+            return 1
+        fi
+    fi
+}
+
+function rollback_to_commit {
+    local commit_hash=$1
+    local dry_run=$2
+
+    # コミット存在チェック
+    if ! git cat-file -e "$commit_hash" 2>/dev/null; then
+        echo -e "${RED}Error: Commit $commit_hash not found${NC}"
+        return 1
+    fi
+
+    local commit_info
+    commit_info=$(git log -1 --format='%h %s' "$commit_hash")
+
+    echo -e "${BLUE}🔄 Rollback Preview: to $commit_hash${NC}"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Target commit: $commit_info"
+    echo ""
+    echo "Commits to revert:"
+    git log --oneline "$commit_hash..HEAD" 2>/dev/null | sed 's/^/  /' || echo "  (no commits to revert)"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    if [ "$dry_run" = "true" ]; then
+        echo ""
+        echo "To execute: hydra rollback --to=$commit_hash"
+        return 0
+    fi
+
+    echo ""
+    echo -e "${RED}Warning: This will revert multiple commits.${NC}"
+    echo "Consider using --pr=N for individual PR rollbacks."
+    echo "This operation is currently preview-only for safety."
+    return 1
+}
+
+function cmd_rollback {
+    local target=""
+    local pr_number=""
+    local commit_hash=""
+    local dry_run="false"
+
+    # 引数がない場合はヘルプを表示
+    if [ -z "$2" ]; then
+        show_rollback_help
+        return 0
+    fi
+
+    # オプション解析（$2以降を処理）
+    shift # $COMMAND を飛ばす
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --last)
+                target="last"
+                shift
+                ;;
+            --pr=*)
+                target="pr"
+                pr_number="${1#*=}"
+                shift
+                ;;
+            --to=*)
+                target="commit"
+                commit_hash="${1#*=}"
+                shift
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --help|-h)
+                show_rollback_help
+                return 0
+                ;;
+            *)
+                echo -e "${RED}Error: Unknown option: $1${NC}"
+                show_rollback_help
+                return 1
+                ;;
+        esac
+    done
+
+    if [ -z "$target" ]; then
+        echo -e "${RED}Error: Specify --last, --pr=N, or --to=<commit>${NC}"
+        show_rollback_help
+        return 1
+    fi
+
+    case "$target" in
+        last)
+            rollback_last "$dry_run"
+            ;;
+        pr)
+            rollback_pr "$pr_number" "$dry_run"
+            ;;
+        commit)
+            rollback_to_commit "$commit_hash" "$dry_run"
+            ;;
+    esac
+}
+
+# =============================================================================
+# merge-order: Analyze worktree dependencies for merge ordering
+# =============================================================================
+
+function show_merge_order_help {
+    echo "Usage: ./scripts/hydra merge-order [options]"
+    echo ""
+    echo "Analyze worktree dependencies to determine optimal merge order."
+    echo ""
+    echo "Options:"
+    echo "  --include=<tasks>  Comma-separated list of tasks to include"
+    echo "  --format=<format>  Output format: table (default) or json"
+    echo "  --help             Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  ./scripts/hydra merge-order                    # Analyze all worktrees"
+    echo "  ./scripts/hydra merge-order --include=a,b      # Only specific tasks"
+    echo "  ./scripts/hydra merge-order --format=json      # JSON output"
+}
+
+# Detect dependencies from import/require statements
+# Args: $1 = worktree path, $2 = worktree name
+# Returns: comma-separated list of dependencies (feat-xxx names)
+function detect_dependencies {
+    local wt_path="$1"
+    local wt_name="$2"
+    local deps=""
+
+    # Search for import/require statements referencing feat-xxx
+    # Patterns:
+    #   - import { x } from '../feat-xxx/...'
+    #   - import x from '../../workspace/feat-xxx/...'
+    #   - require('../feat-xxx/...')
+    #   - require('../../workspace/feat-xxx/...')
+    # Only search in code files (exclude .md, .txt, .json, etc.)
+    local imports
+    imports=$(grep -rE "from ['\"].*feat-|require\(['\"].*feat-" "$wt_path" \
+        --include="*.js" --include="*.ts" --include="*.jsx" --include="*.tsx" \
+        --include="*.mjs" --include="*.cjs" \
+        --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=vendor --exclude-dir=dist --exclude-dir=build \
+        2>/dev/null || true)
+
+    # Also check for Python imports
+    local py_imports
+    py_imports=$(grep -rE "^from feat_|^import feat_" "$wt_path" \
+        --include="*.py" \
+        --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=vendor --exclude-dir=dist --exclude-dir=build \
+        2>/dev/null || true)
+    if [ -n "$imports" ] && [ -n "$py_imports" ]; then
+        imports="${imports}"$'\n'"${py_imports}"
+    else
+        imports="${imports}${py_imports}"
+    fi
+
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            # Extract feat-xxx or feat_xxx pattern
+            local dep
+            dep=$(echo "$line" | grep -oE "feat[-_][a-zA-Z0-9_-]+" | head -1)
+            if [ -n "$dep" ]; then
+                # Normalize: feat_xxx -> feat-xxx
+                dep="${dep//_/-}"
+                # Skip self-reference
+                if [ "$dep" != "$wt_name" ] && [ "$dep" != "feat-$wt_name" ]; then
+                    # Add to deps if not already present
+                    if [ -z "$deps" ]; then
+                        deps="$dep"
+                    elif ! printf '%s\n' "$deps" | tr ',' '\n' | grep -Fxq "$dep"; then
+                        deps="$deps,$dep"
+                    fi
+                fi
+            fi
+        fi
+    done <<< "$imports"
+
+    echo "$deps"
+}
+
+# Check for potential circular dependencies (basic warning)
+# Args: list of "name:deps" entries
+# Returns: 0 if no circular deps detected, 1 if detected
+function check_circular_deps_warning {
+    local has_circular=0
+
+    for entry in "$@"; do
+        local name="${entry%%:*}"
+        local deps="${entry#*:}"
+
+        if [ -n "$deps" ]; then
+            # For each dependency, check if it depends back on us
+            IFS=',' read -ra dep_array <<< "$deps"
+            for dep in "${dep_array[@]}"; do
+                for other_entry in "$@"; do
+                    local other_name="${other_entry%%:*}"
+                    local other_deps="${other_entry#*:}"
+
+                    if [ "$other_name" = "$dep" ]; then
+                        if echo ",$other_deps," | grep -q ",$name,"; then
+                            echo -e "${YELLOW}Warning: Potential circular dependency detected: $name <-> $dep${NC}"
+                            has_circular=1
+                        fi
+                    fi
+                done
+            done
+        fi
+    done
+
+    return $has_circular
+}
+
+# Output merge order as table
+# Args: worktree names array, then "---" separator, then deps_map array (name:deps format)
+function output_merge_order_table {
+    local -a worktrees=()
+    local -a deps_map=()
+
+    # Split args: worktrees first, separated by "---", then deps_map
+    local in_deps=0
+    for arg in "$@"; do
+        if [ "$arg" = "---" ]; then
+            in_deps=1
+            continue
+        fi
+        if [ $in_deps -eq 0 ]; then
+            worktrees+=("$arg")
+        else
+            deps_map+=("$arg")
+        fi
+    done
+
+    # Print header
+    printf "%-24s %-24s %-12s\n" "Branch" "Dependencies" "Status"
+    echo "────────────────────────────────────────────────────────────────"
+
+    for wt in "${worktrees[@]}"; do
+        local deps=""
+        local status="ready"
+        local status_icon="Ready"
+
+        # Find dependencies for this worktree
+        for entry in "${deps_map[@]}"; do
+            local entry_name="${entry%%:*}"
+            if [ "$entry_name" = "$wt" ]; then
+                deps="${entry#*:}"
+                break
+            fi
+        done
+
+        # Determine status based on dependencies
+        if [ -n "$deps" ]; then
+            status="waiting"
+            status_icon="Waiting"
+        fi
+
+        # Format dependencies for display
+        local deps_display="(none)"
+        if [ -n "$deps" ]; then
+            deps_display="$deps"
+        fi
+
+        # Print row with status icon
+        if [ "$status" = "ready" ]; then
+            printf "%-24s %-24s ${GREEN}%-12s${NC}\n" "$wt" "$deps_display" "$status_icon"
+        else
+            printf "%-24s %-24s ${YELLOW}%-12s${NC}\n" "$wt" "$deps_display" "$status_icon"
+        fi
+    done
+}
+
+# Output merge order as JSON
+# Args: same as output_merge_order_table
+function output_merge_order_json {
+    local -a worktrees=()
+    local -a deps_map=()
+
+    # Split args
+    local in_deps=0
+    for arg in "$@"; do
+        if [ "$arg" = "---" ]; then
+            in_deps=1
+            continue
+        fi
+        if [ $in_deps -eq 0 ]; then
+            worktrees+=("$arg")
+        else
+            deps_map+=("$arg")
+        fi
+    done
+
+    echo "{"
+    echo "  \"worktrees\": ["
+
+    local first=1
+    for wt in "${worktrees[@]}"; do
+        local deps=""
+        local status="ready"
+
+        # Find dependencies for this worktree
+        for entry in "${deps_map[@]}"; do
+            local entry_name="${entry%%:*}"
+            if [ "$entry_name" = "$wt" ]; then
+                deps="${entry#*:}"
+                break
+            fi
+        done
+
+        if [ -n "$deps" ]; then
+            status="waiting"
+        fi
+
+        local wt_json
+        local status_json
+        local deps_json
+        wt_json=$(printf '%s' "$wt" | jq -Rs .)
+        status_json=$(printf '%s' "$status" | jq -Rs .)
+        deps_json=$(printf '%s' "$deps" | jq -Rs 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0))')
+
+        if [ $first -eq 1 ]; then
+            first=0
+        else
+            echo ","
+        fi
+
+        printf "    {\"name\": %s, \"dependencies\": %s, \"status\": %s}" "$wt_json" "$deps_json" "$status_json"
+    done
+
+    echo ""
+    echo "  ]"
+    echo "}"
+}
+
+# Main merge-order command
+function cmd_merge_order {
+    local include_filter=""
+    local output_format="table"
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --include=*)
+                include_filter="${1#*=}"
+                shift
+                ;;
+            --format=*)
+                output_format="${1#*=}"
+                shift
+                ;;
+            --help)
+                show_merge_order_help
+                return 0
+                ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}"
+                show_merge_order_help
+                return 1
+                ;;
+        esac
+    done
+
+    # Validate format option
+    if [ "$output_format" != "table" ] && [ "$output_format" != "json" ]; then
+        echo -e "${RED}Invalid format: $output_format. Use 'table' or 'json'.${NC}"
+        return 1
+    fi
+
+    # Header (only for table output)
+    if [ "$output_format" = "table" ]; then
+        echo -e "${BLUE}Merge Order Analysis${NC}"
+        echo ""
+        echo ""
+    fi
+
+    # Collect worktrees and dependencies
+    local -a worktrees=()
+    local -a deps_map=()
+    local worktree_found=0
+
+    while IFS= read -r line; do
+        local wt_path
+        local wt_branch
+        wt_path=$(echo "$line" | awk '{print $1}')
+        wt_branch=$(echo "$line" | awk '{print $3}' | tr -d '[]')
+
+        # Only process worktrees in workspace directory
+        if [[ "$wt_path" == *"/$WORKSPACE_DIR/"* ]] || [[ "$wt_path" == *"/${WORKSPACE_DIR}/"* ]]; then
+            local wt_name
+            wt_name=$(basename "$wt_path")
+
+            # Apply include filter if specified
+            if [ -n "$include_filter" ]; then
+                local match_found=0
+                IFS=',' read -ra filter_array <<< "$include_filter"
+                for filter_item in "${filter_array[@]}"; do
+                    if [ "$wt_name" = "$filter_item" ] || [[ "$wt_name" == *"$filter_item"* ]]; then
+                        match_found=1
+                        break
+                    fi
+                done
+                if [ $match_found -eq 0 ]; then
+                    continue
+                fi
+            fi
+
+            worktrees+=("$wt_name")
+            worktree_found=1
+
+            # Detect dependencies
+            local deps
+            deps=$(detect_dependencies "$wt_path" "$wt_name")
+            deps_map+=("$wt_name:$deps")
+        fi
+    done < <(git worktree list 2>/dev/null)
+
+    # Check if any worktrees were found
+    if [ $worktree_found -eq 0 ]; then
+        if [ "$output_format" = "json" ]; then
+            echo '{"worktrees": []}'
+        else
+            echo "No worktrees found in $WORKSPACE_DIR/"
+            echo ""
+            echo "Create worktrees with: ./scripts/hydra new <task-name>"
+        fi
+        return 0
+    fi
+
+    # Check for circular dependencies (table output only)
+    if [ "$output_format" = "table" ]; then
+        check_circular_deps_warning "${deps_map[@]}" || true
+        echo ""
+    fi
+
+    # Output results
+    if [ "$output_format" = "json" ]; then
+        output_merge_order_json "${worktrees[@]}" "---" "${deps_map[@]}"
+    else
+        output_merge_order_table "${worktrees[@]}" "---" "${deps_map[@]}"
+    fi
+
+    # Summary (table output only)
+    if [ "$output_format" = "table" ]; then
+        echo ""
+        echo "Total: ${#worktrees[@]} worktree(s)"
+    fi
+}
+
+case "$COMMAND" in
+    new)
+        cmd_new
+        ;;
+    close)
+        cmd_close "$@"
+        ;;
+    list)
+        cmd_list
+        ;;
+    preflight)
+        cmd_preflight "$@"
+        ;;
+    rollback)
+        cmd_rollback "$@"
+        ;;
+    merge-order)
+        shift  # Remove 'merge-order' from args
+        cmd_merge_order "$@"
+        ;;
+    *)
+        show_usage
+        exit 1
+        ;;
+esac

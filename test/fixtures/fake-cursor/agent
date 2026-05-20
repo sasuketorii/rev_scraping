@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Fake cursor `agent` binary for testing cursor-wrapper.sh.
+#
+# Mimics official semantics (per cursor.com/docs/cli/reference/parameters):
+#   * `-p` enables non-interactive print; default mode is `agent` (write/shell capable).
+#   * `--mode ask` is true read-only.
+#   * `--force` / `--yolo` auto-approve commands (NOT a file-write gate).
+#
+# Test hooks:
+#   FAKE_CURSOR_EXIT_CODE         — override exit code (default 0)
+#   FAKE_CURSOR_EMIT_STDERR=1     — emit a stderr line for token-parser tests
+#   FAKE_CURSOR_ARGV_LOG=<path>   — append the received argv as one shell-quoted line
+#   FAKE_CURSOR_TOUCH_FILE=<path> — create/truncate path to simulate a write
+set -e
+
+OUTPUT_FORMAT="text"
+MODE=""        # "" = default agent mode, "ask" = read-only, "plan" = planning
+FORCE=false
+PROMPT=""
+PRINT_FLAG=false
+
+# Argv logging for argv-assertion tests
+if [[ -n "${FAKE_CURSOR_ARGV_LOG:-}" ]]; then
+  printf '%q ' "$@" >>"${FAKE_CURSOR_ARGV_LOG}"
+  printf '\n'       >>"${FAKE_CURSOR_ARGV_LOG}"
+fi
+
+if [[ -n "${FAKE_CURSOR_TOUCH_FILE:-}" ]]; then
+  : >"${FAKE_CURSOR_TOUCH_FILE}"
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--print)
+      PRINT_FLAG=true
+      shift
+      ;;
+    --output-format)
+      shift
+      OUTPUT_FORMAT="$1"
+      shift
+      ;;
+    --mode)
+      shift
+      MODE="$1"
+      shift
+      ;;
+    --force|--yolo)
+      FORCE=true
+      shift
+      ;;
+    --version)
+      echo "fake-cursor 0.0.0-test"
+      exit 0
+      ;;
+    -*)
+      echo "fake-cursor: unknown flag $1" >&2
+      exit 2
+      ;;
+    *)
+      if [[ -z "${PROMPT}" ]]; then
+        PROMPT="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+case "${OUTPUT_FORMAT}" in
+  json)
+    echo "{\"prompt\":\"${PROMPT}\",\"mode\":\"${MODE}\",\"force\":${FORCE},\"print\":${PRINT_FLAG}}"
+    ;;
+  stream-json)
+    echo "{\"type\":\"system\",\"subtype\":\"init\"}"
+    echo "{\"type\":\"assistant\",\"content\":\"fake reply\"}"
+    echo "{\"type\":\"result\",\"subtype\":\"completed\"}"
+    ;;
+  *)
+    echo "fake cursor response: mode=${MODE:-agent} force=${FORCE} print=${PRINT_FLAG}"
+    ;;
+esac
+
+if [[ "${FAKE_CURSOR_EMIT_STDERR:-}" == "1" ]]; then
+  echo "fake-cursor stderr line" >&2
+fi
+
+exit "${FAKE_CURSOR_EXIT_CODE:-0}"

@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+developer_instructions = "代替案レビュワーとして、現在案より安全・高速・簡潔・保守性が高い実装代替案を比較提案する。"

@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+developer_instructions = "システム設計プランナーとして、要件整理、設計方針、実装順序、リスクを明確化する。"

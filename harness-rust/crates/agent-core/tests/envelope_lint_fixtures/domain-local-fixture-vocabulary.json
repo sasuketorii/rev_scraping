@@ -1,0 +1,57 @@
+{
+  "_policy": {
+    "vocabulary_consumer_contract": "fixture",
+    "domain_local": {
+      "handoff_state": {
+        "rationale": "Fixture namespace for prompt-local handoff state values."
+      }
+    }
+  },
+  "task_class": {
+    "enum": ["light", "standard", "heavy"]
+  },
+  "schema_profile": {
+    "enum": ["light-change-record", "standard-slice-contract", "heavy-canonical-final-packet"],
+    "standard-slice-contract": {
+      "required_fields": []
+    }
+  },
+  "status": {
+    "enum": ["in progress", "pending review", "pending verification", "pending final review", "pending acceptance", "blocked", "completed"]
+  },
+  "reviewer_verdict": {
+    "enum": ["LGTM", "BLOCK", "Request Changes", "Needs verification", "Needs Discussion"]
+  },
+  "worker_outcome": {
+    "enum": ["DIFF", "BLOCK", "NO-CHANGE"]
+  },
+  "re_slice_delta_type": {
+    "enum": ["none", "narrowed change surface", "redefined owned sink universe", "user decision", "blocker resolution"]
+  },
+  "budget": {
+    "format": "stall<=<minutes>m; wall<=<minutes>m; basis=<task-lineage-opened-at|user-approved-reopen-at>; start=<RFC3339Z>; last-progress=<RFC3339Z>",
+    "basis_enum": ["task-lineage-opened-at", "user-approved-reopen-at"],
+    "default": "stall<=30m; wall<=240m; basis=task-lineage-opened-at; start=<task-opened RFC3339Z>; last-progress=<same or newer RFC3339Z>",
+    "auto_loop_ceiling": "stall<=60m; wall<=480m"
+  },
+  "budget_status": {
+    "enum": ["within-budget", "exhausted"]
+  },
+  "loop_caps": {
+    "same_slice": {},
+    "task_level": {}
+  },
+  "deprecated_aliases": {
+    "forbidden_live_keys": ["checkpoint boundary", "truth destination", "artifact truth destination"]
+  },
+  "counter": {
+    "format": "<actual>/<non-blocking ceiling>",
+    "overflow_behavior": "Record actual overflow as-is and terminally BLOCK rather than rounding the value."
+  },
+  "discovery_owner": {
+    "enum": ["coder", "orchestrator"]
+  },
+  "review_request_target": {
+    "enum": ["INTERMEDIATE", "FINAL"]
+  }
+}

@@ -1,0 +1,16 @@
+---
+description: General rules for all AI agents in this project
+globs: **/*
+---
+
+# Primary Directive
+- Think in English, interact with the user in Japanese.
+
+# Agent Configuration
+
+This file defines the behavior for Cursor agent.
+Crucially, it enforces the universal rules defined in `.agent_rules/RULES.md`.
+
+- **Universal Rules:** `.agent_rules/RULES.md` (CRITICAL / MUST FOLLOW)
+
+You must read and strictly follow the instructions in `.agent_rules/RULES.md` before taking any action.

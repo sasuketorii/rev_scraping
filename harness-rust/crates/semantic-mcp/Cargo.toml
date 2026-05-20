@@ -1,0 +1,43 @@
+[package]
+name = "semantic-mcp"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Semantic MCP server for agent_base — zero-npm replacement"
+
+[lib]
+name = "semantic_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "semantic-mcp"
+path = "src/main.rs"
+
+[dependencies]
+shared = { path = "../shared" }
+tree-sitter-index = { path = "../tree-sitter-index", default-features = false, features = ["lang-rust", "lang-typescript", "lang-python"] }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+lru = { workspace = true }
+fs2 = { workspace = true }
+scopeguard = { workspace = true }
+
+[dev-dependencies]
+agent-core = { path = "../agent-core" }
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = { workspace = true }
+
+[[bench]]
+name = "search_fts5"
+harness = false
+
+[[bench]]
+name = "context_top_k"
+harness = false

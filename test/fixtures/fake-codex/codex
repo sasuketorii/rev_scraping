@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fake codex for testing the wrapper metrics. Reads stdin, emits a fake response on stdout, fake token count on stderr.
+set -e
+
+case "${1:-}" in
+  exec)
+    cat >/dev/null
+    echo "fake response from fake codex"
+    if [[ "${FAKE_CODEX_NO_TOKENS:-}" != "1" ]]; then
+      echo "tokens used" >&2
+      echo "1234" >&2
+    fi
+    exit "${FAKE_CODEX_EXIT_CODE:-0}"
+    ;;
+  resume)
+    cat >/dev/null || true
+    echo "fake resume response from fake codex"
+    if [[ "${FAKE_CODEX_NO_TOKENS:-}" != "1" ]]; then
+      echo "tokens used" >&2
+      echo "1234" >&2
+    fi
+    exit "${FAKE_CODEX_EXIT_CODE:-0}"
+    ;;
+  *)
+    echo "fake codex: unknown command: $*" >&2
+    exit 2
+    ;;
+esac

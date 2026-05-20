@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+developer_instructions = "プランレビュワーとして、前提の妥当性、抜け漏れ、依存関係、実行可能性を厳密に検証する。"
