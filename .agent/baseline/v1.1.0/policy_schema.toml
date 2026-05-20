@@ -1,0 +1,171 @@
+# SPDX-License-Identifier: MIT
+# Source: extended for rev_scraping v1.0.0 (Phase 8 — per-site proxy routing)
+#
+# rev_scraping policy file.
+#
+# Copy to ~/.rev_scraping/policy.toml and tighten the permissions:
+#
+#   mkdir -p ~/.rev_scraping
+#   cp templates/policy.toml ~/.rev_scraping/policy.toml
+#   chmod 600 ~/.rev_scraping/policy.toml
+#
+# Override precedence (highest first):
+#   1. REV_SCRAPING_REQUIRE_VPN=1 env var (cannot be loosened)
+#   2. --require-vpn CLI flag
+#   3. --allow-no-vpn CLI flag (rejected when env=1)
+#   4. policy.toml::require_vpn
+#   5. Built-in default = true (fail-closed)
+
+# Default: require VPN for all fetcher commands (spider / cf-evaluate /
+# relocate --url). Fail-closed.
+require_vpn = true
+
+# Block fetch if the VPN exit IP is NOT in this country. Either an
+# ISO-2 alpha code ("JP") or the long form ("Japan") works on either
+# side — `leak_guard::country_matches` accepts both forms via a small
+# alias table (Japan↔JP, United States↔US) plus case-insensitive
+# equality for everything else. Comment out to skip the country check.
+vpn_required_country = "Japan"
+
+# Multi-instance Gluetun pool. Each entry: container name + host-side
+# HTTP proxy port + host-side control-API port. Mirrors the
+# `VPN_INSTANCES` env var format
+# (vpn-1:8001:8881,vpn-2:8002:8882,...). The env var, when set, wins
+# over the values here so a single .env can drive both the compose
+# template and the leak-guard probe.
+
+[[vpn_instances]]
+name = "vpn-1"
+http_proxy_port = 8001
+control_port = 8881
+
+[[vpn_instances]]
+name = "vpn-2"
+http_proxy_port = 8002
+control_port = 8882
+
+[[vpn_instances]]
+name = "vpn-3"
+http_proxy_port = 8003
+control_port = 8883
+
+# =====================================================================
+# Phase 8 — Per-site proxy routing
+# ---------------------------------------------------------------------
+# Everything below this banner is OPTIONAL. Omitting the entire
+# `[proxies.*]` / `[fallback_chain]` block keeps Phase 6d behaviour:
+# Surfshark tier (from `vpn_instances` above) is the only proxy and
+# `direct` is only legal when `require_vpn = false`.
+#
+# CRITICAL SECRET RULE: any `url = "..."` containing a literal username
+# or password is REJECTED at load. Use `${ENV_VAR}` placeholders and
+# list the env vars in `auth_env = [...]`. Missing env vars on a tier
+# with `enabled_by_default = false` silently disable that tier; missing
+# env vars on a default-on tier are a fatal config error.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# [proxies.<name>] — named proxy tier slots.
+#
+# `name` is the identifier referenced from `authorized.toml ::
+# proxy_tier` and from `[fallback_chain] auto = [...]`. Reserved names:
+#   - "direct"  : always implicitly available; redefine only to attach
+#                 `no_proxy` globs.
+#   - "auto"    : forbidden as a tier name (it's a resolution mode).
+#
+# Required fields: `type`, `strength`.
+# Conditional:     `url`           if type ∈ {http, socks5}
+#                  `instances_from` if type = http-pool
+#                  `auth_env`      if `url` contains `${VAR}`
+#
+# `strength` (ordering used by `min_proxy_strength` gate in
+# authorized.toml): none < datacenter < residential < mobile.
+# ---------------------------------------------------------------------
+
+[proxies.direct]
+type = "none"
+strength = "none"
+# Optional host globs that should always bypass any proxy even when a
+# higher tier is selected. Useful for `*.lan`, `localhost`, internal
+# corporate IPs, etc.
+no_proxy = ["localhost", "127.0.0.1", "::1"]
+
+[proxies.surfshark]
+type = "http-pool"
+# v2 grammar: the only legal value is the symbolic reference below.
+# Future versions may allow naming a second pool.
+instances_from = "policy.vpn_instances"
+strength = "datacenter"
+
+# Cloudflare WARP example (commented out; uncomment after `warp-cli
+# mode proxy && warp-cli connect`). Resolver health-checks via a single
+# TCP-connect on first use; if WARP isn't running the tier is marked
+# unavailable without erroring out.
+#
+# [proxies.warp]
+# type = "socks5"
+# url = "socks5://127.0.0.1:40000"
+# strength = "datacenter"
+# no_proxy = []
+
+# IPRoyal residential example (commented out — paid tier).
+# `enabled_by_default = false` means the tier stays DISABLED until both
+# env vars are set in the process environment AND a target explicitly
+# references `proxy_tier = "iproyal"` (or `iproyal` is listed in
+# `[fallback_chain] auto`). This is the "ship the wiring, don't bill
+# anyone by accident" pattern.
+#
+# [proxies.iproyal]
+# type = "http"
+# url = "http://${IPROYAL_USER}:${IPROYAL_PASS}@residential.iproyal.com:12321"
+# auth_env = ["IPROYAL_USER", "IPROYAL_PASS"]
+# strength = "residential"
+# enabled_by_default = false
+# rotation = "per-session"        # one of: per-request | per-session | sticky
+# country_filter = ["JP", "US"]   # informational; provider-side username syntax
+
+# Other commercial providers follow the same schema — copy the
+# iproyal block and change url/auth_env/strength as appropriate.
+# Examples (kept in comments only; no implicit activation):
+#
+#   [proxies.brightdata]
+#   type = "http"
+#   url = "http://${BRD_USER}-country-jp:${BRD_PASS}@brd.superproxy.io:22225"
+#   auth_env = ["BRD_USER", "BRD_PASS"]
+#   strength = "residential"
+#   enabled_by_default = false
+#
+#   [proxies.oxylabs]
+#   type = "http"
+#   url = "http://customer-${OXY_USER}-cc-jp:${OXY_PASS}@pr.oxylabs.io:7777"
+#   auth_env = ["OXY_USER", "OXY_PASS"]
+#   strength = "residential"
+#   enabled_by_default = false
+
+# ---------------------------------------------------------------------
+# [fallback_chain] — auto-mode tier ordering.
+#
+# Used when a target's `proxy_tier = "auto"` (or omitted entirely).
+# Listed tiers are tried in order; the first `fail_signals` hit
+# rotates to the next tier. A tier with `enabled_by_default = false`
+# whose env vars are unset is silently skipped. The chain is further
+# filtered per-target by `min_proxy_strength`.
+#
+# Paid tiers MUST be added here explicitly — never implicitly. If you
+# want IPRoyal in the auto chain, list it below AND ensure the env
+# vars are exported.
+# ---------------------------------------------------------------------
+
+[fallback_chain]
+# Default chain if a target uses `proxy_tier = "auto"`. Order matters.
+auto = ["direct", "surfshark"]
+# Signals that consume one tier-attempt and advance to the next.
+# Anything else (e.g. http_500, dns_failure of a non-proxy host) is
+# returned to the caller without rotating.
+fail_signals = ["timeout", "http_403", "http_429", "tls_handshake_failed", "connection_refused"]
+# Per-tier attempt count before advancing.
+max_attempts_per_tier = 1
+# Minimum sleep between tier attempts (mitigates request-storm signals).
+cooldown_ms_between_tiers = 250
+# Days a recipe-recorded tier blacklist entry stays effective.
+blacklist_ttl_days = 14

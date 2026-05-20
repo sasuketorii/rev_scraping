@@ -1,0 +1,35 @@
+Defender-testbed evaluation of Cloudflare Turnstile resilience
+
+Usage: rev-stealth cf-evaluate [OPTIONS] --url <URL>
+
+Options:
+      --format <FORMAT>
+          Output format [default: human] [possible values: human, json]
+      --url <URL>
+          
+      --session-id <SESSION_ID>
+          
+  -v, --verbose...
+          Verbose logging (`-v`, `-vv`, `-vvv`)
+      --i-have-authorization
+          
+      --obscura <OBSCURA>
+          [env: REV_STEALTH_OBSCURA=]
+      --require-vpn
+          Phase 6c: fail-closed VPN-required guard. See spider --require-vpn
+      --allow-no-vpn
+          
+      --vpn-instance <VPN_INSTANCE>
+          Phase 6d: force a specific VPN instance from the configured pool
+      --proxy-tier <PROXY_TIER>
+          Force a named proxy tier (e.g. "direct", "surfshark", "warp", "iproyal") or "auto" to use the configured fallback chain. Mutually exclusive with `--vpn-instance` unless the tier is exactly "surfshark"
+      --no-fallback
+          Disable the fallback chain; one attempt at the selected tier only
+      --leak-poll-secs <LEAK_POLL_SECS>
+          Phase 6e: background leak monitor poll interval (seconds) [default: 30]
+      --use-auth <USE_AUTH>
+          Replay stored auth cookies and browser headers from the named profile
+      --auth-domain <AUTH_DOMAIN>
+          Auth AAD/domain context to load; defaults to the target host
+  -h, --help
+          Print help

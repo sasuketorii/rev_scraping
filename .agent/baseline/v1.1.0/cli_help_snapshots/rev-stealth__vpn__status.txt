@@ -1,0 +1,9 @@
+Show the current public IP and the VPN container state
+
+Usage: rev-stealth vpn status [OPTIONS]
+
+Options:
+      --format <FORMAT>      Output format [default: human] [possible values: human, json]
+      --provider <PROVIDER>  Provider slug to scope the status query [default: surfshark]
+  -v, --verbose...           Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help                 Print help

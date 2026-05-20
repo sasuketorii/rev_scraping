@@ -1,0 +1,11 @@
+Verify a previously-issued token (round-trips through the challenge provider's verify endpoint)
+
+Usage: rev-stealth captcha verify [OPTIONS] --type <TYPE> --token <TOKEN> --secret <SECRET>
+
+Options:
+      --format <FORMAT>  Output format [default: human] [possible values: human, json]
+      --type <TYPE>      Challenge type, same vocabulary as `solve --type`
+      --token <TOKEN>    Token returned by `solve`
+  -v, --verbose...       Verbose logging (`-v`, `-vv`, `-vvv`)
+      --secret <SECRET>  Provider secret (loaded from env in production) [env: REV_STEALTH_CAPTCHA_SECRET=]
+  -h, --help             Print help

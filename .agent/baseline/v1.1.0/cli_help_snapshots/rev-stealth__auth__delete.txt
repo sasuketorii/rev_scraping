@@ -1,0 +1,10 @@
+Delete a profile with shred-on-delete
+
+Usage: rev-stealth auth delete [OPTIONS] --profile <PROFILE>
+
+Options:
+      --format <FORMAT>    Output format [default: human] [possible values: human, json]
+      --profile <PROFILE>  
+      --force              Skip the interactive confirmation prompt
+  -v, --verbose...         Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help               Print help

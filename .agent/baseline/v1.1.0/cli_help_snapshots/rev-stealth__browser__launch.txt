@@ -1,0 +1,14 @@
+Launch a stealth browser, navigate to a URL, and emit JSON about the resulting page (UA / viewport / title / final URL). Useful as a smoke test that the launcher works on this host
+
+Usage: rev-stealth browser launch [OPTIONS]
+
+Options:
+      --format <FORMAT>    Output format [default: human] [possible values: human, json]
+      --profile <PROFILE>  Profile slug. One of: `desktop`, `mobile-ios`, `mobile-android`, `ipad`, `galaxy-ultra` [default: mobile-ios]
+      --stealth <STEALTH>  Stealth level: `off`, `basic`, `full` [default: full]
+  -v, --verbose...         Verbose logging (`-v`, `-vv`, `-vvv`)
+      --url <URL>          Navigate to this URL after launch. Default: `about:blank` [default: about:blank]
+      --headed             Run with a visible chrome window instead of new-headless mode
+      --chrome <CHROME>    Override the chrome executable path. By default, chromiumoxide auto-detects the system chrome [env: REV_STEALTH_CHROME=]
+      --dwell <DWELL>      Hold the page for this many seconds after navigation (lets a detector finish its work). Default 0 = exit as soon as `document.readyState` settles [default: 0]
+  -h, --help               Print help

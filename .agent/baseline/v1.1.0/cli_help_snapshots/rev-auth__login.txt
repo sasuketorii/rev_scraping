@@ -1,0 +1,23 @@
+Usage: rev-auth login [OPTIONS] --profile <PROFILE> --url <URL> --domain <DOMAIN>
+
+Options:
+      --profile <PROFILE>
+          
+      --url <URL>
+          
+      --domain <DOMAIN>
+          
+      --user-data-dir <USER_DATA_DIR>
+          
+      --completion-pattern <COMPLETION_PATTERN>
+          
+      --aad-context <AAD_CONTEXT>
+          [default: ""]
+      --obscura-bin <OBSCURA_BIN>
+          Deprecated (Phase 9 hotfix-1): obscura is no longer used for interactive login. The flag is preserved for wrapper-script compatibility but ignored other than to emit a deprecation warning [env: REV_OBSCURA_BIN=]
+      --chrome-bin <CHROME_BIN>
+          Path to the Chrome / Chromium binary used to open the headed login window. Defaults to platform-standard locations (see `resolve_chrome_binary`) [env: REV_AUTH_CHROME_BIN=]
+      --mcp-session-token <MCP_SESSION_TOKEN>
+          Phase 9e: when set, write a completion marker file at `$TMPDIR/rev-auth-<token>.complete` on successful save so an MCP `auth_login_complete` call can detect completion without polling process state
+  -h, --help
+          Print help

@@ -1,0 +1,23 @@
+Locate a previously fingerprinted element in a saved HTML or fresh URL
+
+Usage: rev-stealth relocate [OPTIONS] --stable-id <STABLE_ID>
+
+Options:
+      --format <FORMAT>              Output format [default: human] [possible values: human, json]
+      --session-id <SESSION_ID>      Session id (informational; not required to open the store)
+      --stable-id <STABLE_ID>        stable_id of the element to locate
+  -v, --verbose...                   Verbose logging (`-v`, `-vv`, `-vvv`)
+      --html-file <HTML_FILE>        Local HTML file to scan
+      --url <URL>                    Remote URL to fetch (HTTP-only, no browser launch)
+      --threshold <THRESHOLD>        Similarity threshold [default: 0.85]
+      --parse-store <PARSE_STORE>    Optional ParseStore path (defaults to `~/.rev_scraping/parse.sqlite`)
+      --strict                       Treat Ambiguous as exit 10
+      --i-have-authorization         AUP bypass (logs a warn). Required when `--url` targets a non-allowlisted host
+      --require-vpn                  Phase 6c: fail-closed VPN-required guard. Applies to `--url` only; `--html-file` is a local read
+      --allow-no-vpn                 
+      --vpn-instance <VPN_INSTANCE>  Phase 6d: force a specific VPN instance from the configured pool
+      --proxy-tier <PROXY_TIER>      Force a named proxy tier (e.g. "direct", "surfshark", "warp", "iproyal") or "auto" to use the configured fallback chain. Mutually exclusive with `--vpn-instance` unless the tier is exactly "surfshark"
+      --no-fallback                  Disable the fallback chain; one attempt at the selected tier only
+      --use-auth <USE_AUTH>          Replay stored auth cookies and browser headers from the named profile
+      --auth-domain <AUTH_DOMAIN>    Auth AAD/domain context to load; defaults to the target host
+  -h, --help                         Print help

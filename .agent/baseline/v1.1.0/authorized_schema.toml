@@ -1,0 +1,2 @@
+# v1.1.0 baseline: no authorized_targets.toml template shipped.
+# This sentinel records absence; v1.2.0 P5/P6 may introduce one.

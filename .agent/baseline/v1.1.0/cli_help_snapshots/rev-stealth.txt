@@ -1,0 +1,21 @@
+Defender-facing evaluation toolkit: captcha resilience / browser stealth / VPN rotation / adaptive scraping (authorized targets only)
+
+Usage: rev-stealth [OPTIONS] <COMMAND>
+
+Commands:
+  captcha      CAPTCHA bypass operations (reCAPTCHA v2 / v3 / hCaptcha / Turnstile)
+  browser      Stealth browser operations (launch a profile, run a stealth-test sweep)
+  vpn          VPN IP rotation operations (Surfshark / Gluetun lazy-rotate-on-fail)
+  doctor       Pre-flight leak-prevention checks (kill-switch / DNS / IPv6 / WebRTC). Exits with code 7 when any check fails (fail-closed)
+  spider       AUP-gated browse + optional CF eval + optional adaptive relocate
+  relocate     Locate a previously fingerprinted element in a saved HTML or fresh URL
+  cf-evaluate  Defender-testbed evaluation of Cloudflare Turnstile resilience
+  auth         Authenticated session capture / lifecycle (Phase 9d). Subcommands: login / list / show / delete / status / refresh
+  measure      v1.1.0 (P15): local fingerprint diagnostics for monitoring. External SaaS calls are opt-in via `--enable-external`
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+      --format <FORMAT>  Output format [default: human] [possible values: human, json]
+  -v, --verbose...       Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help             Print help
+  -V, --version          Print version

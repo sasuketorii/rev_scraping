@@ -1,0 +1,29 @@
+Re-run interactive login, overwriting an existing profile
+
+Usage: rev-stealth auth refresh [OPTIONS] --profile <PROFILE> --url <URL>
+
+Options:
+      --format <FORMAT>
+          Output format [default: human] [possible values: human, json]
+      --profile <PROFILE>
+          
+      --url <URL>
+          
+  -v, --verbose...
+          Verbose logging (`-v`, `-vv`, `-vvv`)
+      --domain <DOMAIN>
+          
+      --completion-pattern <COMPLETION_PATTERN>
+          
+      --obscura-bin <OBSCURA_BIN>
+          [env: REV_OBSCURA_BIN=]
+      --rev-auth-bin <REV_AUTH_BIN>
+          [env: REV_AUTH_BIN=]
+      --aad-context <AAD_CONTEXT>
+          [default: ""]
+      --require-vpn
+          Force the VPN-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`
+      --allow-no-vpn
+          Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`
+  -h, --help
+          Print help
