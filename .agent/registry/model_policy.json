@@ -1,0 +1,243 @@
+{
+  "schema_version": "codex-model-policy/v1",
+  "current_model": "gpt-5.5",
+  "stable_default_model": "gpt-5.5",
+  "minimum_allowed_model": "gpt-5.5",
+  "candidate_model": null,
+  "previous_model": "gpt-5.4",
+  "model_order": [
+    "gpt-5.4",
+    "gpt-5.5"
+  ],
+  "runtime_fallback_below_minimum": "forbidden",
+  "roles": {
+    "standard": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "research": {
+      "model_reasoning_effort": "high",
+      "web_search": "live"
+    },
+    "coder": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "high-coder": {
+      "model_reasoning_effort": "high",
+      "web_search": "cached"
+    },
+    "reviewer": {
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached"
+    }
+  },
+  "native_agent_presets": {
+    "model": "gpt-5.5",
+    "allowed_efforts": [
+      "medium",
+      "high",
+      "xhigh"
+    ],
+    "medium_effort_agents": [
+      "alternative_reviewer",
+      "coder",
+      "consistency_reviewer",
+      "performance_reviewer"
+    ],
+    "high_effort_agents": [
+      "stack_upgrade_researcher"
+    ],
+    "xhigh_effort_agents": [
+      "plan_reviewer",
+      "security_reviewer",
+      "stack_upgrade_reviewer",
+      "system_planner"
+    ],
+    "lane_requirements": {
+      "performance_reviewer": {
+        "deterministic_benchmark_or_check_required": true
+      },
+      "initial_execplan_design": {
+        "model_reasoning_effort": "xhigh",
+        "web_search": "cached",
+        "applies_to": [
+          "initial design before ExecPlan approval",
+          "ExecPlan drafting for mutation-authorizing work",
+          "ExecPlan review planning before coder slice execution"
+        ],
+        "native_agent_presets": [
+          "system_planner",
+          "plan_reviewer"
+        ],
+        "boundary": "This is separate from ordinary docs-only or light plan formatting; do not downgrade initial ExecPlan design to medium."
+      }
+    },
+    "compatibility_notes": [
+      "repo-local config uses features.multi_agent only",
+      "features.multi_agent_v2 and agents.max_threads are forbidden until explicitly migrated"
+    ]
+  },
+  "routing_lanes": {
+    "default_standard_light_coder": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached",
+      "entrypoint": "scripts/codex-wrapper.sh --role standard"
+    },
+    "normal_coder": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached",
+      "entrypoint": "scripts/codex-wrapper.sh --role coder"
+    },
+    "complex_coder": {
+      "model_reasoning_effort": "high",
+      "web_search": "cached",
+      "entrypoint": "scripts/codex-wrapper.sh --role high-coder"
+    },
+    "consistency_reviewer_normal": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached",
+      "entrypoint": ".codex/agents/consistency_reviewer.toml"
+    },
+    "performance_reviewer_normal": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached",
+      "deterministic_benchmark_or_check_required": true,
+      "entrypoint": ".codex/agents/performance_reviewer.toml"
+    },
+    "alternative_reviewer_normal": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached",
+      "entrypoint": ".codex/agents/alternative_reviewer.toml"
+    },
+    "alternative_reviewer_comparative_high_risk": {
+      "model_reasoning_effort": "high",
+      "web_search": "cached",
+      "entrypoint": "native high-effort escalation"
+    },
+    "security_reviewer": {
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached",
+      "entrypoint": ".codex/agents/security_reviewer.toml"
+    },
+    "final_release_truth_wrapper_model_policy_reviewer": {
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached",
+      "entrypoint": "scripts/codex-wrapper.sh --role reviewer"
+    },
+    "research": {
+      "model_reasoning_effort": "high",
+      "web_search": "live",
+      "entrypoint": "scripts/codex-wrapper.sh --role research"
+    },
+    "initial_execplan_design": {
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached",
+      "entrypoint": "native Codex system_planner / plan_reviewer preset",
+      "applies_to": "first design / ExecPlan drafting / ExecPlan review planning before mutation-authorizing slice execution",
+      "boundary": "Not used for routine docs-only/light planning or bookkeeping."
+    }
+  },
+  "official_sources": [
+    {
+      "url": "https://developers.openai.com/codex/models",
+      "checked_at": "2026-04-25",
+      "accepted_fact": "gpt-5.5 is listed as OpenAI's newest frontier model for Codex at this baseline; gpt-5.6 is not present as an exact model id.",
+      "verified_model_ids": [
+        "gpt-5.5",
+        "gpt-5.4"
+      ]
+    }
+  ],
+  "official_source_rules": {
+    "accepted_url_prefixes": [
+      "https://developers.openai.com/codex/",
+      "https://platform.openai.com/",
+      "https://openai.com/"
+    ],
+    "candidate_registration_requires": [
+      "official OpenAI or Codex URL",
+      "exact candidate model id in source content",
+      "availability or compatibility context for Codex, API, CLI, SDK, app, or IDE extension",
+      "non-fixture evidence"
+    ],
+    "fixture_evidence": "forbidden"
+  },
+  "generated_artifact": {
+    "path": ".agent/generated/codex_model_policy.runtime.json",
+    "generated_at": "2026-04-25T00:00:00Z"
+  },
+  "blocked_overrides": {
+    "config_keys": [
+      "model",
+      "model_provider",
+      "model_reasoning_effort",
+      "sandbox_mode",
+      "approval_policy",
+      "web_search",
+      "web_search_cached",
+      "features.web_search_cached",
+      "features.web_search_request",
+      "features.multi_agent_v2",
+      "agents.max_threads"
+    ],
+    "feature_flags": [
+      "web_search_cached",
+      "web_search_request",
+      "multi_agent_v2",
+      "multi_agent"
+    ],
+    "options": [
+      "--model",
+      "-m",
+      "--sandbox",
+      "-s",
+      "--ask-for-approval",
+      "-a",
+      "--profile",
+      "-p",
+      "--local-provider",
+      "--cd",
+      "--add-dir",
+      "--search",
+      "--full-auto",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "--oss"
+    ]
+  },
+  "native_config_guards": {
+    "required_features_multi_agent": true,
+    "forbidden_features": [
+      "multi_agent_v2"
+    ],
+    "forbidden_config_keys": [
+      "agents.max_threads"
+    ]
+  },
+  "strict_runtime_surfaces": [
+    "scripts/codex-wrapper.sh",
+    ".agent/generated/codex_model_policy.runtime.json",
+    ".codex/config.toml",
+    ".codex/agents/*.toml",
+    "setup/bootstrap.sh",
+    "test/integration/*.sh",
+    "AGENTS.md",
+    ".agent_rules/RULES.md",
+    "docs/roles/*.md",
+    "docs/manual/*.md",
+    "docs/generated/*.md"
+  ],
+  "historical_allow_paths": [
+    ".agent/archive/**",
+    ".agent/active/prompts/**",
+    ".claude/tmp/**",
+    "*.log",
+    "log.txt"
+  ],
+  "stale_ref_classification_rules": {
+    "strict_runtime_surface": "old real model ids below minimum, unapproved candidates, and generated mirror drift are BLOCK unless explicitly marked as a negative example",
+    "negative_examples": "allowed only under labels such as example_forbidden_model, forbidden, blocked override, negative, or expected FAIL",
+    "historical_archive_log": "archive, prompt outputs, and logs are ALLOW-HISTORICAL",
+    "active_imperative": ".agent/active imperative runtime instructions below minimum are BLOCK; provenance, review reports, official-source notes, and planning text are WARN or ALLOW-NEGATIVE-EXAMPLE"
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "schema_version": 2,
+  "canonical_root": ".agent/skills",
+  "loader_contract": {
+    "required_file": "SKILL.md",
+    "allowed_frontmatter_keys": [
+      "name",
+      "description"
+    ],
+    "allowed_root_entries": [
+      "SKILL.md",
+      "agents",
+      "assets",
+      "references",
+      "scripts"
+    ],
+    "install_boundary": "Canonical source, generated provider projections, and installed Codex projections are tracked separately. A generated Codex projection under .agent/generated/skills/codex is not an active Codex skill; the installed Codex projection at $CODEX_HOME/skills/<skill-name> must also exist and match byte-for-byte for acceptance checks."
+  },
+  "shared_skill_sync": [
+    {
+      "package": "client-distribution-readiness",
+      "skill_name": "client-distribution-readiness",
+      "source_path": ".claude/skills/client-distribution-readiness",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/client-distribution-readiness",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "cloudflare-deploy-guard",
+      "skill_name": "cloudflare-deploy-guard",
+      "source_path": ".claude/skills/cloudflare-deploy-guard",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/cloudflare-deploy-guard",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "codex-app-server-guard",
+      "skill_name": "codex-app-server-guard",
+      "source_path": ".claude/skills/codex-app-server-guard",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/codex-app-server-guard",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "go-skills-knowledge-pack",
+      "skill_name": "go-skills-architecture",
+      "source_path": ".claude/skills/go-skills-knowledge-pack",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/go-skills-knowledge-pack",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "naming-normalization-guard",
+      "skill_name": "naming-normalization-guard",
+      "source_path": ".claude/skills/naming-normalization-guard",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/naming-normalization-guard",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "payload-cms-deploy-guard",
+      "skill_name": "payload-cms-deploy-guard",
+      "source_path": ".claude/skills/payload-cms-deploy-guard",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/payload-cms-deploy-guard",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "rust-skills-knowledge-pack",
+      "skill_name": "rust-skills-architecture",
+      "source_path": ".claude/skills/rust-skills-knowledge-pack",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/rust-skills-knowledge-pack",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "self-growth-proposal-triage",
+      "skill_name": "self-growth-proposal-triage",
+      "source_path": ".claude/skills/self-growth-proposal-triage",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/self-growth-proposal-triage",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "supabase-deploy-guard",
+      "skill_name": "supabase-deploy-guard",
+      "source_path": ".claude/skills/supabase-deploy-guard",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/supabase-deploy-guard",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "typescript-skills-knowledge-pack",
+      "skill_name": "typescript-skills-architecture",
+      "source_path": ".claude/skills/typescript-skills-knowledge-pack",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/typescript-skills-knowledge-pack",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "revc-shadcn-frontend-workflow",
+      "skill_name": "revc-shadcn-frontend-workflow",
+      "source_path": ".claude/skills/revc-shadcn-frontend-workflow",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/revc-shadcn-frontend-workflow",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "shadcn",
+      "skill_name": "shadcn",
+      "source_path": ".claude/skills/shadcn",
+      "projections": [
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/shadcn",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [
+            "provenance.json"
+          ]
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "name": "rustskills-architecture",
+      "canonical_source": {
+        "path": ".agent/skills/rustskills-architecture",
+        "role": "canonical-source"
+      },
+      "projections": [
+        {
+          "provider": "claude",
+          "path": ".claude/skills/rustskills-architecture",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [],
+          "activation": {
+            "status": "project-local-active",
+            "auto_discoverable": true,
+            "install_target": ".claude/skills/rustskills-architecture",
+            "note": "Claude Code project-local skill projection."
+          }
+        },
+        {
+          "provider": "codex-generated",
+          "path": ".agent/generated/skills/codex/rustskills-architecture",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [],
+          "activation": {
+            "status": "install-required",
+            "auto_discoverable": false,
+            "install_target": "$CODEX_HOME/skills/rustskills-architecture",
+            "note": "Generated Codex projection only; install into the Codex skills root before treating it as active."
+          }
+        },
+        {
+          "provider": "codex-installed",
+          "path": "$CODEX_HOME/skills/rustskills-architecture",
+          "projection_kind": "byte-for-byte",
+          "excluded_generated_metadata": [],
+          "activation": {
+            "status": "installed-active",
+            "auto_discoverable": true,
+            "install_target": "$CODEX_HOME/skills/rustskills-architecture",
+            "note": "Actual Codex skill home projection discoverable by future Codex sessions."
+          }
+        }
+      ]
+    }
+  ]
+}

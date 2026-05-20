@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "canonical_classifiers": {
+    "light": {
+      "operating_mode": "dev",
+      "gate_tier": "quick",
+      "reviewer_default": "optional",
+      "artifact_default": "local evidence only",
+      "boundary": "non-normative docs, prompt wording, admin bookkeeping, and reference cleanup outside high-risk surfaces"
+    },
+    "standard": {
+      "operating_mode": "review",
+      "gate_tier": "local",
+      "reviewer_default": "scoped",
+      "artifact_default": "scoped review evidence",
+      "boundary": "ordinary implementation, test, script, docs/manual, registry, active plan, and active SOW changes that do not touch heavy authority surfaces"
+    },
+    "heavy": {
+      "operating_mode": "release",
+      "gate_tier": "full",
+      "reviewer_default": "required",
+      "artifact_default": "full traceability",
+      "boundary": "wrappers, model policy, roles, acceptance truth, authoritative task-lineage ledger, release/tag/merge, security, lease/auth, semantic/index authority, Codex/Claude settings, and native agent config"
+    }
+  },
+  "classifier_command": "bash scripts/harness-governance-classifier.sh --json -- {paths}",
+  "classifier_is_advisory_only": true,
+  "modes": {
+    "dev": {
+      "purpose": "fast local implementation loop",
+      "requires_approved_execplan_for_planned_harness_work": true,
+      "requires_per_iteration_sow_or_ledger_update": false,
+      "requires_reviewer_lgtm": false,
+      "requires_release_gate": false,
+      "default_check_tier": "changed-files"
+    },
+    "review": {
+      "purpose": "prepare a diff for reviewer intake",
+      "requires_approved_execplan_for_planned_harness_work": true,
+      "requires_per_iteration_sow_or_ledger_update": false,
+      "requires_reviewer_lgtm": true,
+      "requires_release_gate": false,
+      "default_check_tier": "changed-files-plus-review-surface"
+    },
+    "release": {
+      "purpose": "release candidate or closeout validation",
+      "requires_approved_execplan_for_planned_harness_work": true,
+      "requires_per_iteration_sow_or_ledger_update": true,
+      "requires_reviewer_lgtm": true,
+      "requires_release_gate": true,
+      "default_check_tier": "full-release"
+    }
+  },
+  "commands": {
+    "review_diff_summary": "git diff --stat -- {paths}",
+    "release_gate": "bash test/integration/harness_release_gate.sh"
+  },
+  "path_rules": [
+    {
+      "name": "diff-whitespace",
+      "applies_to": "all changed files",
+      "command_template": "git diff --check -- {paths}"
+    },
+    {
+      "name": "shell-syntax",
+      "applies_to": "*.sh",
+      "command_template": "bash -n {path}"
+    },
+    {
+      "name": "json-syntax",
+      "applies_to": "*.json",
+      "command_template": "jq empty {path}"
+    },
+    {
+      "name": "integration-test-self-run",
+      "applies_to": "executable test/integration/*.sh",
+      "command_template": "bash {path}"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": "rev-harness-distribution-manifest/v1",
+  "canonical": {
+    "display_name": "Revharness",
+    "machine_name": "rev_harness"
+  },
+  "legacy_aliases": [
+    "agent_base",
+    "agent-base"
+  ],
+  "source_url": "TBD",
+  "preserve_globs_semantics": "adoption-local-preserve-only",
+  "preserve_globs": [
+    ".shared/project_id",
+    ".agent/PROJECT_CONTEXT.md",
+    ".agent/requirements.md",
+    ".agent/active",
+    ".agent/active/**",
+    ".agent/archive",
+    ".agent/archive/**",
+    ".agent/generated",
+    ".agent/generated/**",
+    ".claude/tmp",
+    ".claude/tmp/**",
+    "src",
+    "src/**",
+    "apps",
+    "apps/**",
+    "packages",
+    "packages/**",
+    "services",
+    "services/**"
+  ],
+  "client_distribution": {
+    "exclude_globs": [
+      ".agent/active/handovers",
+      ".agent/active/handovers/**",
+      ".agent/active/prompts",
+      ".agent/active/prompts/**",
+      ".agent/active/reviews",
+      ".agent/active/reviews/**",
+      ".agent/archive",
+      ".agent/archive/**",
+      ".claude/tmp",
+      ".claude/tmp/**",
+      "workspace",
+      "workspace/**",
+      "~/.semantic-mcp/*/semantic.db",
+      "~/.local/share/Revharness/semantic-mcp/v1/*/semantic.db",
+      "~/Library/Application Support/Revharness/semantic-mcp/v1/*/semantic.db",
+      "%LOCALAPPDATA%\\Revharness\\semantic-mcp\\v1\\*\\semantic.db"
+    ],
+    "ship_semantic_db": false,
+    "semantic_db_regeneration": "Regenerate on first use from .shared/project_id through scripts/launch-semantic-mcp.sh, doctor, or an explicit reindex workflow."
+  },
+  "managed_candidate_globs": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".agent_rules",
+    ".agent_rules/**",
+    ".agent/registry",
+    ".agent/registry/**",
+    ".claude/settings.json",
+    ".claude/commands",
+    ".claude/commands/**",
+    ".claude/hooks",
+    ".claude/hooks/**",
+    ".claude/skills",
+    ".claude/skills/**",
+    ".codex",
+    ".codex/**",
+    "docs",
+    "docs/**",
+    "scripts",
+    "scripts/**",
+    "test/integration",
+    "test/integration/**"
+  ]
+}

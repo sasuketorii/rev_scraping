@@ -1,0 +1,188 @@
+[
+  {
+    "path": ".agent_rules/RULES.md",
+    "authority_type": "hard_rules",
+    "governs": [
+      "repo-wide invariants",
+      "fail-closed acceptance"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": "docs/manual/verification-truth-matrix.md",
+    "authority_type": "verification_truth",
+    "governs": [
+      "verification truth placement",
+      "reviewer LGTM validity"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": "AGENTS.md",
+    "authority_type": "runtime_policy",
+    "governs": [
+      "Codex-facing runtime contract",
+      "caller-facing operating constraints"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": "CLAUDE.md",
+    "authority_type": "runtime_policy",
+    "governs": [
+      "Claude-facing runtime contract",
+      "orchestrator operating constraints"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": ".agent/PROJECT_CONTEXT.md",
+    "authority_type": "project_context",
+    "governs": [
+      "project-local operating context",
+      "adoption model guidance"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": "docs/roles/coder.md",
+    "authority_type": "role_policy",
+    "governs": [
+      "coder role definition",
+      "implementation responsibilities"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": "docs/roles/reviewer.md",
+    "authority_type": "role_policy",
+    "governs": [
+      "reviewer role definition",
+      "review output contract"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": "docs/roles/orchestrator.md",
+    "authority_type": "role_policy",
+    "governs": [
+      "orchestrator role definition",
+      "slice handoff responsibilities"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": ".agent/registry/orchestration_policy_projection.json",
+    "authority_type": "contract_surface",
+    "governs": [
+      "policy projection source",
+      "reviewer contract runtime subset"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "jq empty"
+    ]
+  },
+  {
+    "path": ".agent/registry/dependency_policy.json",
+    "authority_type": "dependency_gate",
+    "governs": [
+      "dependency gate configuration"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e",
+      "jq empty"
+    ]
+  },
+  {
+    "path": "docs/manual/common-task-contract.md",
+    "authority_type": "contract_surface",
+    "governs": [
+      "stable contract guide",
+      "task contract semantics"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  },
+  {
+    "path": ".claude/commands/lib/task_contract.sh",
+    "authority_type": "contract_runtime",
+    "governs": [
+      "runtime contract enforcement",
+      "contract emit validate behavior"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e",
+      "bash -n"
+    ]
+  },
+  {
+    "path": ".agent/registry/model_policy.json",
+    "authority_type": "runtime_policy",
+    "governs": [
+      "Codex model source of truth",
+      "model migration policy",
+      "runtime minimum model policy"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "jq empty",
+      "bash scripts/model-policy.sh validate",
+      "bash scripts/model-policy.sh generate --check"
+    ]
+  },
+  {
+    "path": "docs/generated/codex-model-policy.md",
+    "authority_type": "runtime_policy",
+    "governs": [
+      "Codex model policy documentation",
+      "wrapper runtime policy reference"
+    ],
+    "stable": true,
+    "required_checks_surface": [
+      "git diff --check",
+      "test -e"
+    ]
+  }
+]

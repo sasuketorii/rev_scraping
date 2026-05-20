@@ -1,0 +1,140 @@
+{
+  "blocked_overrides": {
+    "config_keys": [
+      "model",
+      "model_provider",
+      "model_reasoning_effort",
+      "sandbox_mode",
+      "approval_policy",
+      "web_search",
+      "web_search_cached",
+      "features.web_search_cached",
+      "features.web_search_request",
+      "features.multi_agent_v2",
+      "agents.max_threads"
+    ],
+    "feature_flags": [
+      "web_search_cached",
+      "web_search_request",
+      "multi_agent_v2",
+      "multi_agent"
+    ],
+    "options": [
+      "--model",
+      "-m",
+      "--sandbox",
+      "-s",
+      "--ask-for-approval",
+      "-a",
+      "--profile",
+      "-p",
+      "--local-provider",
+      "--cd",
+      "--add-dir",
+      "--search",
+      "--full-auto",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "--oss"
+    ]
+  },
+  "current_model": "gpt-5.5",
+  "generated_at": "2026-04-25T00:00:00Z",
+  "generated_by": "scripts/model-policy.sh generate",
+  "minimum_allowed_model": "gpt-5.5",
+  "native_config_guards": {
+    "forbidden_config_keys": [
+      "agents.max_threads"
+    ],
+    "forbidden_features": [
+      "multi_agent_v2"
+    ],
+    "required_features_multi_agent": true
+  },
+  "roles": {
+    "coder": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "high-coder": {
+      "model_reasoning_effort": "high",
+      "web_search": "cached"
+    },
+    "research": {
+      "model_reasoning_effort": "high",
+      "web_search": "live"
+    },
+    "reviewer": {
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached"
+    },
+    "standard": {
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    }
+  },
+  "routing_lanes": {
+    "alternative_reviewer_comparative_high_risk": {
+      "entrypoint": "native high-effort escalation",
+      "model_reasoning_effort": "high",
+      "web_search": "cached"
+    },
+    "alternative_reviewer_normal": {
+      "entrypoint": ".codex/agents/alternative_reviewer.toml",
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "complex_coder": {
+      "entrypoint": "scripts/codex-wrapper.sh --role high-coder",
+      "model_reasoning_effort": "high",
+      "web_search": "cached"
+    },
+    "consistency_reviewer_normal": {
+      "entrypoint": ".codex/agents/consistency_reviewer.toml",
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "default_standard_light_coder": {
+      "entrypoint": "scripts/codex-wrapper.sh --role standard",
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "final_release_truth_wrapper_model_policy_reviewer": {
+      "entrypoint": "scripts/codex-wrapper.sh --role reviewer",
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached"
+    },
+    "initial_execplan_design": {
+      "applies_to": "first design / ExecPlan drafting / ExecPlan review planning before mutation-authorizing slice execution",
+      "boundary": "Not used for routine docs-only/light planning or bookkeeping.",
+      "entrypoint": "native Codex system_planner / plan_reviewer preset",
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached"
+    },
+    "normal_coder": {
+      "entrypoint": "scripts/codex-wrapper.sh --role coder",
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "performance_reviewer_normal": {
+      "deterministic_benchmark_or_check_required": true,
+      "entrypoint": ".codex/agents/performance_reviewer.toml",
+      "model_reasoning_effort": "medium",
+      "web_search": "cached"
+    },
+    "research": {
+      "entrypoint": "scripts/codex-wrapper.sh --role research",
+      "model_reasoning_effort": "high",
+      "web_search": "live"
+    },
+    "security_reviewer": {
+      "entrypoint": ".codex/agents/security_reviewer.toml",
+      "model_reasoning_effort": "xhigh",
+      "web_search": "cached"
+    }
+  },
+  "runtime_fallback_below_minimum": "forbidden",
+  "schema_version": "codex-model-runtime-policy/v1",
+  "source_policy_path": ".agent/registry/model_policy.json",
+  "source_policy_sha256": "a5e13a7967c8c091de8039ea39b5a3d267596ec7b7fd0a5511e104c092d16f10",
+  "stable_default_model": "gpt-5.5"
+}

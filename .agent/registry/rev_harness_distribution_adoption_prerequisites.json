@@ -1,0 +1,40 @@
+{
+  "schema_version": "rev-harness-distribution-adoption-prerequisites/v1",
+  "packet_status": "BLOCK/non-final until exhausted budget is reopened and reviewed",
+  "non_claims": {
+    "lgtm": false,
+    "acceptance": false,
+    "completion": false,
+    "release_readiness": false,
+    "publish": false,
+    "tag": false,
+    "package": false
+  },
+  "prerequisites": [
+    {
+      "name": "dirty surface manifest",
+      "status": "deferred",
+      "reason": "clean distribution does not ship active development manifests; regenerate this task-local artifact when reopening a distribution-adoption packet"
+    },
+    {
+      "name": "evidence manifest",
+      "status": "deferred",
+      "reason": "clean distribution does not ship active development manifests; regenerate this task-local artifact when reopening a distribution-adoption packet"
+    },
+    {
+      "name": "worker lifecycle manifest",
+      "status": "deferred",
+      "reason": "clean distribution does not ship active development manifests; regenerate this task-local artifact when reopening a distribution-adoption packet"
+    },
+    {
+      "name": "counter admission preflight",
+      "status": "BLOCK",
+      "reason": "umbrella packet budget is exhausted and current user-approved reopen evidence has not been materialized for reviewer intake"
+    },
+    {
+      "name": "schema-micro-fix admission",
+      "status": "deferred",
+      "reason": "this remediation includes operational shell/test and packet materialization changes, not a schema-micro-fix-only spot-check packet"
+    }
+  ]
+}

@@ -1,0 +1,450 @@
+{
+  "schema_version": "rev-harness-skill-routing/v1",
+  "class_order": [
+    "light",
+    "standard",
+    "heavy"
+  ],
+  "classes": {
+    "light": {
+      "gate_tier": "quick",
+      "default_skill_load": "none",
+      "allowed_skills": [
+        "orchestrator-bootstrap",
+        "development-junk-cleanup"
+      ],
+      "allowed_wrapper_roles": [
+        "standard"
+      ],
+      "allowed_mcp_servers": []
+    },
+    "standard": {
+      "gate_tier": "local",
+      "default_skill_load": "explicit-only",
+      "allowed_skills": [
+        "orchestrator-bootstrap",
+        "auto-orchestrator",
+        "system-planner",
+        "review-workflow",
+        "research-handoff",
+        "codex-caller",
+        "naming-normalization-guard",
+        "development-junk-cleanup",
+        "client-distribution-readiness",
+        "self-growth-proposal-triage",
+        "harness-official-docs-update",
+        "codex-app-server-product-integration",
+        "rust-skills-architecture",
+        "go-skills-architecture",
+        "typescript-skills-architecture",
+        "revc-shadcn-frontend-workflow",
+        "revharness-semantic-mcp-usage"
+      ],
+      "allowed_wrapper_roles": [
+        "standard",
+        "coder",
+        "high-coder",
+        "research",
+        "reviewer"
+      ],
+      "allowed_mcp_servers": [
+        "semantic"
+      ]
+    },
+    "heavy": {
+      "gate_tier": "full",
+      "default_skill_load": "explicit-only",
+      "allowed_skills": [
+        "orchestrator-bootstrap",
+        "auto-orchestrator",
+        "system-planner",
+        "review-workflow",
+        "research-handoff",
+        "codex-caller",
+        "naming-normalization-guard",
+        "development-junk-cleanup",
+        "client-distribution-readiness",
+        "self-growth-proposal-triage",
+        "harness-official-docs-update",
+        "codex-app-server-product-integration",
+        "codex-app-server-guard",
+        "cloudflare-deploy-guard",
+        "supabase-deploy-guard",
+        "payload-cms-deploy-guard",
+        "baseline-protection",
+        "rust-skills-architecture",
+        "go-skills-architecture",
+        "typescript-skills-architecture",
+        "revc-shadcn-frontend-workflow",
+        "revharness-semantic-mcp-usage"
+      ],
+      "allowed_wrapper_roles": [
+        "standard",
+        "coder",
+        "high-coder",
+        "research",
+        "reviewer"
+      ],
+      "allowed_mcp_servers": [
+        "semantic"
+      ]
+    }
+  },
+  "skills": [
+    {
+      "name": "orchestrator-bootstrap",
+      "path": ".claude/skills/orchestrator-bootstrap",
+      "min_task_class": "light",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "auto-orchestrator",
+      "path": ".claude/skills/auto-orchestrator",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "system-planner",
+      "path": ".claude/skills/system-planner",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "review-workflow",
+      "path": ".claude/skills/review-workflow",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "research-handoff",
+      "path": ".claude/skills/research-handoff",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "codex-caller",
+      "path": ".claude/skills/codex-caller",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "naming-normalization-guard",
+      "path": ".claude/skills/naming-normalization-guard",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "guard-only"
+    },
+    {
+      "name": "self-growth-proposal-triage",
+      "path": ".claude/skills/self-growth-proposal-triage",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": ".claude/skills/self-growth-proposal-triage/provenance.json",
+      "mutation_policy": "proposal-only"
+    },
+    {
+      "name": "development-junk-cleanup",
+      "path": ".claude/skills/development-junk-cleanup",
+      "min_task_class": "light",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "client-distribution-readiness",
+      "path": ".claude/skills/client-distribution-readiness",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "harness-official-docs-update",
+      "path": ".claude/skills/harness-official-docs-update",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "codex-app-server-product-integration",
+      "path": ".claude/skills/codex-app-server-product-integration",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "rust-skills-architecture",
+      "path": ".claude/skills/rust-skills-knowledge-pack",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "go-skills-architecture",
+      "path": ".claude/skills/go-skills-knowledge-pack",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "typescript-skills-architecture",
+      "path": ".claude/skills/typescript-skills-knowledge-pack",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "revc-shadcn-frontend-workflow",
+      "path": ".claude/skills/revc-shadcn-frontend-workflow",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": ".claude/skills/revc-shadcn-frontend-workflow/provenance.json",
+      "mutation_policy": "inspect-only-by-default"
+    },
+    {
+      "name": "codex-app-server-guard",
+      "path": ".claude/skills/codex-app-server-guard",
+      "min_task_class": "heavy",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "guard-only"
+    },
+    {
+      "name": "cloudflare-deploy-guard",
+      "path": ".claude/skills/cloudflare-deploy-guard",
+      "min_task_class": "heavy",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "guard-only"
+    },
+    {
+      "name": "supabase-deploy-guard",
+      "path": ".claude/skills/supabase-deploy-guard",
+      "min_task_class": "heavy",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "guard-only"
+    },
+    {
+      "name": "payload-cms-deploy-guard",
+      "path": ".claude/skills/payload-cms-deploy-guard",
+      "min_task_class": "heavy",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "guard-only"
+    },
+    {
+      "name": "baseline-protection",
+      "path": ".claude/skills/baseline-protection",
+      "min_task_class": "heavy",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "guard-only"
+    },
+    {
+      "name": "revharness-semantic-mcp-usage",
+      "path": ".claude/skills/revharness-semantic-mcp-usage",
+      "min_task_class": "standard",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob"
+      ],
+      "network": false,
+      "mcp_servers": [],
+      "provenance_path": null,
+      "mutation_policy": "inspect-only-by-default"
+    }
+  ],
+  "proposal_state_machine": {
+    "states": [
+      "proposed",
+      "reviewed",
+      "approved",
+      "promoted",
+      "rejected",
+      "quarantined"
+    ],
+    "promotion_gate": [
+      "task_classifier_pass",
+      "skill_routing_check_pass",
+      "provenance_check_pass",
+      "deterministic_checks_pass",
+      "reviewer_lgtm"
+    ],
+    "volatile_roots": [
+      ".claude/tmp"
+    ],
+    "stable_promotion_roots": [
+      "${REV_DEVSKILLS_ROOT:-../rev_devskills}",
+      ".claude/skills",
+      "$CODEX_HOME/skills"
+    ]
+  }
+}

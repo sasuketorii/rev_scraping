@@ -1,0 +1,99 @@
+{
+  "packet": {
+    "canonical_slice_fields": [
+      "task id",
+      "task lineage ledger entry",
+      "prior task id",
+      "slice id",
+      "prior slice id",
+      "change surface",
+      "in-scope",
+      "out-of-scope",
+      "required checks",
+      "evidence destination",
+      "completion boundary"
+    ],
+    "deprecated_field_aliases": [
+      "checkpoint boundary",
+      "truth destination",
+      "artifact truth destination"
+    ],
+    "required_plan_sections": [
+      "In-Scope",
+      "Out-Of-Scope",
+      "Required Deterministic Checks",
+      "Completion Boundary",
+      "Hard Constraints",
+      "Stop-Rule"
+    ],
+    "required_packet_files": [
+      "plan",
+      "sow",
+      "ledger",
+      "coder_prompt",
+      "reviewer_prompt",
+      "coder_output_stub",
+      "reviewer_output_stub",
+      "baseline_snapshot"
+    ],
+    "ledger_markers": [
+      "latest orchestrator-accepted slice",
+      "current active slice",
+      "task-level stall-or-wall-time budget",
+      "task-level stall-or-wall-time budget status"
+    ],
+    "baseline_snapshot_name": "baseline_freeze.txt"
+  },
+  "reviewer_contract": {
+    "canonical_worker_outcome_contract_source": "docs/manual/verification-truth-matrix.md :: Worker Outcome Contract",
+    "accepted_incoming_request_statuses": [
+      "pending review",
+      "pending final review"
+    ],
+    "accepted_review_request_targets": [
+      "INTERMEDIATE",
+      "FINAL"
+    ],
+    "accepted_discovery_owners": [
+      "coder",
+      "orchestrator"
+    ],
+    "accepted_worker_outcomes": [
+      "DIFF",
+      "NO-CHANGE"
+    ],
+    "accepted_review_verdicts": [
+      "LGTM",
+      "BLOCK",
+      "Request Changes",
+      "Needs verification",
+      "Needs Discussion"
+    ],
+    "accepted_outgoing_next_statuses": [
+      "pending acceptance",
+      "blocked",
+      "pending review",
+      "pending verification"
+    ],
+    "verdict_outgoing_next_status": {
+      "LGTM": "pending acceptance",
+      "BLOCK": "blocked",
+      "Request Changes": "pending review",
+      "Needs verification": "pending verification",
+      "Needs Discussion": "blocked"
+    },
+    "blocked_worker_outcome_intake_rule_line": "- reviewer intake must match the active `worker outcome`; `worker outcome=BLOCK` intake is invalid and must be rerouted to a block report",
+    "lgtm_gate": {
+      "required_request_target": "FINAL",
+      "required_incoming_request_status": "pending final review",
+      "required_artifact_integrity": "complete",
+      "required_required_verification_result": "PASS",
+      "required_tests_result": "PASS",
+      "required_adversarial_result": "PASS",
+      "required_slice_contract_sheet_status": "CLOSED",
+      "required_class_closure_sheet_status": "CLOSED",
+      "required_slice_contract_closed_universe_status": "YES",
+      "required_class_closure_closed_universe_status": "YES"
+    }
+  }
+}
