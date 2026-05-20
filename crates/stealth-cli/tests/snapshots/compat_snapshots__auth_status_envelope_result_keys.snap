@@ -1,0 +1,8 @@
+---
+source: crates/stealth-cli/tests/compat_snapshots.rs
+expression: sorted
+---
+- exit_code
+- profile
+- status
+- warn_level

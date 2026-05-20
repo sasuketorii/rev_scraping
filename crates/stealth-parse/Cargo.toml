@@ -1,0 +1,30 @@
+[package]
+name = "stealth-parse"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+description = "Adaptive element relocation + SQLite WAL cache (design adapted from Scrapling, BSD-3-Clause)."
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rusqlite = { workspace = true }
+strsim = { workspace = true }
+regex = { workspace = true }
+scraper = { workspace = true }
+ego-tree = "0.6"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true }
+
+[lints]
+workspace = true

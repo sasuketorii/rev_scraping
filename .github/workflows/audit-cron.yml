@@ -1,0 +1,31 @@
+name: Audit Cron
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  update-dryrun:
+    name: cargo update dry run
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo update --dry-run
+        run: cargo update --dry-run 2>&1 | tee cargo-update-report.txt
+      - name: Upload cargo update report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-update-report
+          path: cargo-update-report.txt
+          if-no-files-found: error

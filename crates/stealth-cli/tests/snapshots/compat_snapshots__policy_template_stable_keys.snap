@@ -1,0 +1,7 @@
+---
+source: crates/stealth-cli/tests/compat_snapshots.rs
+expression: stable
+---
+has_pool: false
+require_vpn: true
+vpn_required_country: Japan

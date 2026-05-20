@@ -1,0 +1,7 @@
+---
+source: crates/stealth-cli/tests/compat_snapshots.rs
+expression: sorted
+---
+- attempt
+- signal
+- tier

@@ -1,0 +1,21 @@
+/target
+/_refs/
+/vendor/*/target/
+/vendor/*/.git/
+Cargo.lock.bak
+*.tmp
+~/.rev_scraping/
+.DS_Store
+
+# soak runner local artifacts
+/soak/
+*.soak.log
+
+# rev-auth / chromiumoxide test scratch dirs
+/.tmp.*/
+**/.tmp.*/
+
+# Secrets — local environment files (never commit)
+.env
+.env.local
+.env.*.local

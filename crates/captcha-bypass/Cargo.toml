@@ -1,0 +1,27 @@
+[package]
+name = "captcha-bypass"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+description = "reCAPTCHA / hCaptcha / Cloudflare Turnstile bypass research (extracted from contact_dev)"
+
+[features]
+default = []
+# Wave 2.2: spawn the Node.js sidecar at sidecar/captcha-bypass.
+sidecar = ["dep:reqwest"]
+
+[dependencies]
+stealth-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true, optional = true }
+
+[lints]
+workspace = true

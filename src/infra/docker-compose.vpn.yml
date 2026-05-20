@@ -1,0 +1,150 @@
+# SPDX-License-Identifier: MIT
+# Source: vendored from rev_stealth, extended to 3-instance pool (Phase 6a).
+#
+# Multi-instance Gluetun VPN pool for rev_scraping.
+#
+# Topology (matches VPN_INSTANCES in .env.example):
+#   vpn-1  →  http_proxy host:8001  control host:8881
+#   vpn-2  →  http_proxy host:8002  control host:8882
+#   vpn-3  →  http_proxy host:8003  control host:8883
+#
+# Security posture:
+#   - FIREWALL=on            kill-switch: all non-VPN egress dropped
+#   - DOT=on                 force DNS-over-TLS, prevent DNS leaks
+#   - BLOCK_MALICIOUS=on     drop known-malicious destinations
+#   - BLOCK_IPV6=on          gluetun firewall drops IPv6 egress (defense layer 1)
+#   - sysctls disable_ipv6=1 kernel-level IPv6 off in container (defense layer 2,
+#                            also checked by vpn-rotate leak_guard.rs)
+#   - Each instance on its own private bridge → no cross-instance leakage
+#   - cap_add: NET_ADMIN + /dev/net/tun are the minimum Gluetun needs;
+#     no privileged: true.
+#
+# Secrets are sourced from `.env` (gitignored). Never bake them in.
+
+services:
+  gluetun-1:
+    image: qmcgaw/gluetun:latest
+    container_name: vpn-1
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_PROVIDER:-surfshark}
+      VPN_TYPE: openvpn
+      OPENVPN_USER: ${VPN_USER}
+      OPENVPN_PASSWORD: ${VPN_PASSWORD}
+      SERVER_COUNTRIES: ${VPN_COUNTRIES:-Japan}
+      FIREWALL: "on"
+      DOT: "on"
+      DOT_PROVIDERS: cloudflare,quad9
+      BLOCK_MALICIOUS: "on"
+      BLOCK_IPV6: "on"
+      HTTPPROXY: "on"
+      HTTPPROXY_LISTENING_ADDRESS: ":8888"
+      HTTP_CONTROL_SERVER_ADDRESS: ":8000"
+      TZ: ${TZ:-UTC}
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    ports:
+      - "127.0.0.1:8001:8888"   # HTTP proxy
+      - "127.0.0.1:8881:8000"   # control API
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/v1/openvpn/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    networks:
+      - vpn1-net
+    restart: unless-stopped
+
+  gluetun-2:
+    image: qmcgaw/gluetun:latest
+    container_name: vpn-2
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_PROVIDER:-surfshark}
+      VPN_TYPE: openvpn
+      OPENVPN_USER: ${VPN_USER}
+      OPENVPN_PASSWORD: ${VPN_PASSWORD}
+      SERVER_COUNTRIES: ${VPN_COUNTRIES:-Japan}
+      FIREWALL: "on"
+      DOT: "on"
+      DOT_PROVIDERS: cloudflare,quad9
+      BLOCK_MALICIOUS: "on"
+      BLOCK_IPV6: "on"
+      HTTPPROXY: "on"
+      HTTPPROXY_LISTENING_ADDRESS: ":8888"
+      HTTP_CONTROL_SERVER_ADDRESS: ":8000"
+      TZ: ${TZ:-UTC}
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    ports:
+      - "127.0.0.1:8002:8888"
+      - "127.0.0.1:8882:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/v1/openvpn/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    networks:
+      - vpn2-net
+    restart: unless-stopped
+
+  gluetun-3:
+    image: qmcgaw/gluetun:latest
+    container_name: vpn-3
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_PROVIDER:-surfshark}
+      VPN_TYPE: openvpn
+      OPENVPN_USER: ${VPN_USER}
+      OPENVPN_PASSWORD: ${VPN_PASSWORD}
+      SERVER_COUNTRIES: ${VPN_COUNTRIES:-Japan}
+      FIREWALL: "on"
+      DOT: "on"
+      DOT_PROVIDERS: cloudflare,quad9
+      BLOCK_MALICIOUS: "on"
+      BLOCK_IPV6: "on"
+      HTTPPROXY: "on"
+      HTTPPROXY_LISTENING_ADDRESS: ":8888"
+      HTTP_CONTROL_SERVER_ADDRESS: ":8000"
+      TZ: ${TZ:-UTC}
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    ports:
+      - "127.0.0.1:8003:8888"
+      - "127.0.0.1:8883:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/v1/openvpn/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    networks:
+      - vpn3-net
+    restart: unless-stopped
+
+# Each instance gets its own bridge so a misconfigured rule can't leak
+# traffic between tunnels.
+networks:
+  vpn1-net:
+    driver: bridge
+  vpn2-net:
+    driver: bridge
+  vpn3-net:
+    driver: bridge

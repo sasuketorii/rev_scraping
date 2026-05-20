@@ -1,0 +1,182 @@
+name: Manual E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2e_target:
+        description: E2E target to run
+        required: true
+        type: choice
+        default: obscura-only
+        options:
+          - live-spider-use-auth
+          - live-spider-use-auth-matrix
+          - live-vpn-rotation
+          - live-captcha
+          - obscura-only
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  e2e:
+    name: e2e (${{ inputs.e2e_target }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - id: obscura-key
+        name: Compute obscura cache key
+        run: |
+          if [ -d vendor/obscura ]; then
+            HASH=$(git -C vendor/obscura rev-parse HEAD 2>/dev/null || find vendor/obscura \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' \) -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1)
+          else
+            HASH=none
+          fi
+          echo "value=$HASH" >> "$GITHUB_OUTPUT"
+      - name: Cache obscura target dir
+        uses: actions/cache@v4
+        with:
+          path: vendor/obscura/target
+          key: obscura-target-${{ runner.os }}-${{ steps.obscura-key.outputs.value }}
+          restore-keys: |
+            obscura-target-${{ runner.os }}-
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Mask secrets
+        run: |
+          echo "::add-mask::${{ secrets.SURFSHARK_USER }}"
+          echo "::add-mask::${{ secrets.SURFSHARK_PASSWORD }}"
+          echo "::add-mask::${{ secrets.CAPSOLVER_API_KEY }}"
+          echo "::add-mask::${{ secrets.AUTH_FIXTURE_KEY }}"
+      - name: Build obscura --release
+        if: hashFiles('vendor/obscura/Cargo.toml') != ''
+        run: |
+          cd vendor/obscura
+          cargo build --release --bin obscura
+      - name: Run selected E2E target
+        env:
+          E2E_TARGET: ${{ inputs.e2e_target }}
+          OBSCURA_BIN: ${{ github.workspace }}/vendor/obscura/target/release/obscura
+          REV_STEALTH_OBSCURA: ${{ github.workspace }}/vendor/obscura/target/release/obscura
+          REV_SCRAPING_RUN_OBSCURA: "1"
+          REV_SCRAPING_RUN_AUTH_E2E: "1"
+          REV_SCRAPING_RUN_VPN_E2E: "1"
+          REV_SCRAPING_RUN_CAPTCHA_E2E: "1"
+          REV_SCRAPING_RUN_NETWORK: "1"
+          SURFSHARK_USER: ${{ secrets.SURFSHARK_USER }}
+          SURFSHARK_PASSWORD: ${{ secrets.SURFSHARK_PASSWORD }}
+          CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+          AUTH_FIXTURE_KEY: ${{ secrets.AUTH_FIXTURE_KEY }}
+          # P4 (B3) live-matrix targets. Populate as repository secrets to
+          # exercise the 3-site authorised matrix. Unset secrets cause the
+          # corresponding env-driven test to skip cleanly.
+          E2E_CF_SITE_URL: ${{ secrets.E2E_CF_SITE_URL }}
+          E2E_CF_SITE_PROFILE: ${{ secrets.E2E_CF_SITE_PROFILE }}
+          E2E_CF_SITE_MARKER: ${{ secrets.E2E_CF_SITE_MARKER }}
+          E2E_CF_SITE_AUP: ${{ secrets.E2E_CF_SITE_AUP }}
+          E2E_SPA_SITE_URL: ${{ secrets.E2E_SPA_SITE_URL }}
+          E2E_SPA_SITE_PROFILE: ${{ secrets.E2E_SPA_SITE_PROFILE }}
+          E2E_SPA_SITE_MARKER: ${{ secrets.E2E_SPA_SITE_MARKER }}
+          E2E_SPA_SITE_AUP: ${{ secrets.E2E_SPA_SITE_AUP }}
+          E2E_SSR_SITE_URL: ${{ secrets.E2E_SSR_SITE_URL }}
+          E2E_SSR_SITE_PROFILE: ${{ secrets.E2E_SSR_SITE_PROFILE }}
+          E2E_SSR_SITE_MARKER: ${{ secrets.E2E_SSR_SITE_MARKER }}
+          E2E_SSR_SITE_AUP: ${{ secrets.E2E_SSR_SITE_AUP }}
+        run: |
+          set -euo pipefail
+          case "$E2E_TARGET" in
+            obscura-only)
+              cargo test --workspace -- --ignored obscura_lifecycle cdp_shim_e2e e2e_spider_fallback
+              ;;
+            live-spider-use-auth)
+              cargo test -p stealth-cli --test e2e_auth_flow -- --ignored e2e_spider_with_use_auth_replays_cookies
+              ;;
+            live-spider-use-auth-matrix)
+              # P4 (B3) live matrix: 3 authorised targets (CF-protected / SPA /
+              # SSR). Each iteration receives its target URL + profile + AUP
+              # pattern + optional content marker via environment, set as repo
+              # secrets to keep real values out of source. The test
+              # `e2e_spider_use_auth_live_env_driven` skips automatically if
+              # any required env var is missing, so undefined matrix entries
+              # are no-ops rather than failures.
+              set +e
+              FAILED=0
+              for SITE in cf-site spa-site ssr-site; do
+                case "$SITE" in
+                  cf-site)
+                    export REV_SCRAPING_E2E_TARGET_URL="${E2E_CF_SITE_URL:-}"
+                    export REV_SCRAPING_E2E_AUTH_PROFILE="${E2E_CF_SITE_PROFILE:-}"
+                    export REV_SCRAPING_E2E_ASSERT_MARKER="${E2E_CF_SITE_MARKER:-}"
+                    export REV_SCRAPING_E2E_AUP_PATTERN="${E2E_CF_SITE_AUP:-}"
+                    ;;
+                  spa-site)
+                    export REV_SCRAPING_E2E_TARGET_URL="${E2E_SPA_SITE_URL:-}"
+                    export REV_SCRAPING_E2E_AUTH_PROFILE="${E2E_SPA_SITE_PROFILE:-}"
+                    export REV_SCRAPING_E2E_ASSERT_MARKER="${E2E_SPA_SITE_MARKER:-}"
+                    export REV_SCRAPING_E2E_AUP_PATTERN="${E2E_SPA_SITE_AUP:-}"
+                    ;;
+                  ssr-site)
+                    export REV_SCRAPING_E2E_TARGET_URL="${E2E_SSR_SITE_URL:-}"
+                    export REV_SCRAPING_E2E_AUTH_PROFILE="${E2E_SSR_SITE_PROFILE:-}"
+                    export REV_SCRAPING_E2E_ASSERT_MARKER="${E2E_SSR_SITE_MARKER:-}"
+                    export REV_SCRAPING_E2E_AUP_PATTERN="${E2E_SSR_SITE_AUP:-}"
+                    ;;
+                esac
+                echo "::group::live-spider-use-auth $SITE"
+                cargo test -p stealth-cli --test e2e_spider_use_auth_mock \
+                  -- --ignored e2e_spider_use_auth_live_env_driven --nocapture \
+                  || FAILED=$((FAILED + 1))
+                echo "::endgroup::"
+              done
+              set -e
+              if [ "$FAILED" -ne 0 ]; then
+                echo "live matrix failures: $FAILED" >&2
+                exit 1
+              fi
+              ;;
+            live-vpn-rotation)
+              ENV_FILE="$(mktemp)"
+              chmod 600 "$ENV_FILE"
+              {
+                printf 'VPN_PROVIDER=surfshark\n'
+                printf 'VPN_USER=%s\n' "$SURFSHARK_USER"
+                printf 'VPN_PASSWORD=%s\n' "$SURFSHARK_PASSWORD"
+                printf 'VPN_COUNTRIES=Japan\n'
+              } > "$ENV_FILE"
+              export ENV_FILE
+              bash scripts/vpn_up.sh
+              trap 'bash scripts/vpn_down.sh' EXIT
+              cargo test -p stealth-cli --test e2e_vpn_proxy -- --ignored
+              ;;
+            live-captcha)
+              test -n "${CAPSOLVER_API_KEY:-}"
+              cargo test -p captcha-bypass --features sidecar -- --nocapture
+              ;;
+            *)
+              echo "unknown e2e_target: $E2E_TARGET" >&2
+              exit 2
+              ;;
+          esac
+      - name: Upload E2E logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ inputs.e2e_target }}
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore

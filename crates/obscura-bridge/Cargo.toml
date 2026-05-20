@@ -1,0 +1,43 @@
+[package]
+name = "obscura-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+description = "Bridge between rev_scraping and the vendored obscura browser binary (subprocess + CDP)."
+
+[features]
+default = []
+# TLS ClientHello dump. Implementation gated on Phase 0 SOW (S3 observation
+# mechanism). Currently exposes an `unimplemented!()` stub so downstream code
+# can compile against the API surface.
+tls-dump = []
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+chromiumoxide = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures = { workspace = true }
+futures-util = "0.3"
+reqwest = { workspace = true }
+chrono = { workspace = true }
+secrecy = { workspace = true }
+mobile-fp = { path = "../mobile-fp" }
+stealth-core = { path = "../stealth-core" }
+dashmap = "6"
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

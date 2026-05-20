@@ -1,0 +1,259 @@
+# =====================================================================
+#  rev_scraping — Site Recipe Template (L2 discovery cache)
+# ---------------------------------------------------------------------
+#  This file is a *structural reference* only. It is NOT a working
+#  recipe for example.com. Copy it to
+#      ~/.rev_scraping/sites/<your-domain>.toml
+#  and fill in real values. Fields prefixed with `# REQUIRED` MUST be
+#  present; everything else is optional and may be omitted.
+#
+#  Schema version: 2 (Phase 8: proxy tier auto-learn fields added)
+#  Loader:         stealth-sites::SiteRecipe (v1 recipes still load;
+#                  new fields default to None/empty when absent)
+#  Companion L1:   ~/.rev_scraping/parse.sqlite (stealth-parse cache)
+# =====================================================================
+
+schema_version = 2
+
+# ---------------------------------------------------------------------
+# [site] — identity & high-level classification
+# ---------------------------------------------------------------------
+[site]
+# REQUIRED. eTLD+1. Used as the cache key (filename == domain).
+domain = "example.com"
+
+# REQUIRED. ISO-8601 UTC. Updated automatically on `--cache-refresh`.
+last_verified = "2026-05-12T00:00:00Z"
+
+# REQUIRED. One of: "spa" | "ssr" | "hybrid" | "api-only" | "static".
+rendering = "spa"
+
+# Optional. Detected frontend framework. Free-form but prefer:
+#   "nuxt" | "next" | "remix" | "sveltekit" | "wordpress" | "ghost"
+#   | "shopify" | "astro" | "vanilla" | "unknown"
+framework = "nuxt"
+
+# Optional. Backend hint, used to pick parser heuristics.
+backend_hint = "node-express"
+
+# Optional. Free-form tags for filtering (`rev-stealth recipe list --tag paywall`).
+tags = ["paywall", "article", "user-profile"]
+
+# ---------------------------------------------------------------------
+# [api] — root API descriptor (one per recipe)
+# ---------------------------------------------------------------------
+[api]
+# REQUIRED. Base URL prefix prepended to endpoint `path` fields.
+base_url = "https://api.example.com"
+
+# Whether **any** documented endpoint needs auth to return useful data.
+public_auth_required = false
+
+# One of: "none" | "cookie" | "bearer" | "basic" | "custom".
+# NOTE: credentials themselves are NEVER stored here. See `.secrets`.
+auth_method = "none"
+
+# Optional. Name of secret key in `~/.rev_scraping/secrets.toml` if any.
+# Loader will resolve it lazily; absence is not an error unless used.
+auth_secret_ref = ""
+
+# Recommended client-side throttle. Honored by spider unless overridden.
+rate_limit_recommendation = { rps = 2.0, burst = 4 }
+
+# Optional. Default response encoding.
+response_encoding = "json"
+
+# ---------------------------------------------------------------------
+# [[api.endpoints]] — repeatable. Each row is one discovered endpoint.
+# ---------------------------------------------------------------------
+[[api.endpoints]]
+# REQUIRED. Logical name used by callers (`recipe.endpoints("article")`).
+purpose = "article"
+
+# REQUIRED. RFC 6570 URI template relative to `api.base_url`.
+path = "/v1/articles/{article_id}"
+
+# Optional convenience: the fully expanded pattern (for documentation).
+url_pattern = "https://api.example.com/v1/articles/{article_id}"
+
+# REQUIRED. Uppercase HTTP verb.
+http_method = "GET"
+
+# Required headers (lowercase keys). Values may reference env via `${VAR}`.
+required_headers = { accept = "application/json" }
+
+# Optional. Query params required for a successful response.
+required_query = []
+
+# JSON Pointer style hints describing where data lives.
+response_shape = { root = "/data", item = "/data" }
+
+# How the endpoint was found. One of:
+#   "manual" | "ssr-payload" | "js-bundle" | "network-capture"
+#   | "openapi" | "sitemap" | "agent-mcp"
+discovered_via = "network-capture"
+
+# REQUIRED. ISO-8601 UTC of last successful 200.
+last_verified = "2026-05-12T00:00:00Z"
+
+# Optional. Observed average latency (ms) — used for budget planning.
+avg_latency_ms = 180
+
+# Optional. Status codes other than 200 considered "OK" (e.g. 304).
+ok_status = [200, 304]
+
+[[api.endpoints]]
+purpose = "user_profile"
+path = "/v1/users/{username}"
+url_pattern = "https://api.example.com/v1/users/{username}"
+http_method = "GET"
+required_headers = { accept = "application/json" }
+response_shape = { root = "/data" }
+discovered_via = "ssr-payload"
+last_verified = "2026-05-12T00:00:00Z"
+
+[[api.endpoints]]
+purpose = "user_articles"
+path = "/v1/users/{username}/articles"
+http_method = "GET"
+required_query = ["page", "per_page"]
+response_shape = { root = "/data", item = "/data/items", paging = "/data/meta" }
+discovered_via = "network-capture"
+last_verified = "2026-05-12T00:00:00Z"
+
+# ---------------------------------------------------------------------
+# [scraping_strategy] — how the spider should approach this domain
+# ---------------------------------------------------------------------
+[scraping_strategy]
+# One of: "api" | "obscura" | "reqwest" | "stealth-cf" | "hybrid"
+preferred_method = "api"
+
+# Used when preferred_method fails (e.g. 403, captcha, schema drift).
+fallback_method = "obscura"
+
+# Field names (in the parsed result) that require auth/payment.
+paywall_fields = ["body", "premium_content"]
+
+# Fields safe to fetch without auth.
+public_fields = ["title", "intro", "author", "price", "published_at"]
+
+# Optional: should we follow internal links automatically?
+follow_internal_links = false
+
+# Optional: max depth when crawling.
+max_depth = 1
+
+# ---------------------------------------------------------------------
+# Phase 8 — proxy tier auto-learn (schema_version >= 2)
+# ---------------------------------------------------------------------
+# These fields are populated automatically by the resolver when a
+# request invoked under `proxy_tier = "auto"` succeeds (or fails) at a
+# specific tier. Editing them by hand is allowed but typically
+# unnecessary. Both fields are OPTIONAL; schema_version=1 recipes that
+# omit them load unchanged.
+#
+# `proxy_tier_recommended`: the tier that most recently succeeded for
+# this domain. The resolver promotes it to the front of the auto chain
+# on subsequent runs (still filtered by `min_proxy_strength`).
+proxy_tier_recommended = "surfshark"
+#
+# `proxy_tier_blacklist`: tiers that consumed a `fail_signal` for this
+# domain. Entries auto-expire after
+# `[fallback_chain] blacklist_ttl_days` (policy.toml; default 14d).
+# Demoted (not skipped) in the auto chain.
+proxy_tier_blacklist = [
+    { name = "direct", observed_at = "2026-05-12T03:14:00Z", signal = "http_403" },
+]
+#
+# `min_proxy_strength`: per-recipe floor. Overrides authorized.toml's
+# floor only when stricter (max of the two wins). Useful when a
+# domain's protection level changes mid-Phase. Values: none | datacenter
+# | residential | mobile.
+min_proxy_strength = "datacenter"
+
+# ---------------------------------------------------------------------
+# [rate_limits] — runtime concurrency caps (per process)
+# ---------------------------------------------------------------------
+[rate_limits]
+concurrent = 2
+delay_ms = 500
+jitter_ms = 250
+respect_retry_after = true
+
+# ---------------------------------------------------------------------
+# [selectors] — DOM selectors keyed by stealth-parse stable_id.
+#               Used only when scraping_strategy.preferred_method falls
+#               back to HTML parsing.
+# ---------------------------------------------------------------------
+[selectors]
+title       = { css = "h1.article-title",       stable_id = "sp_title_v1" }
+body        = { css = "div.article-body",       stable_id = "sp_body_v1" }
+author      = { css = "a.author-name",          stable_id = "sp_author_v1" }
+published_at = { css = "time[datetime]", attr = "datetime", stable_id = "sp_date_v1" }
+
+# ---------------------------------------------------------------------
+# [fingerprint] — recommended TLS/HTTP fingerprint preset.
+#                 Resolved by mobile-fp crate at runtime.
+# ---------------------------------------------------------------------
+[fingerprint]
+mobile_preset = "ios_safari_17"
+sec_ch_ua_required = true
+referer_policy = "strict-origin-when-cross-origin"
+accept_language = "ja,en-US;q=0.9,en;q=0.8"
+
+# ---------------------------------------------------------------------
+# [anti_bot] — protections observed at the edge
+# ---------------------------------------------------------------------
+[anti_bot]
+cloudflare = false
+turnstile  = false
+datadome   = false
+recaptcha  = false
+akamai     = false
+# Strategy when bypass needed. One of:
+#   "none" | "obscura" | "stealth-cf" | "manual-cookie"
+bypass_strategy = "none"
+
+# ---------------------------------------------------------------------
+# [notes] — free-form. agent jots anything noteworthy here.
+# ---------------------------------------------------------------------
+[notes]
+text = """
+Example notes section. Document any quirks discovered during crawling:
+- SSR payload is embedded in <script id="__NUXT_DATA__">.
+- API returns 429 when concurrency > 4, even from residential IPs.
+- Mobile UA returns different field set than desktop UA.
+"""
+
+# ---------------------------------------------------------------------
+# [auth] — interactive-login recipe (optional, Phase 9)
+# ---------------------------------------------------------------------
+# Describes how a human can log in once so subsequent scrapes can
+# replay the session. Populated by `rev-auth login` (Phase 9b/9c).
+# Omit this section entirely for sites that work without login.
+[auth]
+# Whether this site is unusable without auth (true) or merely
+# returns richer data with auth (false).
+required = false
+
+# REQUIRED if section present. The URL a human visits to log in.
+login_url = "https://example.com/login"
+
+# Optional regex over the URL bar; matched to detect "login done".
+completion_pattern = "^https://example\\.com/(dashboard|home)"
+
+# Optional name of an AuthStore profile that the recipe recommends.
+recommended_profile = "example-default"
+
+# What to do when an auth-aware command runs without --use-auth:
+#   "refuse"        -> reject (exit code 4). Default for member sites.
+#   "warn-continue" -> log a warning, continue (degraded data).
+#   "allow"         -> auth purely optional. No warning.
+refusal_policy = "allow"
+
+# Optional. Expected session lifetime; used to warn when a profile
+# captured longer ago than this is about to be replayed.
+session_ttl_days = 14
+
+# Free-form operator note.
+note = "Login uses email + magic link. 2FA optional."
