@@ -1,0 +1,11 @@
+Capture and encrypt authorized browser auth cookies
+
+Usage: rev-auth <COMMAND>
+
+Commands:
+  login  
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version

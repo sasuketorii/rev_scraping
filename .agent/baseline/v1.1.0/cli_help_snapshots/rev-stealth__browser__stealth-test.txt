@@ -1,0 +1,14 @@
+Run a stealth self-test: launch a stealth browser, navigate to the target detection page (defaults to bot.sannysoft.com), wait briefly, then dump UA / viewport / title
+
+Usage: rev-stealth browser stealth-test [OPTIONS]
+
+Options:
+      --format <FORMAT>    Output format [default: human] [possible values: human, json]
+      --target <TARGET>    Detection page to probe [default: https://bot.sannysoft.com/]
+      --profile <PROFILE>  [default: mobile-ios]
+  -v, --verbose...         Verbose logging (`-v`, `-vv`, `-vvv`)
+      --stealth <STEALTH>  [default: full]
+      --dwell <DWELL>      [default: 5]
+      --headed             
+      --chrome <CHROME>    [env: REV_STEALTH_CHROME=]
+  -h, --help               Print help

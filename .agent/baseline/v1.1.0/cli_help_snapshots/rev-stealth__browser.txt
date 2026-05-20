@@ -1,0 +1,13 @@
+Stealth browser operations (launch a profile, run a stealth-test sweep)
+
+Usage: rev-stealth browser [OPTIONS] <COMMAND>
+
+Commands:
+  launch        Launch a stealth browser, navigate to a URL, and emit JSON about the resulting page (UA / viewport / title / final URL). Useful as a smoke test that the launcher works on this host
+  stealth-test  Run a stealth self-test: launch a stealth browser, navigate to the target detection page (defaults to bot.sannysoft.com), wait briefly, then dump UA / viewport / title
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+      --format <FORMAT>  Output format [default: human] [possible values: human, json]
+  -v, --verbose...       Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help             Print help

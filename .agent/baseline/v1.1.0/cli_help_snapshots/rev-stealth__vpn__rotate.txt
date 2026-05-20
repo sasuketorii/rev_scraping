@@ -1,0 +1,12 @@
+Trigger a VPN rotation. With `lazy-on-fail`, rotation is skipped unless the failure counter has crossed the threshold
+
+Usage: rev-stealth vpn rotate [OPTIONS]
+
+Options:
+      --format <FORMAT>      Output format [default: human] [possible values: human, json]
+      --provider <PROVIDER>  VPN provider slug (currently only `surfshark`) [default: surfshark]
+      --strategy <STRATEGY>  Rotation strategy: `lazy-on-fail`, `every-n`, `interval` [default: lazy-on-fail]
+  -v, --verbose...           Verbose logging (`-v`, `-vv`, `-vvv`)
+      --region <REGION>      Optional region (`jp`, `us-west`, `de`, ...). Cycled through when omitted
+      --reason <REASON>      Reason hint; recorded in the audit log for forensics [default: manual]
+  -h, --help                 Print help

@@ -1,0 +1,13 @@
+Solve a CAPTCHA challenge
+
+Usage: rev-stealth captcha solve [OPTIONS] --type <TYPE> --site-url <URL>
+
+Options:
+      --format <FORMAT>  Output format [default: human] [possible values: human, json]
+      --type <TYPE>      Challenge type: `recaptcha-v2`, `recaptcha-v3`, `hcaptcha`, `turnstile`
+      --site-url <URL>   Target site URL hosting the challenge
+  -v, --verbose...       Verbose logging (`-v`, `-vv`, `-vvv`)
+      --site-key <KEY>   Sitekey (auto-detected if omitted on supported challenge types)
+      --action <ACTION>  reCAPTCHA v3 action label [default: submit]
+      --dry-run          Skip the live solver and exercise the sidecar plumbing only. Useful for CI smoke tests
+  -h, --help             Print help

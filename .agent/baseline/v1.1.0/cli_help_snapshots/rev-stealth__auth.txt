@@ -1,0 +1,17 @@
+Authenticated session capture / lifecycle (Phase 9d). Subcommands: login / list / show / delete / status / refresh
+
+Usage: rev-stealth auth [OPTIONS] <COMMAND>
+
+Commands:
+  login    Spawn `rev-auth` for interactive login; AUP-gated
+  list     List saved profiles (metadata only, cookie values never disclosed)
+  show     Show a single profile's metadata (redacted)
+  delete   Delete a profile with shred-on-delete
+  status   Report freshness/expiry status for a profile
+  refresh  Re-run interactive login, overwriting an existing profile
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --format <FORMAT>  Output format [default: human] [possible values: human, json]
+  -v, --verbose...       Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help             Print help

@@ -1,0 +1,21 @@
+Pre-flight leak-prevention checks (kill-switch / DNS / IPv6 / WebRTC). Exits with code 7 when any check fails (fail-closed)
+
+Usage: rev-stealth doctor [OPTIONS]
+
+Options:
+      --container <CONTAINER>
+          VPN container name to inspect [default: gluetun]
+      --format <FORMAT>
+          Output format [default: human] [possible values: human, json]
+      --expected-country <EXPECTED_COUNTRY>
+          Expected VPN exit country (ISO-2, e.g. "JP"). Skipped when omitted
+  -v, --verbose...
+          Verbose logging (`-v`, `-vv`, `-vvv`)
+      --output-format <OUTPUT_FORMAT>
+          Output format for doctor diagnostic results: `json` (machine-parseable, default) or `text` (human-readable) [default: json] [possible values: json, text]
+      --skip-exit-ip
+          Skip the live `ipinfo.io` exit-IP probe (offline / CI mode)
+      --deep
+          v1.1.0 (P16): run extended stack health checks (obscura binary, VPN instance pool, sites recipe count, auth profile validity, AuthStore key source). The default check set stays minimal so the existing fail-closed contract (exit 7 on leak) is unchanged; `--deep` adds non-leak diagnostic WARN/FAIL items
+  -h, --help
+          Print help

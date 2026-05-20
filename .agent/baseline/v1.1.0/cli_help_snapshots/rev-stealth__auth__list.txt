@@ -1,0 +1,8 @@
+List saved profiles (metadata only, cookie values never disclosed)
+
+Usage: rev-stealth auth list [OPTIONS]
+
+Options:
+      --format <FORMAT>  Output format [default: human] [possible values: human, json]
+  -v, --verbose...       Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help             Print help

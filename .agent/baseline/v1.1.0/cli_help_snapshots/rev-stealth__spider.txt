@@ -1,0 +1,77 @@
+AUP-gated browse + optional CF eval + optional adaptive relocate
+
+Usage: rev-stealth spider [OPTIONS] --url <URL>
+
+Options:
+      --format <FORMAT>
+          Output format [default: human] [possible values: human, json]
+      --url <URL>
+          Target URL
+      --session-id <SESSION_ID>
+          Session id (auto-generated when omitted)
+  -v, --verbose...
+          Verbose logging (`-v`, `-vv`, `-vvv`)
+      --mobile-preset <MOBILE_PRESET>
+          Mobile fingerprint preset slug
+      --cf-evaluate
+          Evaluate Cloudflare Turnstile resilience (defender-testbed; no solver)
+      --vpn
+          Route through `vpn-rotate` before launch
+      --stable-id <STABLE_ID>
+          stable_id to locate via `stealth-parse` after navigation
+      --threshold <THRESHOLD>
+          Similarity threshold for relocate [default: 0.85]
+      --strict
+          Treat Ambiguous relocate as a hard failure (exit code 10)
+      --i-have-authorization
+          AUP bypass (logs a warn). Equivalent to env-ack for the day
+      --obscura <OBSCURA>
+          Path to the obscura binary. Overridable via env [env: REV_STEALTH_OBSCURA=]
+      --parse-store <PARSE_STORE>
+          Optional ParseStore path (defaults to `~/.rev_scraping/parse.sqlite`)
+      --use-auth <USE_AUTH>
+          Replay stored auth cookies and browser headers from the named profile
+      --auth-domain <AUTH_DOMAIN>
+          Auth AAD/domain context to load; defaults to the target host
+      --http-only
+          Skip obscura entirely and fetch via reqwest. Implies no JS execution, no CF eval, no DOM injection
+      --auto-fallback
+          When obscura launch / CDP fails, automatically retry with reqwest. Default true; set `--no-auto-fallback` to disable for deterministic agent workflows that need a hard exit-3 on browser failure
+      --no-auto-fallback
+          Explicit disable for `--auto-fallback` (overrides the default)
+      --dump-html <DUMP_HTML>
+          Dump the fetched HTML to the given path (UTF-8). With obscura, the post-render `document.documentElement.outerHTML` is captured (so SPAs land hydrated); with the reqwest fallback / `--http-only`, the raw response body is written. Parent directories are created as needed and the file is created with mode `0600` on Unix
+      --wait-ms <WAIT_MS>
+          After obscura navigate completes, wait N milliseconds before dumping the HTML. Useful for SPA hydration. No-op on the reqwest fallback path
+      --wait-selector <WAIT_SELECTOR>
+          After obscura navigate completes, wait until the given CSS selector appears in the DOM (max 30 seconds). Takes precedence over `--wait-ms`. No-op on the reqwest fallback path
+      --require-vpn
+          Force the VPN-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1` only in the sense that env can't be loosened further
+      --allow-no-vpn
+          Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1` (which is the only way to enforce the policy from outside the process)
+      --vpn-instance <VPN_INSTANCE>
+          Force this invocation to use the named VPN instance, overriding the HRW session-sticky pick. Useful for tests and reproducible runs. Must match a `name` in the configured `vpn_instances` list
+      --proxy-tier <PROXY_TIER>
+          Force a named proxy tier (e.g. "direct", "surfshark", "warp", "iproyal") or "auto" to use the configured fallback chain. Mutually exclusive with `--vpn-instance` unless the tier is exactly "surfshark"
+      --no-fallback
+          Disable the fallback chain; one attempt at the selected tier only
+      --leak-poll-secs <LEAK_POLL_SECS>
+          Polling interval (seconds) for the background leak monitor. Only honoured when `require_vpn=true`. Range [5, 300]; out-of-range values are clamped. Default 30s [default: 30]
+      --no-cache
+          Skip recipe lookup AND skeleton save for this invocation
+      --cache-refresh
+          Ignore any existing recipe, run full discovery, and overwrite the recipe on success
+      --cache-only
+          Hard-require a recipe hit. On miss, exit code 9 and do nothing
+      --cache-ttl <CACHE_TTL>
+          Treat recipes whose `last_verified` is older than DAYS as expired. Default: 30 days. Expired recipes are refreshed and overwritten [default: 30]
+      --recipe-dir <RECIPE_DIR>
+          Override the recipe directory (defaults to `~/.rev_scraping/sites/`)
+      --recipe-endpoint <RECIPE_ENDPOINT>
+          When a recipe is hit and exposes API endpoints, call the endpoint matching this `purpose` directly via reqwest, skipping browser entirely
+      --recipe-param <KEY=VALUE>
+          Placeholder substitutions for the recipe endpoint URL. Repeatable; e.g. `--recipe-param username=alice --recipe-param id=42`
+      --recipe-no-learn
+          Disable Phase 7c auto-learning (Network capture + JS bundle scan + recipe upsert). Privacy-sensitive runs may opt out; the skeleton save still applies unless `--no-cache` is set. Default: off (i.e. learning is ON)
+  -h, --help
+          Print help

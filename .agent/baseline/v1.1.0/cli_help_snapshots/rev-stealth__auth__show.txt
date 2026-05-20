@@ -1,0 +1,9 @@
+Show a single profile's metadata (redacted)
+
+Usage: rev-stealth auth show [OPTIONS] --profile <PROFILE>
+
+Options:
+      --format <FORMAT>    Output format [default: human] [possible values: human, json]
+      --profile <PROFILE>  
+  -v, --verbose...         Verbose logging (`-v`, `-vv`, `-vvv`)
+  -h, --help               Print help

@@ -1,0 +1,11 @@
+v1.1.0 (P15): local fingerprint diagnostics for monitoring. External SaaS calls are opt-in via `--enable-external`
+
+Usage: rev-stealth measure [OPTIONS] --url <URL>
+
+Options:
+      --format <FORMAT>          Output format [default: human] [possible values: human, json]
+      --url <URL>                URL to measure against. The page is not actually fetched unless `--enable-external` is set; we only validate the URL shape here
+      --enable-external          Opt-in to external fingerprint SaaS calls (CreepJS, bot.sannysoft.com, etc.). Default: disabled
+  -v, --verbose...               Verbose logging (`-v`, `-vv`, `-vvv`)
+      --user-agent <USER_AGENT>  Optional override for the User-Agent we attribute the measurement to. When omitted we use a neutral rev-stealth placeholder
+  -h, --help                     Print help
