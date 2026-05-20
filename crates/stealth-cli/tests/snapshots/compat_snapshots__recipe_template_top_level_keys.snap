@@ -1,0 +1,14 @@
+---
+source: crates/stealth-cli/tests/compat_snapshots.rs
+expression: keys
+---
+- anti_bot
+- api
+- auth
+- fingerprint
+- notes
+- rate_limits
+- schema_version
+- scraping_strategy
+- selectors
+- site

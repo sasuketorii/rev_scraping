@@ -1,0 +1,13 @@
+---
+source: crates/stealth-cli/tests/compat_snapshots.rs
+expression: names
+---
+- captcha
+- browser
+- vpn
+- doctor
+- spider
+- relocate
+- cf-evaluate
+- auth
+- measure

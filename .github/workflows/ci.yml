@@ -1,0 +1,317 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
+
+  check:
+    name: cargo check (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+        toolchain: ["1.83", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.toolchain == 'stable'
+      - uses: dtolnay/rust-toolchain@1.83.0
+        if: matrix.toolchain == '1.83'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+      - name: cargo check --workspace --all-targets
+        run: cargo check --workspace --all-targets
+
+  clippy:
+    name: cargo clippy (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+        toolchain: ["1.83", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.toolchain == 'stable'
+        with:
+          components: clippy
+      - uses: dtolnay/rust-toolchain@1.83.0
+        if: matrix.toolchain == '1.83'
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+      - name: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: cargo test (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+        toolchain: ["1.83", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.toolchain == 'stable'
+      - uses: dtolnay/rust-toolchain@1.83.0
+        if: matrix.toolchain == '1.83'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+      - name: cargo test --workspace --no-fail-fast
+        run: cargo test --workspace --no-fail-fast
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}-${{ matrix.toolchain }}
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  docs:
+    name: cargo doc
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo doc --workspace --no-deps
+        run: cargo doc --workspace --no-deps
+
+  spdx:
+    name: source and license checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Check source annotations and SPDX
+        run: bash scripts/check_source_and_spdx.sh
+      - name: Check BSL contamination
+        run: bash scripts/check_bsl_contamination.sh
+
+  build-obscura:
+    name: Build vendored obscura binary
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    outputs:
+      obscura-key: ${{ steps.key.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - id: key
+        name: Compute obscura cache key
+        run: |
+          if [ -d vendor/obscura ]; then
+            HASH=$(git -C vendor/obscura rev-parse HEAD 2>/dev/null || find vendor/obscura \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' \) -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1)
+          else
+            HASH=none
+          fi
+          echo "value=$HASH" >> "$GITHUB_OUTPUT"
+      - name: Cache obscura target dir
+        id: obscura-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/obscura/target
+          key: obscura-target-${{ runner.os }}-${{ steps.key.outputs.value }}
+          restore-keys: |
+            obscura-target-${{ runner.os }}-
+      - name: Build obscura --release
+        if: hashFiles('vendor/obscura/Cargo.toml') != ''
+        run: |
+          cd vendor/obscura
+          cargo build --release --bin obscura
+      - name: Upload obscura binary
+        if: hashFiles('vendor/obscura/Cargo.toml') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/obscura
+          retention-days: 1
+          if-no-files-found: error
+
+  test-obscura-lifecycle:
+    name: E2E obscura_lifecycle
+    needs: build-obscura
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Download obscura binary
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/
+      - name: chmod +x obscura
+        run: chmod +x vendor/obscura/target/release/obscura
+      - name: cargo test -- --ignored obscura_lifecycle
+        env:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+        run: |
+          export OBSCURA_BIN="$(pwd)/vendor/obscura/target/release/obscura"
+          export REV_STEALTH_OBSCURA="$OBSCURA_BIN"
+          cargo test --workspace -- --ignored obscura_lifecycle
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: obscura-lifecycle-logs
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  test-cdp-shim-lifecycle:
+    name: E2E cdp_shim_e2e
+    needs: build-obscura
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Download obscura binary
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/
+      - name: chmod +x obscura
+        run: chmod +x vendor/obscura/target/release/obscura
+      - name: cargo test -- --ignored cdp_shim_e2e
+        env:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+        run: |
+          export OBSCURA_BIN="$(pwd)/vendor/obscura/target/release/obscura"
+          export REV_STEALTH_OBSCURA="$OBSCURA_BIN"
+          cargo test --workspace -- --ignored cdp_shim_e2e
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdp-shim-logs
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  test-spider-fallback:
+    name: E2E e2e_spider_fallback
+    needs: build-obscura
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Download obscura binary
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/
+      - name: chmod +x obscura
+        run: chmod +x vendor/obscura/target/release/obscura
+      - name: cargo test -- --ignored e2e_spider_fallback
+        env:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+        run: |
+          export OBSCURA_BIN="$(pwd)/vendor/obscura/target/release/obscura"
+          export REV_STEALTH_OBSCURA="$OBSCURA_BIN"
+          cargo test --workspace -- --ignored e2e_spider_fallback
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spider-fallback-logs
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore

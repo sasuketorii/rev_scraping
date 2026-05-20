@@ -1,0 +1,15 @@
+rev_scraping
+Copyright 2026 Sasuke Torii
+
+This product includes software from obscura
+Copyright 2024 h4ckf0r0day
+Licensed under the Apache License, Version 2.0 (vendored at vendor/obscura/)
+
+Cloudflare Turnstile detection / iframe evaluation logic
+design adapted from Scrapling (BSD-3-Clause, D4Vinci)
+No verbatim code copy.
+
+Adaptive selector / SQLite WAL design adapted from
+Scrapling (BSD-3-Clause, D4Vinci)
+
+goscrapy (BSL) — design pattern reference only (no verbatim code).

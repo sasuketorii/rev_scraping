@@ -1,0 +1,29 @@
+[package]
+name = "stealth-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+description = "Core traits and shared types for rev_stealth (browser stealth / captcha bypass / VPN rotation)"
+
+[features]
+default = ["browser"]
+# Pulls in chromiumoxide + the stealth browser launcher. Disable for
+# minimal-dependency builds (e.g. just the error / profile types).
+browser = ["dep:chromiumoxide", "dep:futures"]
+
+[dependencies]
+mobile-fp = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+chromiumoxide = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+
+[lints]
+workspace = true

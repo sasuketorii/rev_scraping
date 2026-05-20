@@ -1,0 +1,37 @@
+[package]
+name = "vpn-rotate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+description = "VPN IP rotation (Surfshark / Gluetun) with lazy-rotate-on-fail strategy"
+
+[features]
+default = []
+# Wave 3: enable bollard-backed Docker control + reqwest IP lookup.
+docker = ["dep:bollard", "dep:reqwest"]
+
+[dependencies]
+stealth-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+regex = { workspace = true }
+url = { workspace = true }
+toml = "0.8"
+bollard = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+dashmap = "6"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

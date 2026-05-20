@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: MIT
+# gitleaks configuration for rev_scraping (P10 security hardening).
+# Run with: gitleaks detect --source . --no-banner --config .gitleaks.toml
+#
+# Extends the default gitleaks ruleset with project-specific patterns for
+# VPN credentials, cookie material, and Surfshark-style OpenVPN secrets that
+# have appeared in our `_refs/` history.
+
+title = "rev_scraping gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that contain templates, vendored refs, lock files, or generated changelogs"
+paths = [
+    '''\.lock$''',
+    '''(^|/)_refs/''',
+    '''(^|/)vendor/''',
+    '''\.example\.toml$''',
+    '''\.env\.example$''',
+    # Local-only env files are gitignored (see .gitignore) and never enter
+    # version control. gitleaks `--no-git` mode scans the working tree so we
+    # explicitly drop them here to keep the workstation scan clean. The real
+    # invariant is enforced by `.gitignore` + the `--git` mode used in CI.
+    '''(^|/)\.env(\.[^/]+)?\.local$''',
+    '''(^|/)CHANGELOG\.md$''',
+    '''(^|/)target/''',
+    '''(^|/)\.agent/''',
+    '''(^|/)\.tmp\.[^/]+/''',
+]
+regexes = [
+    # Allow obvious placeholders in docs/templates.
+    '''(?i)(REPLACE_ME|YOUR_[A-Z_]+_HERE|<your[-_][a-z0-9_-]+>|example\.com)''',
+]
+
+[[rules]]
+id = "revscraping-vpn-credentials"
+description = "Inline VPN_USER / VPN_PASSWORD assignment with a real-looking value"
+regex = '''(?i)(VPN_USER(NAME)?|VPN_PASSWORD|SURFSHARK_(USER|PASSWORD))\s*[:=]\s*['"][^'"\s$]{8,}['"]'''
+tags = ["vpn", "credential"]
+
+[[rules]]
+id = "revscraping-cookie-value"
+description = "cookie_value / session_cookie assignment with high-entropy payload"
+regex = '''(?i)(cookie[_-]?value|session[_-]?cookie|auth[_-]?cookie)\s*[:=]\s*['"][A-Za-z0-9_\-+=/.]{20,}['"]'''
+tags = ["cookie", "session"]
+
+[[rules]]
+id = "revscraping-openvpn-inline-cert"
+description = "Inline OpenVPN private key block accidentally committed"
+regex = '''-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'''
+tags = ["openvpn", "key"]
+
+[[rules]]
+id = "revscraping-anthropic-key"
+description = "Anthropic API key"
+regex = '''sk-ant-(api|admin)[0-9a-zA-Z_-]{20,}'''
+tags = ["anthropic", "api-key"]

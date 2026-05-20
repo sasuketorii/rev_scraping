@@ -1,0 +1,118 @@
+[workspace]
+resolver = "2"
+exclude = [
+    "_refs",
+    "vendor/obscura/.git",
+    "vendor/obscura/target",
+]
+members = [
+    # Vendored from rev_stealth @ 6fc38fd
+    "crates/stealth-core",
+    "crates/mobile-fp",
+    "crates/vpn-rotate",
+    "crates/captcha-bypass",
+    "crates/stealth-cli",
+    # New for rev_scraping v1.0.0 (Phase 1 stubs)
+    "crates/obscura-bridge",
+    "crates/stealth-cf",
+    "crates/stealth-parse",
+    "crates/stealth-mcp",
+    "crates/stealth-sites",
+    "crates/stealth-auth",
+]
+
+[workspace.package]
+version = "1.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT"
+authors = ["Sasuke Torii"]
+
+[workspace.dependencies]
+# Internal workspace crates (path-based so vendored `{ workspace = true }` refs resolve)
+stealth-core = { path = "crates/stealth-core" }
+mobile-fp = { path = "crates/mobile-fp" }
+vpn-rotate = { path = "crates/vpn-rotate" }
+captcha-bypass = { path = "crates/captcha-bypass" }
+stealth-cli = { path = "crates/stealth-cli" }
+obscura-bridge = { path = "crates/obscura-bridge" }
+stealth-cf = { path = "crates/stealth-cf" }
+stealth-parse = { path = "crates/stealth-parse" }
+stealth-mcp = { path = "crates/stealth-mcp" }
+stealth-sites = { path = "crates/stealth-sites" }
+stealth-auth = { path = "crates/stealth-auth" }
+
+# Async runtime / utility
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# IDs / strings
+uuid = { version = "1", features = ["v4", "serde"] }
+strsim = "0.11"
+regex = "1"
+url = "2"
+dirs = "5"
+tempfile = "3"
+
+# Browser / CDP
+chromiumoxide = "0.9"
+tokio-tungstenite = "0.26"
+
+# HTML / scraping
+scraper = "0.20"
+
+# HTTP / Networking
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "cookies"] }
+# NOTE: `wreq` (Phase 0 RC) is intentionally NOT declared at workspace scope
+# as of v1.1.0 (P10 security hardening). No crate depended on it on the
+# default path. If a future stealth experiment needs it, opt in behind a
+# per-crate feature gate (e.g. `wreq-stealth = ["dep:wreq"]`) so cargo-deny /
+# cargo-audit coverage does not silently inherit an RC supply-chain risk for
+# the whole workspace. See README §14 and ExecPlan §J.
+
+# Storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+chacha20poly1305 = "0.10"
+keyring = "3"
+argon2 = "0.5"
+secrecy = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+parking_lot = "0.12"
+
+# Docker (vpn-rotate)
+bollard = "0.21"
+
+# MCP (Phase 3)
+# NOTE: `rmcp` is intentionally NOT declared at workspace scope as of v1.1.0
+# (P10 security hardening). `stealth-mcp` ships a hand-rolled JSON-RPC layer
+# pinned to the 2024-11-05 schema instead — see crates/stealth-mcp/src/lib.rs.
+# Re-add as a workspace dep only when an rmcp release matches our schema and
+# passes cargo-deny / cargo-audit on its own.
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

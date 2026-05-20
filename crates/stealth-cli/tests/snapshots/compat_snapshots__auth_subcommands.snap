@@ -1,0 +1,10 @@
+---
+source: crates/stealth-cli/tests/compat_snapshots.rs
+expression: names
+---
+- login
+- list
+- show
+- delete
+- status
+- refresh
