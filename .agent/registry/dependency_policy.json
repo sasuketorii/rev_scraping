@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "description": "Dependency policy gate configuration",
+  "rules": {
+    "block_on_critical_cve": true,
+    "warn_on_major_update": true,
+    "auto_approve_patch": true,
+    "max_outdated_days": 90
+  },
+  "overrides": []
+}
