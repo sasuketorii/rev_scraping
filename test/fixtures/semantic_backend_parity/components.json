@@ -1,0 +1,42 @@
+[
+  {
+    "semantic_id": "ui:Button",
+    "name": "Button",
+    "module": "ui",
+    "file_path": "src/app/Button.tsx",
+    "kind": "component",
+    "exports": ["Button"],
+    "imports": [],
+    "status": "active"
+  },
+  {
+    "semantic_id": "ui:ButtonGhost",
+    "name": "ButtonGhost",
+    "module": "ui",
+    "file_path": "src/app/ButtonGhost.tsx",
+    "kind": "component",
+    "exports": ["ButtonGhost"],
+    "imports": [],
+    "status": "active"
+  },
+  {
+    "semantic_id": "ui:App2Thing",
+    "name": "App2Thing",
+    "module": "ui",
+    "file_path": "src/app2/Thing.tsx",
+    "kind": "component",
+    "exports": ["App2Thing"],
+    "imports": [],
+    "status": "active"
+  },
+  {
+    "semantic_id": "ui:Consumer",
+    "name": "Consumer",
+    "module": "ui",
+    "file_path": "src/lib/Consumer.tsx",
+    "kind": "component",
+    "exports": ["Consumer"],
+    "imports": ["Button"],
+    "status": "active"
+  }
+]

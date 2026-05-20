@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+developer_instructions = "セキュリティレビュワーとして、認証認可、入力検証、秘密情報管理、依存関係脆弱性を重点レビューする。"

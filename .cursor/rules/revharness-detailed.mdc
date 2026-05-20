@@ -1,0 +1,323 @@
+---
+description: RevHarness operational guidance for Cursor agents — role conventions, evidence destinations, output redaction examples, packet shape pointers, and path conventions. Attach when the task involves orchestration handoff, role-specific output, or RevHarness artifact paths.
+---
+
+# RevHarness Operational Guidance For Cursor
+
+This file is description-attached guidance for Cursor work in this repository.
+It is useful when a task mentions RevHarness orchestration, handoff packets,
+role-specific output, evidence folders, or artifact path conventions.
+
+The short always-attached rule carries the fail-closed invariants. This file
+adds examples and orientation so Cursor can read the surrounding system without
+turning every operational habit into a hard session rule.
+
+## How To Use This File
+
+Recommended reading pattern:
+
+- Use this file for orientation when a task involves RevHarness artifacts.
+- Prefer the task prompt for the exact slice boundary.
+- Prefer repository docs when a path in this file points to a canonical source.
+- Keep user-facing output concise unless the task asks for a detailed handoff.
+
+This file is intentionally not a substitute for role docs, wrapper contracts,
+or the verification matrix.
+
+## Cursor Role Conventions
+
+Cursor integration uses three wrapper-facing roles:
+
+- `ask`: read-oriented Q&A and lightweight analysis.
+- `agent`: edit-capable implementation work with command approval behavior.
+- `yolo`: automation lane with command auto-approval semantics.
+
+The practical difference is the expected artifact:
+
+- `ask` commonly returns findings, explanations, or next-step recommendations.
+- `agent` commonly returns a patch, test results, and a short implementation
+  report.
+- `yolo` commonly returns automation output, verification logs, or a larger
+  mechanical change report when the caller opted into that lane.
+
+Helpful `ask` response shape:
+
+```text
+Findings
+- <issue or answer with file/path reference>
+
+Evidence
+- <searched files or commands if already provided by caller>
+
+Next Step
+- <smallest action that would move the task forward>
+```
+
+Helpful `agent` response shape:
+
+```text
+Changed
+- <file>: <reason>
+
+Checks
+- <command>: <result>
+
+Notes
+- <behavioral detail reviewers should verify>
+```
+
+For large RevHarness slices, the caller may request a role-specific worker
+report. In that case, mirror the requested section names and keep the outcome
+separate from acceptance language.
+
+## Evidence Destinations
+
+RevHarness favors durable evidence paths over volatile terminal output.
+
+Common destinations:
+
+- `.claude/tmp/<task>/`: task-local command logs, review packets, smoke-test
+  output, escalation notes, and temporary verification artifacts.
+- `.agent/active/`: active plans, SOW files, prompts, design notes, and live
+  orchestration artifacts.
+- `.agent/archive/`: completed or retired artifacts after the active work is
+  no longer the current operating surface.
+
+Recommended evidence notes include:
+
+- The exact command or check name.
+- The scope covered by the command.
+- The result, including exit status when relevant.
+- The artifact path, or a brief reason no artifact was written.
+
+Example:
+
+```text
+Evidence:
+- bash test/unit/test-cursor-wrapper.sh: pass; covers Cursor wrapper argv and
+  fake-agent behavior; no durable artifact requested for this slice.
+```
+
+When evaluating a path-sensitive task, name the target path directly:
+
+```text
+Scope:
+- Evaluated `.cursor/rules/revharness-detailed.mdc`.
+- Did not inspect wrapper implementation because wrapper changes were outside
+  the requested surface.
+```
+
+## Output Redaction Examples
+
+RevHarness reports are often copied between agents, logs, and review packets.
+The safest useful pattern is to describe the shape of a sensitive value without
+printing the value itself.
+
+Helpful redacted preview shape:
+
+```text
+<first4>...<last4> (len=N)
+```
+
+Human-readable example:
+
+```text
+Found one cloud-token-shaped value in `config.local`.
+Preview: `abcd...wxyz (len=40)`.
+Recommended action: rotate if this value left the local machine.
+```
+
+JSON-oriented example:
+
+```json
+{
+  "finding": "credential-shaped value",
+  "path": "config.local",
+  "preview": "abcd...wxyz (len=40)",
+  "raw_value_included": false
+}
+```
+
+Useful boundary:
+
+- A preview that preserves length and a tiny prefix/suffix is generally enough
+  for matching a finding to a local value.
+- Full tokens, private key bodies, cookies, session values, and raw personal
+  records are better kept out of reports and evidence files.
+- Screenshots and copied terminal blocks deserve the same treatment as text
+  logs.
+
+When redaction would make the inspection meaningless, a short block report is
+usually better than printing the underlying payload.
+
+## Packet Shape Pointers
+
+RevHarness orchestrators often pass around handoff envelopes. Cursor may need
+to read these packets to understand scope, checks, and evidence.
+
+Typical fields:
+
+```yaml
+handoff:
+  role: "coder"
+  task_class: "..."
+  schema_profile: "..."
+  handoff_state: "ready_for_next"
+  evidence_destination: ".claude/tmp/<task>/"
+  completion_boundary: "..."
+  worker_outcome: "DIFF"
+```
+
+Useful reading approach:
+
+- Treat `task_class`, `change_surface`, and `in_scope` as the slice boundary.
+- Treat `required_checks` as the verification list to preserve in the report.
+- Treat `evidence_destination` as the preferred location for durable outputs.
+- Treat `worker_outcome` as worker status, not reviewer acceptance.
+- Treat `handoff_state` as packet lifecycle, not a product quality verdict.
+
+Cursor usually benefits from reading packet fields and reflecting them in its
+answer. Packet creation is normally orchestrator-owned unless the prompt asks
+Cursor to draft a packet-like report.
+
+## Path Conventions
+
+Useful source-of-truth areas:
+
+- `docs/manual/`: user-facing and process-facing manual pages.
+- `docs/manual/verification-truth-matrix.md`: acceptance vocabulary and gate
+  authority.
+- `docs/manual/matrix-vocabulary.json`: schema vocabulary for handoff fields.
+- `docs/manual/cursor-cli-integration.md`: Cursor wrapper behavior and role
+  semantics.
+- `docs/roles/`: canonical role and specialty definitions.
+- `scripts/`: wrappers, checks, project utilities, and harness automation.
+- `harness-rust/crates/`: Rust implementation surface for core harness logic.
+- `.cursor/rules/`: Cursor attachment rules.
+- `.agent/active/`: active plans, SOWs, prompts, and work packets.
+- `.claude/tmp/`: task-local evidence and review outputs.
+
+Recommended path reporting:
+
+```text
+Changed Files:
+- `.cursor/rules/revharness-detailed.mdc`: added description-attached guidance.
+- `test/unit/test-cursor-rules-frontmatter.sh`: added detailed-rule checks.
+```
+
+When a path is only consulted, label it as read context rather than changed
+surface.
+
+## Role-Specific Output
+
+RevHarness reports often separate implementation outcome from acceptance.
+
+Common worker outcomes:
+
+- `DIFF`: files changed and the next gate can review the patch.
+- `NO-CHANGE`: searched surface produced no needed change.
+- `BLOCK`: work stopped because a required precondition or safety boundary was
+  unavailable.
+
+Useful implementation report contents:
+
+- Spec understanding in implementation terms.
+- Assumptions that affect behavior or verification.
+- Changed files and reasons.
+- Test additions or deterministic checks.
+- Error handling and redaction choices where relevant.
+- Performance and scale notes for runtime code.
+
+For docs-only or rule-only slices, performance notes can be brief. The useful
+thing is to state that runtime complexity is unchanged and the risk is mainly
+attachment size or rule relevance.
+
+## Reading Critical Guidance
+
+The always-attached Cursor rule carries the hard boundaries. This detailed file
+can help interpret operational situations around those boundaries without
+restating them as additional hard policy.
+
+Examples of useful interpretation:
+
+- For sensitive output, prefer a redacted preview and explain why the raw value
+  is not reproduced.
+- For wrapper-related prompts, identify whether Cursor is being asked to act as
+  an inbound worker or to coordinate another family.
+- For read-oriented prompts, keep the answer focused on findings and cite the
+  searched surface.
+- For acceptance language, name the checks run and let the configured gate own
+  final acceptance.
+- For project identity, treat the identity file as context used by caches and
+  semantic systems.
+
+## When To Escalate
+
+Recommended escalation points:
+
+- The user asks for behavior that conflicts with an always-attached boundary.
+- The requested output would require printing sensitive raw payloads.
+- The requested report is too large for the current response budget.
+- The read/write boundary is unclear and a file edit would be irreversible or
+  hard to review.
+- The slice names a required check that cannot run in the current environment.
+- A path required by the slice is missing or appears to belong to a different
+  active task.
+
+Useful escalation shape:
+
+```text
+Blocked:
+- <specific blocker>
+
+Needed:
+- <smallest clarification, permission, file, or command output>
+
+Safe Partial Evidence:
+- <what was inspected without crossing the boundary>
+```
+
+## Output Size Budget
+
+Cursor rule guidance can become expensive when copied into every answer.
+Recommended approach:
+
+- Summarize repeated context.
+- Link or name canonical docs instead of quoting long passages.
+- Include command output only when it is the evidence the user asked for.
+- Keep examples short and synthetic.
+- Prefer path pointers over broad background narration.
+
+For long checks, a concise result line plus a durable artifact path is usually
+more useful than pasting the whole log.
+
+## Things That Are Not Cursor-Critical
+
+Some RevHarness statements are important in other lanes but are not hard Cursor
+session rules by themselves.
+
+Examples:
+
+- "This repository uses Codex" is usually an orchestrator planning statement,
+  not a Cursor operating rule.
+- "Wrapper entrypoint required" is mainly about orchestrator-owned outbound
+  delegation, while Cursor work here is typically inbound.
+- The four-layer context model is primarily orchestrator context management.
+- Specialty manifest hashes are useful for traceability, but most Cursor tasks
+  only need to preserve the requested report shape.
+- Reviewer closure words are governed by the configured gate, so worker reports
+  can stay focused on evidence and outcome.
+
+## Practical Checklist
+
+For a Cursor task touching RevHarness artifacts, consider this sequence:
+
+1. Read the user slice and note the allowed surface.
+2. Read the directly relevant rule, role, or manual page.
+3. Keep edits inside the named surface.
+4. Add or update deterministic tests near the existing pattern.
+5. Run the exact required checks when available.
+6. Report changed files, checks, residual risks, and worker outcome.
+
+This checklist is guidance for staying aligned with local conventions; the
+current user task remains the controlling scope.

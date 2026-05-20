@@ -1,0 +1,233 @@
+{
+  "_policy": {
+    "vocabulary_consumer_contract": "Any code or doc that introduces a NEW canonical enum / field name / format string MUST either (a) add it under the appropriate vocabulary key in this file, or (b) declare it as `domain_local: <namespace>` with a one-line rationale under `_policy.domain_local.<namespace>`.",
+    "domain_local": {
+      "handoff_state": {
+        "rationale": "Worker-to-worker handoff lifecycle state; intentionally separated from matrix review status to avoid procedural reviewer loops on artifact lifecycle words.",
+        "values": [
+          "ready_for_next",
+          "needs_fix",
+          "needs_more_context",
+          "blocked"
+        ],
+        "consumers": [
+          "docs/prompts/_archive/role-operating-templates-v0.md",
+          "docs/roles/coder/specialties/*.md",
+          "docs/roles/reviewer/specialties/*.md",
+          "docs/roles/orchestrator/specialties/*.md",
+          ".agent/active/plan_*.md handoff yaml"
+        ]
+      },
+      "execplan_state": {
+        "rationale": "ExecPlan artifact lifecycle state; separates plan-artifact disposition (proposed/accepted/superseded) from matrix review status.",
+        "values": [
+          "proposed",
+          "accepted",
+          "superseded"
+        ],
+        "consumers": [
+          ".agent/active/plan_*.md front-matter"
+        ]
+      }
+    }
+  },
+  "task_class": {
+    "enum": [
+      "light",
+      "standard",
+      "heavy"
+    ],
+    "_source_lines": "verification-truth-matrix.md:12-22"
+  },
+  "schema_profile": {
+    "enum": [
+      "light-change-record",
+      "standard-slice-contract",
+      "heavy-canonical-final-packet"
+    ],
+    "light-change-record": {
+      "required_fields": [
+        "task class",
+        "intent",
+        "changed files",
+        "why light is valid",
+        "required quick checks",
+        "check results",
+        "completion boundary"
+      ],
+      "_source_lines": "verification-truth-matrix.md:24-32"
+    },
+    "standard-slice-contract": {
+      "required_fields": [
+        "task class",
+        "task id",
+        "slice id",
+        "change surface",
+        "in-scope",
+        "out-of-scope",
+        "required local checks",
+        "evidence destination",
+        "completion boundary",
+        "worker outcome",
+        "scope delta since last review"
+      ],
+      "_source_lines": "verification-truth-matrix.md:34-44"
+    },
+    "heavy-canonical-final-packet": {
+      "required_fields": [
+        "task id",
+        "task lineage ledger entry",
+        "prior task id",
+        "slice id",
+        "prior slice id",
+        "review request target",
+        "discovery owner",
+        "bug class candidate",
+        "change surface",
+        "in-scope",
+        "out-of-scope",
+        "required checks",
+        "evidence destination",
+        "completion boundary",
+        "scope delta since last review",
+        "class closure sheet",
+        "sheet status",
+        "owned sink universe",
+        "closed universe status",
+        "closed universe basis",
+        "fix-review loops used",
+        "closure resets used",
+        "reviewer-found same-class finding count",
+        "re-slice count for task",
+        "cumulative reviewer requests for task",
+        "cumulative late same-class findings for task",
+        "cumulative closure resets for task",
+        "task-level stall-or-wall-time budget",
+        "task-level stall-or-wall-time budget status"
+      ],
+      "_source_lines": "verification-truth-matrix.md:52-87"
+    },
+    "_source_lines": "verification-truth-matrix.md:18-46"
+  },
+  "status": {
+    "enum": [
+      "in progress",
+      "pending review",
+      "pending verification",
+      "pending final review",
+      "pending acceptance",
+      "blocked",
+      "completed"
+    ],
+    "_source_lines": "verification-truth-matrix.md:118-129"
+  },
+  "reviewer_verdict": {
+    "enum": [
+      "LGTM",
+      "BLOCK",
+      "Request Changes",
+      "Needs verification",
+      "Needs Discussion"
+    ],
+    "_source_lines": "verification-truth-matrix.md:131-137"
+  },
+  "worker_outcome": {
+    "enum": [
+      "DIFF",
+      "BLOCK",
+      "NO-CHANGE"
+    ],
+    "_source_lines": "verification-truth-matrix.md:383-390"
+  },
+  "re_slice_delta_type": {
+    "enum": [
+      "none",
+      "narrowed change surface",
+      "redefined owned sink universe",
+      "user decision",
+      "blocker resolution"
+    ],
+    "_source_lines": "verification-truth-matrix.md:88-92"
+  },
+  "budget": {
+    "format": "stall<=<minutes>m; wall<=<minutes>m; basis=<task-lineage-opened-at|user-approved-reopen-at>; start=<RFC3339Z>; last-progress=<RFC3339Z>",
+    "basis_enum": [
+      "task-lineage-opened-at",
+      "user-approved-reopen-at"
+    ],
+    "default": "stall<=30m; wall<=240m; basis=task-lineage-opened-at; start=<task-opened RFC3339Z>; last-progress=<same or newer RFC3339Z>",
+    "auto_loop_ceiling": "stall<=60m; wall<=480m",
+    "_source_lines": "verification-truth-matrix.md:85-86,100-105,161-164,221-226"
+  },
+  "budget_status": {
+    "enum": [
+      "within-budget",
+      "exhausted"
+    ],
+    "_source_lines": "verification-truth-matrix.md:85-86,222-224"
+  },
+  "loop_caps": {
+    "same_slice": {
+      "fix_review_loops": {
+        "non_blocking_ceiling": 2,
+        "block_at": 3
+      },
+      "reviewer_found_same_class_finding_count": {
+        "non_blocking_ceiling": 1,
+        "block_at": 2
+      },
+      "closure_resets": {
+        "non_blocking_ceiling": 2,
+        "block_at": 3
+      },
+      "_source_lines": "verification-truth-matrix.md:214-219"
+    },
+    "task_level": {
+      "re_slice_count_for_task": {
+        "non_blocking_ceiling": 2,
+        "block_at": 3
+      },
+      "cumulative_reviewer_requests_for_task": {
+        "non_blocking_ceiling": 6,
+        "block_at": 7
+      },
+      "cumulative_late_same_class_findings_for_task": {
+        "non_blocking_ceiling": 2,
+        "block_at": 3
+      },
+      "cumulative_closure_resets_for_task": {
+        "non_blocking_ceiling": 2,
+        "block_at": 3
+      },
+      "_source_lines": "verification-truth-matrix.md:220-227"
+    },
+    "_source_lines": "verification-truth-matrix.md:214-227"
+  },
+  "deprecated_aliases": {
+    "forbidden_live_keys": [
+      "checkpoint boundary",
+      "truth destination",
+      "artifact truth destination"
+    ],
+    "_source_lines": "verification-truth-matrix.md:98,489"
+  },
+  "counter": {
+    "format": "<actual>/<non-blocking ceiling>",
+    "overflow_behavior": "Record actual overflow as-is and terminally BLOCK rather than rounding the value.",
+    "_source_lines": "verification-truth-matrix.md:100-106"
+  },
+  "discovery_owner": {
+    "enum": [
+      "coder",
+      "orchestrator"
+    ],
+    "_source_lines": "verification-truth-matrix.md:64"
+  },
+  "review_request_target": {
+    "enum": [
+      "INTERMEDIATE",
+      "FINAL"
+    ],
+    "_source_lines": "verification-truth-matrix.md:63"
+  }
+}

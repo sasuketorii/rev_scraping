@@ -1,0 +1,25 @@
+# Canonical safe-ish Codex config baseline for app-server/client integration review.
+# Adapt to your environment. Do not blindly copy to production, and verify syntax
+# against the current Codex config reference before use.
+
+model = "gpt-5.3-codex"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+allow_login_shell = false
+web_search = "cached"
+
+[sandbox_workspace_write]
+network_access = false
+
+# Prefer reusable permission profiles when your Codex version supports them.
+# Deny-read examples must be adjusted to your filesystem and workspace layout.
+# [permissions.safe.filesystem]
+# "/absolute/path/to/project/.env" = "none"
+# "/absolute/path/to/project/.ssh/**" = "none"
+# "/absolute/path/to/project/secrets/**" = "none"
+
+# Network should stay off by default. If a workflow absolutely needs it, create
+# narrow domain allowlists rather than enabling broad network access.
+# [permissions.docs-only.network.domains]
+# "developers.openai.com" = "allow"
+# "api.github.com" = "allow"

@@ -1,0 +1,45 @@
+[package]
+name = "agent-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Core orchestration engine for agent_base"
+
+[dependencies]
+shared = { path = "../shared" }
+harness-cache = { path = "../harness-cache" }
+tree-sitter-index = { path = "../tree-sitter-index" }
+rusqlite = { workspace = true }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Date/time and identifiers
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# File locking
+fs2 = { workspace = true }
+
+# Temp files
+tempfile = { workspace = true }
+
+# Regex (for jq path validation)
+regex = { workspace = true }
+
+# Hashing (context + capsule modules)
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["signal", "process"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

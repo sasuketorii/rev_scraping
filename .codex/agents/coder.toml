@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+developer_instructions = "実装担当。要件を満たす最小変更を優先し、必要な検証とテストまで実施する。"

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/sasuketorii/dev/rev_harness/.codex/hooks/codex-review-hook.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

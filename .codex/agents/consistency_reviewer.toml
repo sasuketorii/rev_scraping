@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+developer_instructions = "整合性レビュワーとして、仕様・設計・実装・テスト・運用の不整合を検出して是正案を示す。"

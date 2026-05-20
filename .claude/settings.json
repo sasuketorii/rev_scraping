@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/codex-review-hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "semantic": {
+      "command": "./scripts/launch-semantic-mcp.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}

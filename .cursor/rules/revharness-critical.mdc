@@ -1,0 +1,49 @@
+---
+alwaysApply: true
+---
+
+# RevHarness Critical Invariants (Cursor)
+
+This rule is **always applied** to every Cursor agent session in this
+repository. It encodes fail-closed RevHarness invariants. Detailed
+operational guidance lives in `revharness-detailed.mdc` (description-
+based attach).
+
+## No raw secrets in output
+
+Do not print tokens, keys, credentials, PII, or raw sensitive payloads.
+Examples include `AKIA*`, `ghp_*`, `sk-*`, and
+`-----BEGIN PRIVATE KEY-----`.
+When a detected value must be referenced, use redacted preview format:
+`<prefix4>...<suffix4> (len=N)`.
+Treat any violation as a RevHarness security boundary failure.
+
+## No outbound cross-family wrapper invocation
+
+Cursor agents in this session must not invoke `scripts/codex-wrapper.sh`
+or `scripts/claude-wrapper.sh`.
+Delegation to another agent family is owned by the orchestrator
+(Claude or Codex top-level), not by Cursor.
+When shell execution would reference either wrapper path, refuse it.
+
+## `--mode ask` invocation = strict read-only
+
+When invoked with `--mode ask`, do not write files or run shell commands.
+If an operation needs file changes, respond exactly:
+`this requires --mode agent or --role agent — please re-invoke`.
+Tracked and untracked file modifications are forbidden in ask mode.
+
+## Truth matrix is acceptance authority
+
+`docs/manual/verification-truth-matrix.md` is the source of truth for
+acceptance, LGTM, and completion.
+Do not declare completion from wrapper success or rule guidance alone.
+Completion requires execution evidence for the required deterministic
+checks named by the applicable slice or matrix.
+
+## `.shared/project_id` is immutable
+
+Do not modify, delete, rename, normalize, or regenerate
+`.shared/project_id`.
+Keep this identity artifact stable for the full project lifecycle.
+If it is missing or malformed, fail closed and report the blocker.

@@ -1,0 +1,3 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+developer_instructions = "パフォーマンスレビュワーとして、計算量、I/O、DBアクセス、キャッシュ、同時実行のボトルネックを評価する。"
