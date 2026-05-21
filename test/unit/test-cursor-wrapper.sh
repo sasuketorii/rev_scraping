@@ -205,14 +205,17 @@ else
   echo "FAIL: forward_signal does not propagate signal to child"; FAIL=$((FAIL+1))
 fi
 
-# 23. Vendoring guard (dedicated cursor-wrapper case)
-# Run wrapper with mismatched REV_HARNESS_CANONICAL_ROOT to ensure the guard fires
-out=$(REV_HARNESS_CANONICAL_ROOT="/nonexistent/canonical/root" "${WRAPPER}" --role ask --dry-run 2>&1)
+# 23. Canonical-guard identity-class smoke (dedicated cursor-wrapper case)
+# The detailed identity-class behavior (canonical-dev / managed-adopter / ambiguous-copy
+# / invalid) is exercised by test/unit/test-canonical-guard.sh. Here we just smoke-test
+# that the wrapper's source of _canonical-guard.sh resolves through the official
+# REV_HARNESS_CANONICAL_ROOT for the local checkout, i.e. a clean invocation passes.
+out=$(REV_HARNESS_CANONICAL_ROOT="${REPO_ROOT}" "${WRAPPER}" --role ask --dry-run 2>&1)
 rc=$?
-if [[ "${rc}" != "0" ]] && echo "${out}" | grep -q "VENDOR GUARD"; then
-  echo "PASS: vendoring guard fires on non-canonical root"; PASS=$((PASS+1))
+if [[ "${rc}" == "0" ]] && ! echo "${out}" | grep -q "VENDOR GUARD"; then
+  echo "PASS: canonical-guard passes on official root (no VENDOR GUARD warning)"; PASS=$((PASS+1))
 else
-  echo "FAIL: vendoring guard (rc=${rc})"; echo "      ${out}" | head -3; FAIL=$((FAIL+1))
+  echo "FAIL: canonical-guard official-root smoke (rc=${rc})"; echo "      ${out}" | head -3; FAIL=$((FAIL+1))
 fi
 
 # ---- Cursor rules visibility telemetry ----
@@ -269,12 +272,18 @@ else
   echo "FAIL: ask dry-run read-only diff gate skip (rc=${rc})"; echo "${out}" | sed 's/^/      /'; FAIL=$((FAIL+1))
 fi
 
-# 29. ask role blocks if the fake agent writes into the worktree
-readonly_violation_file="${REPO_ROOT}/.ask-readonly-violation-test-$$"
+# 29. ask role blocks if the fake agent writes into the worktree.
+# IMPORTANT: the fixture path must NOT match a .gitignore pattern, otherwise
+# `git ls-files --others --exclude-standard` (which the ask diff gate uses)
+# won't see it and the gate falsely passes. We use a leading-non-dot name to
+# stay outside the .ask-readonly-* / .agent-write-test-* ignore patterns.
+readonly_violation_file="${REPO_ROOT}/cursor-ask-violation-test-$$"
 /bin/rm -f "${readonly_violation_file}"
+trap "/bin/rm -f '${readonly_violation_file}'" EXIT
 out=$(FAKE_CURSOR_TOUCH_FILE="${readonly_violation_file}" "${WRAPPER}" --role ask --stdin <<< "hello" 2>&1)
 rc=$?
 /bin/rm -f "${readonly_violation_file}"
+trap - EXIT
 if [[ "${rc}" == "2" ]] \
    && echo "${out}" | grep -q "ask-readonly-enforce" \
    && echo "${out}" | grep -q "read-only invariant violated" \
@@ -285,9 +294,11 @@ else
 fi
 readonly_violation_file=""
 
-# 30. agent role permits the same fake write path without firing the ask gate
-agent_write_file="${REPO_ROOT}/.agent-write-test-$$"
+# 30. agent role permits the same fake write path without firing the ask gate.
+# Same non-dot prefix as #29 so the diff gate can actually see the file.
+agent_write_file="${REPO_ROOT}/cursor-agent-write-test-$$"
 /bin/rm -f "${agent_write_file}"
+trap "/bin/rm -f '${agent_write_file}'" EXIT
 out=$(FAKE_CURSOR_TOUCH_FILE="${agent_write_file}" "${WRAPPER}" --role agent --stdin <<< "hello" 2>&1)
 rc=$?
 /bin/rm -f "${agent_write_file}"
