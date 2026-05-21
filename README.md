@@ -1,730 +1,1205 @@
-# rev_scraping — Ultimate Stealth Scraping Toolkit for AI Agents
+# RevHarness
 
-**Status:** v1.0.0-dev (Phase 0 complete) · License: MIT
+> **Claude Code と Codex を repo-local policy・durable state・deterministic verification の上で協調させる、source-centric な AI 開発ハーネス。**
 
-`rev_scraping` is a **Defender-Facing Evaluation Toolkit**. It is designed to be driven by
-AI coding agents (codex, Claude Code, etc.) through a CLI or MCP (stdio transport) interface,
-so they can evaluate the *resilience of bot-mitigation defenses* on **authorized** targets.
-
-This project is positioned as a defender / red-team evaluation tool. It is **not** a
-general-purpose unauthorized scraping tool.
+`Revharness` (canonical display name) / `rev_harness` (canonical machine name) は、AI エージェント運用の速度を落とさずに **再現性・精度・安全性** を機械的に担保するための薄い基盤です。`agent_base` / `agent-base` は legacy alias として残しています。
 
 ---
 
-## ⚠️ Authorized Targets Only — read this before running anything
+## 目次
 
-Use of this toolkit is restricted to systems for which **you possess explicit written
-authorization** (e.g. you own the target, or you have a signed pentest / red-team SOW).
-
-Unauthorized use may violate, among others:
-
-- **Cloudflare Terms of Service §2.8** — bypassing Cloudflare protections without
-  authorization is a ToS violation.
-- **Japan: 不正アクセス禁止法 (Act on Prohibition of Unauthorized Computer Access)** —
-  unauthorized access or circumvention of access controls is a criminal offense.
-- **United States: Computer Fraud and Abuse Act (CFAA, 18 U.S.C. § 1030)** —
-  accessing computers "without authorization" or in excess of authorization is a federal crime.
-
-You, the operator, are solely responsible for ensuring your usage complies with all
-applicable laws and contractual terms. The authors disclaim all liability for misuse.
-
-### Technical AUP enforcement
-
-- An allowlist file is required at `~/.rev_scraping/authorized.toml` (directory permission `0700`).
-  Schema:
-  ```toml
-  [[targets]]
-  url_pattern = "^https://example\\.test/.*"
-  ```
-- Targets not matching any `url_pattern` will be **refused by the CLI** (exit 1).
-- The acknowledgement environment variable `REV_SCRAPING_AUP_ACK` is **scoped to the current
-  date** (date-hash TTL); it must be re-set each calendar day.
-- Per Phase 0 decisions, the CLI itself does **not** print a runtime disclaimer banner;
-  this README is the canonical disclaimer surface.
+1. [何のための基盤か](#1-何のための基盤か)
+2. [一目で見る](#2-一目で見る-at-a-glance)
+3. [アーキテクチャ — 3 層モデル](#3-アーキテクチャ--3-層モデル)
+4. [Runtime Data Plane — 2 系統 db / project_id 分離 / call flow](#4-runtime-data-plane--2-系統-db--project_id-分離--call-flow)
+5. [技術スタック / 言語マップ](#5-技術スタック--言語マップ)
+6. [Quick Start](#6-quick-start)
+7. [機能カタログ — Rust Core (harness-rust/)](#7-機能カタログ--rust-core-harness-rust)
+8. [機能カタログ — Shell Scripts (scripts/)](#8-機能カタログ--shell-scripts-scripts-50)
+9. [機能カタログ — Skills & Specialties](#9-機能カタログ--skills--specialties)
+10. [Hooks — エディタ→キュー→Rust の 3 段アダプタ](#10-hooks--エディタキューrust-の-3-段アダプタ)
+11. [Auto-orchestration — `auto_orchestrate.sh` + lib](#11-auto-orchestration--auto_orchestratesh--lib)
+12. [Tests — 1,600+ deterministic checks](#12-tests--1600-deterministic-checks)
+13. [Truth Surfaces — verification-truth-matrix を中心とする正本](#13-truth-surfaces--verification-truth-matrix-を中心とする正本)
+14. [Roles — Orchestrator / Coder / Reviewer](#14-roles--orchestrator--coder--reviewer)
+15. [Governance — Truth Read Order と Fail-Closed Boundaries](#15-governance--truth-read-order-と-fail-closed-boundaries)
+16. [Operator Troubleshooting — 症状別レシピ](#16-operator-troubleshooting--症状別レシピ)
+17. [Project Structure](#17-project-structure)
+18. [Maturity & Status](#18-maturity--status)
+19. [Customization & Contributing](#19-customization--contributing)
 
 ---
 
-## Project layout
+## 1. 何のための基盤か
 
-```
-rev_scraping/
-├── Cargo.toml              workspace root
-├── crates/
-│   ├── stealth-core/       (vendored from rev_stealth @ 6fc38fd, MIT)
-│   ├── mobile-fp/          (vendored, MIT)
-│   ├── vpn-rotate/         (vendored, MIT)
-│   ├── captcha-bypass/     (vendored, MIT)
-│   ├── stealth-cli/        (vendored, MIT)
-│   ├── obscura-bridge/     (NEW, Phase 1a — subprocess + CDP bridge)
-│   ├── stealth-cf/         (NEW, Phase 1b — Turnstile resilience eval)
-│   ├── stealth-parse/      (NEW, Phase 1c — adaptive relocate + SQLite WAL)
-│   ├── stealth-mcp/        (NEW, Phase 3   — MCP stdio server, hand-rolled JSON-RPC)
-│   ├── stealth-sites/      (NEW, v1.1.0 P11 — recipe-driven site adapters)
-│   └── stealth-auth/       (NEW, v1.1.0 Phase 9 — encrypted cookie cache + rev-auth)
-├── vendor/
-│   └── obscura/            (vendored obscura source, Apache-2.0)
-├── _refs/                  (read-only reference clones — obscura, Scrapling, rev_harness)
-├── scripts/
-│   ├── check_source_and_spdx.sh
-│   └── check_bsl_contamination.sh
-├── docs/
-├── tests/
-└── .agent/active/plan_v1.0.0.md
-```
+AI agent (Claude Code / Codex) を本番品質のコード生成に使うと、3 つの壁にあたります。
 
-## License composition
+| 壁 | 起きること | RevHarness のアプローチ |
+|---|---|---|
+| **再現性** | 同じ依頼に違う結果。LGTM が口約束化 | `docs/manual/verification-truth-matrix.md` を acceptance の正本にし、deterministic check artifact のみを LGTM/completion 根拠にする |
+| **境界の崩壊** | エージェントが scope を超える / 別 role の権限を侵食する | `scripts/codex-wrapper.sh --role <coder\|high-coder\|reviewer\|research\|standard>` で sandbox / approval / effort / model 上書きを fail-closed に固定 |
+| **コンテキスト爆発** | 大規模 repo で context が肥大化、無関係な部分を読み続ける | `semantic-mcp` の 2-step (`sem.context.top_k` → `sem.capsule`) で 220tok 上限の prompt capsule、`file_sha_rollup` + `INDEX_VERSION` で freshness 担保 |
 
-| Component                              | License         | Notes                                     |
-| -------------------------------------- | --------------- | ----------------------------------------- |
-| First-party crates (`obscura-bridge`, `stealth-cf`, `stealth-parse`, `stealth-mcp`) | MIT             | Authored by Sasuke Torii / REV-C Inc.     |
-| Vendored from rev_stealth              | MIT             | Originally authored in rev_stealth        |
-| `vendor/obscura/`                      | Apache-2.0      | Upstream obscura. Attribution recorded in [`NOTICE`](./NOTICE). |
-| Design influence: Scrapling            | BSD-3-Clause    | Design adaptation only, no verbatim port  |
-| Design influence: goscrapy             | BSL             | **Design reference only** — zero code     |
-| Bundled blocklist (3520 entries)       | inherited from obscura | redistributed as obscura ships     |
-
-## Quick start
-
-```bash
-# Phase 0: workspace skeleton compiles (stubs only)
-cargo check --workspace
-
-# Phase 1+: see .agent/active/plan_v1.0.0.md
-cargo test --workspace
-```
-
-## Development status
-
-- **Phase 0** (this commit): workspace scaffold, vendored crate import, plan rev3 saved.
-- **Phase 1 a-d**: parallel implementation of `obscura-bridge`, `stealth-cf`,
-  `stealth-parse`, `mobile-fp` obscura glue.
-- **Phase 2**: `stealth-cli` extension with AUP enforcement.
-- **Phase 3**: `stealth-mcp` (stdio).
-- **Phase 4**: E2E + `measure` deliverable.
-
-See `.agent/active/plan_v1.0.0.md` for the full ExecPlan (rev3).
+軽量 shell helper + 小さな JSON registry + Rust core で、変更 path から必要な check だけを選び、レビューに渡せる envelope を機械的に作ります。常駐型オーケストレーターではなく **repo に置ける薄いハーネス** として、新規プロジェクトは `src/` を product workspace に、既存プロジェクトには compatibility / overlay path として重ねられます。
 
 ---
 
-## §12 Agentic Scraping Stack
-
-> **Positioning: Defender-Facing Evaluation Toolkit.**
-> Read the disclaimers at the top of this README — Cloudflare ToS §2.8, Japan's
-> 不正アクセス禁止法, and the U.S. CFAA — before doing anything in this section.
-
-`rev_scraping` is an agentic toolkit invoked by AI coding agents
-(codex, Claude Code, etc.) via either a CLI binary (`rev-stealth`) or an
-MCP **stdio** server (`stealth-mcp`). It exists to let an agent **evaluate the
-resilience of bot-mitigation defenses on authorized targets** — not to
-defeat them on third-party systems.
-
-### Architecture (simplified)
+## 2. 一目で見る (at a glance)
 
 ```
-   agent (codex / Claude Code)
-        │  CLI argv                       MCP stdio (JSON-RPC 2.0)
-        ▼                                       ▼
-   stealth-cli  ◄────── in-proc lib ────── stealth-mcp
-        │
-        ├── obscura-bridge ───► vendor/obscura (Chrome145 TLS/HTTP2 FP,
-        │                       3520-entry blocklist, CDP server)
-        ├── stealth-cf     ───► obscura-bridge   (Turnstile resilience eval)
-        ├── stealth-parse  ───► ~/.rev_scraping/parse.sqlite (WAL, 30 d)
-        ├── mobile-fp      ───► obscura-bridge   (mobile FP injection)
-        ├── captcha-bypass
-        └── vpn-rotate     ───► leak_guard.on_vpn_loss
-                                └─► ObscuraBridge::shutdown  (S11, fail-closed)
+Rust workspace     6 crates / ~44,200 LOC / 697 lib tests (1,116 with integration+bin+doc)
+Shell scripts      50+ scripts across 11 categories / 35+ fail-closed
+Skills             32 skills (100% provider parity .claude/skills ↔ .agents/skills; Cursor-visible via official Skills standard)
+Canonical roles    3 (Orchestrator / Coder / Reviewer)
+Specialty files    16 (orchestrator 6 / coder 6 / reviewer 4) — 6 projected to SKILL.md
+Truth docs         18 manual docs + 3 role docs + matrix-vocabulary.json + cursor-rules-residual-risks.md
+MCP tools          8 (sem.* server-side, stdio MCP)
+Languages indexed  6 (Rust / TypeScript+JS / Python / Go / Shell / Markdown via tree-sitter)
+Tests (total)      1,633+ (Rust 1,116 + shell unit 517 + integration smoke)
+Deterministic gate verification-truth-matrix.md + 5 lint subcommands (envelope/specialty/execplan/...) + 9 shell test suites
 ```
 
-### Crates
+---
 
-| Crate            | Responsibility                                                          |
-| ---------------- | ----------------------------------------------------------------------- |
-| `stealth-cli`    | `rev-stealth` binary: AUP-gated subcommands + JSON output schema        |
-| `obscura-bridge` | obscura subprocess lifecycle + CDP (chromiumoxide 0.9) + bridge SSRF    |
-| `stealth-cf`     | Defender-side Turnstile resilience evaluation (no solver)               |
-| `stealth-parse`  | Adaptive relocate (SQLite WAL, strsim ≥ 0.85, exit 10 ambiguous path)   |
-| `stealth-mcp`    | MCP stdio server (hand-rolled JSON-RPC, 2024-11-05 schema) — exposes CLI ops as MCP tools |
-| `mobile-fp`      | Mobile fingerprint preset injection via obscura CDP                     |
-| `vpn-rotate`     | Surfshark/Gluetun rotation + `leak_guard::on_vpn_loss` (fail-closed)    |
-| `captcha-bypass` | Existing captcha solver glue                                            |
-| `stealth-core`   | Shared types / `ExitCode`                                               |
-| `stealth-sites`  | Recipe-driven site adapters (v1.1.0 P11) — pluggable per-site selectors |
-| `stealth-auth`   | Encrypted cookie cache + `rev-auth` helper (Phase 9, ChaCha20-Poly1305) |
+## 3. アーキテクチャ — 3 層モデル
 
-### Building obscura binary
+```
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 3: Product Code (src/)                                   │
+│   実際の application / service / library — Revharness が守る対象 │
+└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 2: Project State (.agent/, .claude/tmp/, etc.)           │
+│   ExecPlan, SOW, prompts, evidence, lineage ledger, run state  │
+└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 1: Framework / Core Harness                              │
+│   harness-rust/ (Rust)  +  scripts/ (shell wrappers/gates)     │
+│   .claude/ + .agents/  +  docs/  +  .codex/                    │
+└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 0: Ground Truth                                          │
+│   .agent_rules/RULES.md  +  CLAUDE.md  +  .shared/project_id   │
+│   docs/manual/verification-truth-matrix.md (acceptance 正本)   │
+└────────────────────────────────────────────────────────────────┘
+```
 
-`spider` and `cf-evaluate` launch the vendored `obscura` Chrome-145 / CDP
-server as a child process. The workspace does **not** auto-build it,
-because obscura lives under `vendor/obscura/` with its own
-`Cargo.toml` (Apache-2.0, see `NOTICE`).
+Truth は下層ほど安定 (Layer 0) で、上層ほど揮発的 (Layer 3 はプロダクトの動きそのもの)。**acceptance / LGTM / completion は Layer 0 の deterministic check に必ず根拠を持つ**設計です。
+
+---
+
+## 4. Runtime Data Plane — 2 系統 db / project_id 分離 / call flow
+
+Section 3 の static な層モデルとは別に、**実行時にどんなデータが・どこに・どう動くか**を理解しておくと、トラブルシュートと multi-repo 運用が一気に楽になります。本セクションは 4 つのトピックを順に扱います。
+
+### 4.1 2 系統 SQLite db が並列で動く
+
+RevHarness の semantic infrastructure は **2 つの SQLite db** が project_id 別に並列存在します。役割と所在を取り違えると「sem.* が空応答」「table missing」の原因になるので、明示しておきます。
+
+| 系統 | 物理パス (macOS) | バイナリ | 役割 | テーブル数 | maturity |
+|---|---|---|---|---|---|
+| **Rust MCP db (canonical)** | `~/Library/Application Support/Revharness/semantic-mcp/v1/<project_id>/semantic.db` | `harness-rust/crates/semantic-mcp` の Rust binary (`launch-semantic-mcp.sh` 経由) | full schema (registry + symbol + FTS5 BM25) | **16** | **High** — production の正規経路 |
+| Node MCP db (legacy compat) | `~/.semantic-mcp/<project_id>/semantic.db` | `scripts/semantic-mcp-server/dist/cli.js` (Node 20+) | registry-only (queue / capsule / review / projects / components / outbox / registry_deltas) | **7** | Medium — Rust 不在環境向け fallback |
+
+Linux では Library path 部分が `~/.local/share/Revharness/semantic-mcp/v1/<project_id>/` になります。Windows 上では `%LOCALAPPDATA%\Revharness\semantic-mcp\v1\<project_id>\` です (`scripts/rev-harness-distribution-adoption.sh` の `client_distribution.exclude_globs` に 3 OS 全部記載)。
+
+#### Rust db (canonical) の 16 テーブル
+
+| カテゴリ | テーブル | 役割 |
+|---|---|---|
+| Identity | `projects` | この db を所有する `project_id` (immutable identity authority) を 1 行で保持 |
+| Registry | `components` | 論理コンポーネント (`semantic_id`) のカタログ。`sem.registry.upsert/query/set_status/delete` の主表 |
+| Registry FTS | `components_fts`, `components_fts_data`, `components_fts_idx`, `components_fts_docsize`, `components_fts_config` | SQLite FTS5 (BM25) で `sem.search` を支える virtual table 一式 |
+| Audit | `registry_deltas` | components への変更履歴 (誰がいつ何を) |
+| Workflow | `capsules` | `sem.capsule` の出力 (`CAPSULE_SHA256` / `INDEX_VERSION` / `FILE_SHA_ROLLUP` bound) |
+| Outbox | `outbox_queue` | semantic-review-queue へ push する pending message |
+| Review | `review_queue_items` | enqueue → lease → complete の review item |
+| Review | `review_runs` | reviewer 実行履歴 (`run_id` / `verdict`) |
+| Symbol | `symbols` | tree-sitter 抽出の関数・構造体・class 等 (1 行 = 1 シンボル) |
+| Symbol | `symbol_dependencies` | symbol 間の依存グラフ (impact analysis の辺) |
+| Symbol cache | `file_parse_cache` | per-file content hash + grammar version cache (incremental indexing 用) |
+| Meta | `_ts_meta` | schema 版・最終 index 時刻・`INDEX_VERSION` 等のメタ |
+
+#### Node db (legacy) との関係
+
+Node db は **registry 7 テーブルだけ**を持ち、symbol layer は持ちません。Node binary (`scripts/semantic-mcp-server/`) は Rust 不在環境 (古い CI、debian slim container、開発初期) の fallback として残してありますが、新規環境では Rust binary が canonical です。
+
+`scripts/semantic-bootstrap.sh` (0.0.13) は Node 側の bootstrap を担当し、Rust 側は `launch-semantic-mcp.sh` を 1 回起動するだけで自動 migration が走って full 16-table schema に到達します。詳しくは [Quick Start 5.2](#62-30-秒で動かす) を参照。
+
+### 4.2 project_id namespace isolation — multi-repo 同居の物理保証
+
+複数プロジェクトを 1 ユーザーが運用しても db が衝突しないのは、**`.shared/project_id` を path namespace に直接焼き込んでいる**からです。
+
+```
+~/Library/Application Support/Revharness/semantic-mcp/v1/
+├── revharness-691f52d5cca3/   ← rev_harness 専用
+│   ├── semantic.db
+│   ├── semantic.db-wal
+│   └── semantic.db.harness-lock
+├── rev_scraping-09399a56d97f/        ← rev_scraping 専用
+│   └── semantic.db
+├── rev_salescopilot-a2e475d74ca4/    ← rev_salescopilot 専用
+│   └── semantic.db
+└── contact_dev-618a3613ee7a/         ← contact_dev 専用
+    └── semantic.db
+```
+
+3 層の物理保証:
+
+1. **ディレクトリ分離**: `<project_id>` が path component なので、別 repo の db が同じファイルを書くことは構造的に不可能。inode も別。
+2. **DB-record スコープ**: `projects` テーブルにも自分の `project_id` が刻まれ、全クエリが `WHERE project_id = ?` で絞られる (= 万一誤って別 db を開いても他人の行を返さない、二重ガード)。
+3. **同時書き込みロック**: `semantic.db.harness-lock` (shared crate の `SemanticDbLock`) が advisory file lock を取って、同 db への同時 server 起動を 1 つに制限。
+
+`.shared/project_id` は immutable 設計で、`scripts/project-id.sh bootstrap <name>` で初回生成後は手で書き換え禁止 (`canonical-guard.sh` が `invalid` 判定で fail-close するため、識別子破壊事故を防ぐ)。
+
+### 4.3 application_id RSEM marker — db 所有権の安全弁
+
+各 db は SQLite の `PRAGMA application_id` に **`0x5253454D`** を書き込んであります。ASCII で読むと:
+
+```
+0x52 = 'R'
+0x53 = 'S'
+0x45 = 'E'
+0x4D = 'M'
+→ "RSEM" = Revharness SEMantic
+```
+
+意義は 3 つ:
+
+1. **誤識別防止**: ユーザー個人の SQLite db (家計簿、写真メタ、etc.) を Revharness のツールが間違って開いて壊さない。`sem.admin.gc` も RSEM marker が無い db は対象外。
+2. **ツール側の安全弁**: `harness-doctor.sh --check-vendoring` や distribution adoption check が「これは Revharness 由来の db です」を判定するキーとして使う。
+3. **既存 db への自動採用**: 起動時に `application_id == 0` (未署名) なら自動で `0x5253454D` を書き込む。server log に `adopted application_id = 0x5253454D for /path/...` が出るのがこれ。**最初の 1 回だけ書き込まれ、以降は再起動しても変わらない** (immutable header)。
+
+### 4.4 End-to-end call flow — wrapper invocation の解剖
+
+`bash scripts/codex-wrapper.sh --role coder --stdin < prompt.md` 1 行で何が起きているか、runtime path を追います。
+
+```
+                             ┌─────────────────────────────────────────┐
+                             │ Layer 0: identity authority             │
+                             │  .shared/project_id  (immutable)        │
+                             └────────────────┬────────────────────────┘
+                                              │ read
+                                              ▼
+┌────────────────────────┐    ┌──────────────────────────────────────┐
+│ user / CLI / hook      │───▶│ scripts/codex-wrapper.sh             │
+│ (echo prompt | …)      │    │  ↓ source                            │
+└────────────────────────┘    │ scripts/_canonical-guard.sh (0.0.12) │
+                              │  ↓ classify identity:                │
+                              │    canonical-dev / managed-adopter   │
+                              │    /ambiguous-copy/invalid           │
+                              │  ↓ if invalid → exit 70 (fail-close) │
+                              │  ↓ if ambiguous → warn (advisory)    │
+                              │  ↓ else        → silent pass         │
+                              └────────────┬─────────────────────────┘
+                                           │
+              ┌────────────────────────────┼────────────────────────────┐
+              │                            │                            │
+              ▼                            ▼                            ▼
+┌──────────────────────┐    ┌──────────────────────────┐    ┌──────────────────────┐
+│ optional: pre-call   │    │ codex CLI invocation     │    │ optional: semantic-  │
+│ semantic-mcp pull    │    │  ↓ role-scoped sandbox   │    │ review-queue enqueue │
+│ (sem.context.top_k → │    │  ↓ approval / model      │    │ (outbox_queue table) │
+│  sem.capsule)        │    │  ↓ effort cap            │    └──────────────────────┘
+│  ↓ Rust MCP server   │    │  ↓ run                   │
+│  ↓ context_token     │    │  ↓ emit metrics line     │
+│  ↓ 220-tok capsule   │    │  → user-visible output   │
+└──────────────────────┘    └──────────────────────────┘
+
+scripts/launch-semantic-mcp.sh が背後で起動 (stdio MCP server)
+  ↓ Rust binary harness-rust/target/release/semantic-mcp
+  ↓ opens Library-path db (auto-migrates schema if needed)
+  ↓ acquires SemanticDbLock
+  ↓ handles JSON-RPC: initialize / tools/list / tools/call
+  ↓ tools/call sem.context.top_k:
+       1. impact_analysis(changed_files) using symbol_dependencies graph
+       2. rank_top_k(report, fan_in, k)
+       3. issue context_token = SHA256(file_sha_rollup + INDEX_VERSION + summary)
+       4. return top_k_symbols (observability) + context_token (auth)
+  ↓ tools/call sem.capsule:
+       5. validate context_token (TTL 30min, single use)
+       6. emit 220-tok capsule with CAPSULE_SHA256 binding
+       7. INSERT INTO capsules (...)
+       8. return capsule body (caller uses as compact context for coder/reviewer)
+```
+
+ポイント:
+
+- **guard は wrapper invocation 全部の手前にあり**、identity が壊れた状態ではこの flow は始まらない (0.0.12 default-warn 後も `invalid` は strict 維持)
+- **sem.context.top_k と sem.capsule は別の MCP call** で、間を `context_token` で繋ぐ。caller が `top_k_symbols` を直接 sem.capsule に渡そうとすると fail-closed (token 必須)
+- **MCP server は per-project_id で 1 プロセス**。同じ project_id に並列で複数起動しようとすると `SemanticDbLock` が advisory warning を出し、後発側は同 db に書かない設計
+- **metrics 1 行 = wrapper invocation 1 回**。`REV_HARNESS_DELEGATION_METRIC` JSON line が `wrapper_role` / `specialty` / `manifest_hash` / `exit_code` / `total_tokens` を持って stdout に出る (CI / billing tracking 用)
+
+### 4.5 Bootstrap order (新規 adopter 向け)
+
+これら全部を**ゼロから準備する**には:
 
 ```bash
-# 1. Build the obscura binary out-of-tree (workspace excludes it; see
-#    Cargo.toml `[workspace] exclude`).
-cd vendor/obscura && cargo build --release --bin obscura
-# 2. Either copy / symlink it onto PATH ...
-ln -sf "$(pwd)/target/release/obscura" /usr/local/bin/obscura
-# 3. ... or point rev-stealth at it explicitly via env var.
-export REV_STEALTH_OBSCURA="$(pwd)/target/release/obscura"
-# 4. Or pass --obscura /path/to/obscura on each invocation.
+# 1. project_id を確立 (immutable identity)
+./scripts/project-id.sh bootstrap "$(basename "$PWD")"
+
+# 2. Rust core build (workspace 全 6 crate)
+( cd harness-rust && cargo build --release -p agent-core -p semantic-mcp )
+
+# 3. (optional) Node-side registry db を bootstrap (Rust 不在環境 fallback 用)
+bash scripts/semantic-bootstrap.sh
+#   → ~/.semantic-mcp/<pid>/semantic.db に 7 registry tables を migrate
+
+# 4. Rust-side full db を migrate + RSEM marker 採用
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"bootstrap","version":"0"}}}' \
+  | bash scripts/launch-semantic-mcp.sh
+#   → Library-path db に 16 tables 全部 migrate + application_id=RSEM 採用
+
+# 5. シンボル index に実データを投入 (本格運用前に 1 度)
+PLAN=$(find .agent/active -name "plan_*.md" 2>/dev/null | head -1)
+./harness-rust/target/release/agent-core context update --plan "$PLAN" --output /tmp/snap.json
+jq '{files: [.files[] | select(.language as $l | ["rust","typescript","tsx","javascript","jsx","python","go","shell"] | index($l))], timestamp: .timestamp}' /tmp/snap.json > /tmp/snap.filt.json
+./harness-rust/target/release/agent-core context index-symbols \
+  --snapshot /tmp/snap.filt.json \
+  --db-path "$HOME/Library/Application Support/Revharness/semantic-mcp/v1/$(cat .shared/project_id)/semantic.db" \
+  --project-id "$(cat .shared/project_id)"
+#   → symbols テーブルに 100s-10,000s 行 INSERT (codebase 規模次第)
 ```
 
-**Symptoms when obscura is missing.** `spider` and `cf-evaluate` exit
-with code **3** (`obscura launch (permanent): BinaryNotFound`).
-Workaround: `relocate --html-file path.html` is the only subcommand that
-runs without obscura; it operates on a local HTML snapshot and never
-launches a browser. `doctor`, `vpn` and `captcha` are also obscura-free.
+step 5 を省くと sem.context.top_k が impact 分析の対象 symbol を見つけられず top_k=0 を返します (動作はするが空)。トラブル時の典型症状なので [section 16 Operator Troubleshooting](#16-operator-troubleshooting--症状別レシピ) も参照してください。
 
-### CI integration / running ignored E2E tests locally
+---
 
-All obscura-dependent integration tests are tagged `#[ignore]` so plain
-`cargo test` stays green on hosts without the binary. To reproduce the
-exact matrix that CI runs (verification matrix S1 / S2 / S9, plus the
-Phase 5a `cdp_shim_e2e` and Phase 5b `e2e_spider_fallback` harnesses):
+## 5. 技術スタック / 言語マップ
+
+| 言語 / 技術 | 役割 | 主な配置 | 成熟度 |
+|---|---|---|---|
+| **Rust 2021** | 中核 CLI、MCP server、symbol indexer、cache、hook ingress | `harness-rust/crates/` 全 6 crate | 高 (production-grade) |
+| **Bash** | wrapper / gate / lint / cleanup / metrics / build | `scripts/` (50+)、`.claude/commands/` | 高 (35+ fail-closed) |
+| **TypeScript / Node.js** | semantic-mcp の compatibility surface (Rust 不在環境向け) | `scripts/semantic-mcp-server/` | 中 (legacy fallback) |
+| **SQLite + FTS5** | semantic registry / review queue / file index / capsule cache | `~/Library/Application Support/Revharness/semantic-mcp/v1/<project_id>/semantic.db` (macOS) | 高 (FTS5 BM25 + migration) |
+| **tree-sitter** | symbol extraction (6 言語、grammar version tracking) | `harness-rust/crates/tree-sitter-index/` | 高 (incremental + dedup) |
+| **JSON / JSONL** | matrix-vocabulary, delegation metrics, task-contract, state.json | `docs/manual/matrix-vocabulary.json`、stderr metric line | 高 (schema versioned) |
+| **Markdown** | ExecPlan、role docs、specialty manifests (embedded JSON)、truth matrix | `.agent/`、`docs/roles/`、`docs/manual/` | 高 (canonical 正本) |
+| **TOML** | Codex native agent presets、`.codex/config.toml` | `.codex/` | 中 |
+
+開発スタイルは **Rust-first backend / shell-first orchestration glue**。新規 control-plane は Rust、エージェント呼び出し境界は shell wrapper、永続データは SQLite。
+
+---
+
+## 6. Quick Start
+
+### 6.1 前提
+
+- Claude Code CLI (`claude`) または Codex CLI (`codex`) のいずれか以上
+- `jq`, `git`, `bash 4+`, `sqlite3`
+- Rust toolchain (`cargo`) — Rust core 機能を使う場合 (`semantic-mcp` / `agent-core`)
+- Node 20+ — `scripts/semantic-mcp-server/` の Node legacy compat surface を使う場合
+- macOS / Linux (Windows は WSL2 推奨)
+
+### 6.2 30 秒で動かす (最短ルート)
 
 ```bash
-./scripts/run_obscura_e2e.sh                 # builds obscura if missing
-./scripts/run_obscura_e2e.sh -- --nocapture  # pass extra args to cargo test
-OBSCURA_BIN=/abs/path/obscura ./scripts/run_obscura_e2e.sh
+# 1. clone
+git clone https://github.com/sasuketorii/rev_harness.git
+cd rev_harness
+
+# 2. project_id artifact (初回のみ、immutable identity を確立)
+./scripts/project-id.sh bootstrap "$(basename "$PWD")"
+
+# 3. Rust core build
+(cd harness-rust && cargo build --release -p agent-core -p semantic-mcp)
+
+# 4. semantic-mcp 起動 (自動 migration + RSEM marker 採用)
+./scripts/launch-semantic-mcp.sh   # Ctrl-C で抜ける、schema は永続化される
+
+# 5. wrapper 経由で Codex を呼ぶ
+echo "Hello, RevHarness." | ./scripts/codex-wrapper.sh --role coder --stdin
 ```
 
-The script exports two env vars that gate the test code paths:
+step 4 で Rust db に 16 tables (registry + symbol) が migrate され、`application_id=0x5253454D` (RSEM) marker が打たれます。詳細な data plane の動きは [section 4](#4-runtime-data-plane--2-系統-db--project_id-分離--call-flow) を参照。
 
-| Variable                   | Consumer                                          | Meaning                                  |
-| -------------------------- | ------------------------------------------------- | ---------------------------------------- |
-| `REV_SCRAPING_RUN_OBSCURA` | `obscura_lifecycle.rs` (S2)                       | Set to `1` to opt in; otherwise tests skip gracefully. |
-| `OBSCURA_BIN`              | `obscura_lifecycle.rs`                            | Absolute path to the obscura binary.     |
-| `REV_STEALTH_OBSCURA`      | `stealth-cli` (`spider`, `cf-evaluate`)           | Absolute path used by CLI invocations.   |
+### 6.3 本格運用前のフル準備 (推奨)
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the equivalent matrix
-on every push to `main` and every PR: a dedicated `build-obscura` job
-compiles the vendored binary once (with `vendor/obscura/target` cached
-on the vendored revision so V8 snapshots are reused across runs) and
-fans the artifact out to the lifecycle / shim / fallback E2E jobs.
-
-### CLI quick start
+step 4 までで wrapper invocation は通りますが、**`sem.context.top_k` の impact 分析を機能させるには symbol index に実データを投入する必要**があります。step 4 の後に追加:
 
 ```bash
-# 1. Build release binary.
-cargo build --release
-# 2. Author the allowlist. Directory must be mode 0700.
-mkdir -p -m 0700 ~/.rev_scraping
-cat >~/.rev_scraping/authorized.toml <<'TOML'
-[[targets]]
-url_pattern = "^https://your-authorized-target\\.test/"
-TOML
+# 6. (optional) Node-side registry db も bootstrap (legacy compat / Rust 不在環境向け)
+bash scripts/semantic-bootstrap.sh
 
-# 3. Spider an authorized URL with CF resilience eval + relocate.
-./target/release/rev-stealth \
-    --format json \
-    spider \
-    --url https://your-authorized-target.test/page \
-    --cf-evaluate \
-    --stable-id product.price \
-    --threshold 0.85
+# 7. symbol index に repo content を投入 (1 度実行で symbols テーブルに数千行)
+PLAN=$(find .agent/active -name "plan_*.md" 2>/dev/null | head -1)
+[[ -z "$PLAN" ]] && PLAN=README.md   # plan が無ければ任意の md ファイルでも可
+./harness-rust/target/release/agent-core context update --plan "$PLAN" --output /tmp/snap.json
+jq '{files: [.files[] | select(.language as $l | ["rust","typescript","tsx","javascript","jsx","python","go","shell"]|index($l))], timestamp: .timestamp}' \
+  /tmp/snap.json > /tmp/snap.filt.json
+./harness-rust/target/release/agent-core context index-symbols \
+  --snapshot /tmp/snap.filt.json \
+  --db-path "$HOME/Library/Application Support/Revharness/semantic-mcp/v1/$(cat .shared/project_id)/semantic.db" \
+  --project-id "$(cat .shared/project_id)"
 
-# 4. Run cf-evaluate stand-alone.
-./target/release/rev-stealth --format json cf-evaluate \
-    --url https://your-authorized-target.test/cf-page
-
-# 5. Relocate against a saved HTML fixture (no network).
-./target/release/rev-stealth --format json relocate \
-    --session-id $(uuidgen) \
-    --stable-id product.price \
-    --html-file ./page.html \
-    --threshold 0.85
+# 8. (sanity) symbol が入ったか確認
+sqlite3 "$HOME/Library/Application Support/Revharness/semantic-mcp/v1/$(cat .shared/project_id)/semantic.db" \
+  "SELECT language, COUNT(*) FROM symbols GROUP BY language"
 ```
 
-### MCP quick start
+step 7 を省くと sem.* call は schema 通りに動きますが、`top_k=0 件` (= 何も返らない) のままです。診断は [section 16.1](#161-sem-が空応答--pending_count-0--何も返らない) 参照。
 
-`stealth-mcp` speaks MCP over stdio. As of v1.1.0 P10 (security hardening),
-the server ships a hand-rolled JSON-RPC 2.0 implementation pinned to the
-MCP `2024-11-05` schema — no `rmcp` dependency. Transport decision §8 #4
-remains stdio-only.
+### 6.4 主な使い方ルート
 
-#### Claude Code `.mcp.json`
+| やりたいこと | 入り口 |
+|---|---|
+| Claude Code で auto orchestration を走らせる | `./.claude/commands/auto_orchestrate.sh --plan .agent/active/plan_*.md --phase impl --run-coder` |
+| Codex を role 固定で 1 回呼ぶ | `./scripts/codex-wrapper.sh --role <coder\|high-coder\|reviewer\|research\|standard> --stdin < prompt.md` |
+| ExecPlan を lint する | `cd harness-rust && cargo run -p agent-core -- execplan lint <plan.md>` |
+| handoff envelope を lint する | `cargo run -p agent-core -- envelope lint --specialty <slug> <envelope.md>` |
+| specialty manifest を check / project する | `cargo run -p agent-core -- specialty lint --check-projections docs/roles/**/specialties/*.md` |
+| task-stamp (SHA-256 deterministic ID) を作る | `cargo run -p agent-core -- task-stamp --task-id ID-001 --description "..." --timestamp 2026-05-20T00:00:00Z` |
+| secret scan を走らせる | `scripts/rev-harness-secret-guard.sh check --staged-only` |
+| semantic capsule を取る | semantic-mcp 経由で `sem.context.top_k` → `sem.capsule` を JSON-RPC で呼ぶ (詳細は `revharness-semantic-mcp-usage` skill) |
 
-```json
+---
+
+## 7. 機能カタログ — Rust Core (harness-rust/)
+
+`harness-rust/Cargo.toml` workspace。Rust 2021 edition、6 crate、合計 ~44,200 LOC。全 crate に `cargo test` が通る単体テストが揃っており、production crate として扱える成熟度。
+
+### 6.1 `agent-core` — オーケストレーション CLI (22 subcommands)
+
+shell スクリプト群を逐次 Rust に置き換えた中核 CLI。`cargo run -p agent-core -- <subcommand>` で起動。
+
+| Subcommand | 機能 | 旧 shell 置き換え | 出力例 / lint rule |
+|---|---|---|---|
+| `state` | session/task state の get/set/clear/gc | state.sh | `.claude/tmp/<task>/state.json` |
+| `session` | session lifecycle (init/start/stop/status/refresh) | session.sh | non-interactive invariant 遵守 |
+| `context` | code change context analysis、impact-top-k、symbol indexing | context_analysis.sh | `update`, `index-symbols`, `delta`, `preflight`, `detect-deletions`, `sync-freshness` |
+| `capsule` | semantic capsule 生成 (≤220tok)、`CAPSULE_SHA256` / `FILE_SHA_ROLLUP` binding | context_capsule.sh | `INDEX_VERSION` slot exclusion 固定 |
+| `cache` | verify/review/capsule artifact cache (LRU、220tok 上限) | — | SQLite `_cache_meta` |
+| `verify` | shadow verification (ephemeral worktree lint/test) | shadow_verify.sh | QG-1/QG-2 fail-closed |
+| `review` | Codex reviewer 実行 + 履歴 audit | reviewer.sh | review trace persistence |
+| `coder` | Claude/Codex coder 実行 (start/watch/health/interrupt) | coder.sh | role-aware dispatch |
+| `orchestrate` | cross-agent orchestration (plan/execute/checkpoint/rollback) | auto_orchestrate.sh 補助 | state machine driven |
+| `contract` | task contract bind/validate/status | task_contract.sh | `.claude/tmp/<task>/task-contract.json` |
+| **`envelope`** | handoff envelope render + **lint** (5 hard + 3 warning rules) | — | rule_id: `envelope.field-presence` / `envelope.enum-membership` / `envelope.prose-code-example` etc. |
+| **`execplan`** | ExecPlan markdown lint (5 hard + 1 warning) | — | `execplan.specialty-id-missing` / `canonical-role-mismatch` / `invocation-path-invalid` / `manifest-hash-stale` / `selection-reason-thin` |
+| **`specialty`** | specialty manifest lint (R1-R15) + SKILL.md projection (role-aware) | — | `specialty.placeholder-only-section` (R13) / `missing-example` (R14) / `deprecated-alias-in-body` (R15) etc. |
+| `worktree` | git worktree (create/list/cleanup/status) | hydra 置換 | concurrent task 分離 |
+| `gate` | quality gate (lint / check-coverage / audit) | quality_gate.sh | Level A/B/C |
+| `project-id` | project_id artifact 解決/検証 | project-id.sh 一部 | `.shared/project_id` immutable |
+| `init` | プロジェクト初期化 (directory + DB seed) | init-project.sh | one-time bootstrap |
+| `hook` | hook validate / register / test | — | hook-review-queue と接続 |
+| `lease` | lease registry validation (concurrent provider 制御) | — | codex/claude 排他 |
+| **`secret`** (parent) | secret scan 系の親 subcommand。`secret scan` を内包 | — | future-proof な namespace |
+| **`secret scan`** | staged/ref/files/pre-push stdin の secret scan、allowlist fingerprint、JSON schema v1 | — | accidental secret prevention guard |
+| **`semantic`** (parent) | semantic.db 管理系の親 subcommand。`semantic gc` を内包 | — | 将来 `semantic status` / `reindex` 拡張余地 |
+| **`semantic gc`** | `~/Library/Application Support/Revharness/semantic-mcp/v1/<project_id>/semantic.db` の cleanup CLI。`--older-than-days` / `--all-projects` / `--ignore-active-lock` / `--json`、`--dry-run` と `--force` は mutual exclusive (exit 2) | (MCP `sem.admin.gc` の CLI 兄弟) | JSON schema v1、active DB は file lock 経由で default skip |
+| **`task-stamp`** | 入力検証付き SHA-256 deterministic task ID 生成 | — | regex bounded task_id + control-char rejected description + RFC3339 UTC timestamp、JSONL 1 行出力 |
+
+**主要 lint subcommands の rule 一覧:**
+
+- `envelope lint`: matrix-vocabulary に対する field-presence / enum-membership / domain-local boundary / prose-code-example / `--specialty` で specialty required heading 検証
+- `execplan lint`: specialty-using slice 5 hard rule + selection-reason thinness warning。`manifest_hash` は live re-hash で freshness check (presence-only ではない)
+- `specialty lint` (R1-R15): manifest schema、required sections、role-aware body、placeholder-only / missing-example / deprecated-alias-in-body 構造的 lint。`--check-projections` で `.claude/skills/`+`.agents/skills/` への projection drift も検知
+- `cache`, `verify`, `review`, `gate`: deterministic verification artifact の生成・検証
+
+**maturity**: 高 — fail-closed の test、role-aware skill_body generator、live hash recomputation、provider parity 自動生成、6 specialty が projection enabled。
+
+### 6.2 `semantic-mcp` — Stdio MCP server (8 tools)
+
+Claude Code / Codex の MCP client から `./scripts/launch-semantic-mcp.sh` 経由で起動。`~/Library/Application Support/Revharness/semantic-mcp/v1/<project_id>/semantic.db` (macOS) を durable authority に。
+
+| Tool | 機能 | 重要な制約 |
+|---|---|---|
+| `sem.context.top_k` | changed_files から BFS impact analysis + top-k symbol ranking | `context_token` (SHA256(file_sha_rollup + INDEX_VERSION + summary)) 発行、TTL 30 分、`file_parse_cache` 要事前 populate |
+| `sem.capsule` | server-issued `context_token` を入力に 220tok 上限の compact capsule 生成 | body は `CAPSULE_SHA256=` / `INDEX_VERSION=` / `FILE_SHA_ROLLUP=` を必ず含む。caller 提供の `top_k_symbols` は受理しない (token 必須) |
+| `sem.preflight` | scope / proposed_components / deleted_paths / move_candidates → pass/warn/block | semantic registry に対する事前検証 |
+| `sem.registry.upsert` | symbol registry delta update (semantic_id, logical_id, kind, imports, exports, deps) | idempotency tracking |
+| `sem.registry.query` | path_prefix / name / symbol / status で検索 (FTS5 BM25) | compact result field |
+| `sem.registry.set_status` | symbol lifecycle (active/inactive/incomplete/buggy/deprecated) | inactive_reason 必須 |
+| `sem.registry.delete` | logical delete (idempotent) | by semantic_id / logical_id / symbol |
+| `sem.search` | bounded advisory FTS5 search (capsule_budget aware) | scopePaths 必須、top-level conditional keyword 禁止 (OpenAI Responses API 互換) |
+| `sem.health` | server / DB / table readiness probe | — |
+| `sem.admin.gc` | stale managed DB の dry-run/force delete | older_than_days 指定 |
+
+**LOC**: ~13,400。Tests: 43 lib tests + 2 criterion benchmark (`search_fts5`, `context_top_k`)。SQLite migration は schema 冪等。
+
+**maturity**: 高 — FTS5 BM25 indexing、LRU 220tok cap、freshness invariant (context_token replay resistance)、Cargo feature による 6 言語 grammar の切替。
+
+### 6.3 `tree-sitter-index` — Symbol indexer (6 languages)
+
+`semantic-mcp` と `agent-core context` の symbol extraction エンジン。
+
+| Feature flag | 対応言語 | LOC (extractor) |
+|---|---|---|
+| `lang-rust` (default) | Rust | 511 |
+| `lang-typescript` (default、JS 含む) | TypeScript / JavaScript | 611 |
+| `lang-python` (default) | Python | 464 |
+| `lang-go` (optional) | Go | 512 |
+| `lang-shell` (optional) | Bash / Shell | 193 |
+| `all-languages` | 上記すべて | — |
+
+API: `index_files_at_path()`, `impact_analysis_at_path()`, `should_force_full_review()`。incremental indexing 対応 (per-file hash + grammar version cache)。
+
+**LOC**: ~4,600 (extractors 2,300 + db/incremental/parser/types)。Tests: 181 lib tests + 1 benchmark。
+
+### 6.4 `hook-review-queue` — Hook ingress (Rust binary)
+
+`.claude/hooks/codex-review-hook.sh` から委譲される Rust 側エンジン。
+
+- `hook review-queue` subcommand: stdin の JSON (tool_name, file_path) を受け、real-path canonicalization → repo-relative check → write-tool allowlist (Edit/Write) → queue helper 起動
+- `NormalizedPath` enum で `RepoRelative` / `OutsideRepo` を厳密分離
+- **fail-closed**: 未知 tool / 範囲外 path / queue_helper 不在 / shim/proxy のみ解決可能 → 即 exit non-zero
+- trusted runtime dir allowlist (real-user canonical home root) + canonical path matching
+
+**LOC**: ~630。Tests: 29 lib + 統合。
+
+### 6.5 `harness-cache` — Artifact cache
+
+SQLite-backed cache (verify result / review / capsule / file index) with LRU eviction + 220 token budget enforcement。
+
+- `CacheManager::{check,store}_verify_result()`
+- `CacheManager::{check,store}_review()`
+- `CacheManager::{check,store}_capsule()` (token budget enforced)
+- `CacheManager::{file_index_entry, update_file_index}()`
+- `gc()`, `maintenance()` — `_cache_meta` table で schema version 管理 (semantic-mcp の `PRAGMA user_version` と非干渉)
+
+**LOC**: ~1,900。Tests: 54 lib tests + fixtures。
+
+### 6.6 `shared` — Foundation layer
+
+全 crate の基礎。
+
+| Module | 役割 |
+|---|---|
+| `error` | `AgentError` enum + `Result<T>` |
+| `freshness` | `snapshot()` → `FreshnessSnapshot` (file_sha_rollup, index_version, ttl_secs) |
+| `git` | repo root detection、tree-sitter state |
+| `lock` | `FileLock` (fs2-based、ScopeGuard cleanup) |
+| `logging` | tracing-subscriber 初期化 (JSON output、env-filter) |
+| `paths`, `ranker`, `types`, `validation` | path canonicalize、top-k score、common structs、jq path validator |
+
+**LOC**: ~2,000 (最小 crate だが再利用密度最高)。Tests: 29 lib tests。
+
+---
+
+## 8. 機能カタログ — Shell Scripts (`scripts/`, 50+)
+
+50+ shell script を 11 カテゴリに整理。`bash` (49) + Node.js TypeScript (`semantic-mcp-server/`)。35+ scripts が **fail-closed** (validation gate + non-zero exit + 明確 error)。
+
+### 7.1 Wrappers / Entry points
+
+| Script | 役割 | 主要呼び出し |
+|---|---|---|
+| **`codex-wrapper.sh`** | Codex CLI canonical entrypoint。`--role <standard\|research\|coder\|high-coder\|reviewer>` で sandbox/approval/effort/model を固定、`--specialty <slug>` で specialty 経路、`--dry-run` で 0-cost 検証、`REV_HARNESS_DELEGATION_METRIC` JSONL 出力 | orchestrator / cross-family / CI |
+| `codex-wrapper-high.sh` / `-medium.sh` / `-xhigh.sh` | 互換 shim → canonical wrapper (high-coder / standard / reviewer) | 旧 caller |
+| `claude-wrapper.sh` | Claude CLI 互換 shim (deprecated 2026-07-14)。`--bare` は API-key auth 必須で fail-closed | legacy 経路のみ |
+| `cursor-wrapper.sh` | Cursor CLI entrypoint。`--role ask\|agent\|yolo`、rules presence metric、enum self-check metric slot、`ask` pre/post git diff gate、0-cost `--dry-run` | read-only Q&A / 軽量 edit / automation lane |
+
+Cursor 経由で Codex / Claude wrapper lane に横抜けしないよう、Codex/Claude wrapper 側は `_outbound-deny.sh` を通じて parent process を確認します。Cursor 自身の実行は許可しつつ、Cursor-origin process から他 vendor wrapper を呼ぶ経路を machine-level に拒否する hardening です。
+
+### 7.2 Semantic-MCP
+
+| Script | 役割 |
+|---|---|
+| `launch-semantic-mcp.sh` | semantic MCP server エントリ。`harness-rust/crates/semantic-mcp` (Rust 優先) → Node.js fallback (`scripts/semantic-mcp-server/dist/cli.js`)。trusted runtime dir allowlist で fail-closed |
+| `project-id.sh` | `.shared/project_id` 解決 + immutable artifact getter/setter |
+| `resolve-semantic-project-id.sh` | drift classification を含む project-id resolver |
+| `run-semantic-node-tool.sh` | Node.js 系 semantic tool 呼び出し (symlink-safe) |
+| `semantic-review-queue.sh` | review queue operator (enqueue/lease/drain/complete/requeue/export) |
+
+### 7.3 Classifier / Routing
+
+| Script | 役割 |
+|---|---|
+| `rev-harness-task-classifier.sh` | intent + files → `light` / `standard` / `heavy` task class、`schema_profile`、`gate_tier`、`final_reviewer_gate_required` を JSON 出力 |
+| `harness-block-router.sh` | BLOCK type → `code-block` / `process-block` / `governance-block` / `terminal-block` |
+| `harness-governance-classifier.sh` | path set → governance class (advisory) |
+
+### 7.4 Verification / Gates
+
+| Script | 役割 |
+|---|---|
+| `quality_gate.sh` | Rust quality check (Level A: fmt / B: +clippy+test+audit / C: +bench) |
+| `harness-doctor.sh` | harness health summary、vendoring check (exit 70/71 で vendoring detection) |
+| `harness-check-planner.sh` | mode (dev/review/release) → deterministic check command set |
+| `harness-projection-preflight.sh` | reviewer-next-status schema validation |
+| `harness-runtime-baseline.sh` | wall/rss/cpu 等の orchestration runtime sampling |
+| `cross-family-live-smoke-preflight.sh` | Codex↔Claude live smoke 前の advisory check |
+| `cross-family-live-artifact-smoke.sh` | opt-in 短時間 live handoff (900s timeout) |
+
+### 7.5 Metrics
+
+| Script | 役割 |
+|---|---|
+| `collect-delegation-metrics.sh` | `REV_HARNESS_DELEGATION_METRIC` JSONL を集約 → session JSON (median/p75/total) |
+| `compute-completion-delta.sh` | baseline vs post の ratio + pct_change + threshold_met (-20%) |
+| `harness-benchmark.sh` | model-policy aware の canonical runtime benchmark + evidence manifest |
+| `bench_runner.sh` | Criterion 集計 + p95 ratio assertion (cold/warm threshold) |
+
+### 7.6 Build / Project setup
+
+| Script | 役割 |
+|---|---|
+| `build-dev.sh` | macOS/iOS dev build (no sign/notarize) |
+| `init-project.sh` | repo bootstrap (project_id artifact、template、.gitignore) |
+| `model-policy.sh` | `model_policy.json` source → runtime compiled policy、hash 検証 |
+| `sign-and-build.sh` | release 用 codesign + notarize + staple + verify (macOS) |
+
+### 7.7 Cleanup / Maintenance
+
+| Script | 役割 |
+|---|---|
+| `harness-active-artifact-pruner.sh` | `.claude/tmp` 等の run artifact を dry-run 既定で archive (no delete by default) |
+| `rev-harness-janitor.sh` | inspect / plan / archive-report (read-only) |
+| `cleanup-codex-mcp-zombies.sh` | MCP zombie プロセス report / kill |
+| `shim-hits-rotate.sh` | `~/.rev_harness/shim-hits.log` の size-based rotation |
+
+### 7.8 Governance / Evidence
+
+| Script | 役割 |
+|---|---|
+| `rev-harness-admission.sh` | reviewer admission preflight (counter request / schema-micro-fix) |
+| `rev-harness-dirty-surface.sh` | dirty/HOLD ownership preflight (read-only git status) |
+| `rev-harness-evidence-manifest.sh` | evidence manifest (artifact 存在 + sha256 + 状態) 検証 |
+| `rev-harness-worker-lifecycle.sh` | worker lifecycle manifest validation |
+| `rev-harness-lease-guard.sh` | lease registry operator (validate/open/heartbeat/close/block/reap) |
+
+### 7.9 Distribution / Adoption
+
+| Script | 役割 |
+|---|---|
+| `rev-harness-skill-projection.sh` | shared skill canonical sources + provider projection 検証 (manifest 駆動) |
+| `rev-harness-skill-routing-check.sh` | skill routing matrix invariants |
+| `rev-harness-distribution-adoption.sh` | distribution preflight (composite of projection + dirty + evidence + lifecycle) |
+| `rev-harness-src-promote.sh` | product payload copy plan (apply は意図的に無効化) |
+| `rev-harness-upgrade.sh` | upgrade inspector / planner |
+
+### 7.10 Utility / Guards
+
+| Script | 役割 |
+|---|---|
+| `_canonical-guard.sh` | vendoring 防止 (sourced by wrappers、`REV_HARNESS_CANONICAL_ROOT` 強制、exit 70 EX_SOFTWARE on vendored) |
+| `_outbound-deny.sh` | Cursor-origin process から Codex/Claude wrapper への outbound delegation を parent-process check で拒否 |
+| `_shim-log.sh` | PII-safe shim log (JSONL append、fail-open) |
+| `codex-job.sh` | 非同期 job (start/status/wait/result/gc) — fire-and-forget |
+| `rev-harness-secret-guard.sh` | `agent-core secret scan` passthrough + managed pre-commit/pre-push hook installer |
+| `subscription-auth-guard.sh` | subscription-only auth enforcement (API-key auth を block) |
+| `validate-orchestration-packet.sh` | orchestration packet compile/validate |
+| `check-matrix-vocabulary-sync.sh` | `matrix-vocabulary.json` hash と `verification-truth-matrix.md` marker の一致確認 |
+| `rev-harness-dual-native-check.sh` | dual-native orchestration 文言 audit |
+| `rev-harness-static-asset-check.sh` | .html href + .css braces + .js node --check + .json jq |
+
+### 7.11 Semantic-mcp-server (Node.js compat surface)
+
+`scripts/semantic-mcp-server/`: Node.js + TypeScript で書かれた MCP server の compatibility surface。Rust 不在 / 古い CI 環境向けの fallback。Rust に置き換え済みのため新規利用は非推奨。
+
+---
+
+## 9. 機能カタログ — Skills & Specialties
+
+`.claude/skills/<slug>/SKILL.md` (Claude Code 用) と `.agents/skills/<slug>/SKILL.md` (Codex / cross-platform 用) で **100% provider parity**。32 skill。
+
+Cursor Agent Skills については `.agents/skills/` が project-level discovery path、`.claude/skills/` が legacy compatibility path として扱われます。さらに `.cursor/skills/` を canonical Cursor path として確保しています。既存 32 skill (`cursor-caller`、`production-function-implementer`、`staff-code-reviewer` など) は `name:` / `description:` frontmatter compliance を `test/unit/test-cursor-skills-compliance.sh` で deterministic に検証します。
+
+加えて `docs/roles/<role>/specialties/<slug>.md` に **16 canonical specialty file** (embedded JSON manifest)。そのうち 6 specialty が `thin_skill_projection.enabled: true` で SKILL.md に自動 projection されています。
+
+### 8.1 Orchestration Core (7 skills)
+
+| Skill | Trigger |
+|---|---|
+| `auto-orchestrator` | orchestrator turn 開始時の pre-flight classification、適切な workflow skill へ routing |
+| `system-planner` | 計画 / 分析段階 |
+| `orchestrator-bootstrap` | session 開始ルーチン (semantic capsule + memory + truth consult) |
+| `scope-guard` (specialty) | 曖昧な scope / "ざっくり" 依頼の境界確定 |
+| `slice-designer` (specialty) | 大きすぎる依頼の task class / slice boundary / evidence destination 決定 |
+| `context-compactor` (specialty) | 長時間 session / handoff 前のコンテキスト圧縮 (compact_handoff ≤ 220 tokens) |
+| `structured-mentor` (specialty) | コードを書かずに前提・制約・リスク・代替案の明確化 |
+
+### 8.2 Worker Lenses (6 skills)
+
+| Skill | Trigger |
+|---|---|
+| `production-function-implementer` (specialty) | 本番品質関数実装、機密データ、エラー処理網羅 |
+| `staff-code-reviewer` (specialty) | コードレビュー、PR レビュー、リリース前最終チェック、bug/security 検出 |
+| `codex-caller` | Claude → Codex cross-family delegation (wrapper 契約) |
+| `review-workflow` | reusable review and fix loop |
+| `research-handoff` | external research と handoff workflow |
+| `baseline-protection` | coder→reviewer cycle のベースライン安定保護 (pre-write prompt pair、no-write-during-agent) |
+
+### 8.3 Knowledge Packs (4 skills)
+
+`rust-skills-knowledge-pack`、`rustskills-architecture`、`go-skills-knowledge-pack`、`typescript-skills-knowledge-pack`。各言語の最新 stable、依存 governance、benchmark / 公式 doc consultation を駆動。
+
+### 8.4 Deploy Guards (4 skills)
+
+`cloudflare-deploy-guard`、`payload-cms-deploy-guard`、`supabase-deploy-guard`、`codex-app-server-guard`。各 platform へのデプロイ前に **GO/NO-GO gate** を強制 (課金 / セキュリティ / 権限漏洩 / abuse risk / rollback readiness)。
+
+### 8.5 Product Integration & Frontend (5 skills)
+
+`revc-shadcn-frontend-workflow`、`codex-app-server-product-integration`、`shadcn`、`design-principles`、`naming-normalization-guard`。
+
+### 8.6 Repo Lifecycle (5 skills)
+
+`development-junk-cleanup`、`client-distribution-readiness`、`self-growth-proposal-triage`、`harness-official-docs-update`、`revharness-semantic-mcp-usage`。
+
+### 8.7 Canonical Specialties (16 files, `docs/roles/`)
+
+| Role | Specialty | Projection | Required output sections (抜粋) |
+|---|---|---|---|
+| **Orchestrator** | scope-guard | ✅ | Requested Outcome / Explicit Requirements / Non-Goals / Acceptance Criteria / Minimum Shippable Scope / Pre-Implementation Blockers |
+| Orchestrator | slice-designer | ✅ | Classification / Slice Contract / Routing |
+| Orchestrator | context-compactor | ✅ | Original Goal / Confirmed Facts / Files Changed / Compact Handoff |
+| Orchestrator | structured-mentor | ✅ | My Understanding / Weak Reasoning Points / Alternatives / Smallest Useful Validation |
+| Orchestrator | adr-author | — | Status / Decision / Rationale / Rollback / Likely Regrets |
+| Orchestrator | migration-planner | — | Migration Goal / Verification Plan / Rollback Plan / Catastrophic Failure |
+| **Coder** | production-function-implementer | ✅ | Spec Understanding / Implementation Notes / Tests / Error Handling / Logging-Security / Performance / Worker Outcome |
+| Coder | codebase-archaeologist | — | Codebase Summary / Entry Points / Patterns / Safe First Changes / Risky Areas |
+| Coder | hypothesis-driven-debugger | — | Symptom Restatement / Root Cause Candidates / First Experiment / Do Not Touch Yet |
+| Coder | performance-detective | — | Bottleneck Hypotheses / Complexity Analysis / Improvement Candidates |
+| Coder | refactor-safety-analyst | — | Caller Map / Invariants / Breakage Scenarios / Migration Path |
+| Coder | risk-based-test-strategist | — | Risks / Test Case Matrix / Tests Not Worth Writing |
+| **Reviewer** | staff-code-reviewer | ✅ | Findings / Block Reason / Residual Risk / Missing Context / Verdict |
+| Reviewer | independent-verifier | — | Requirement Match / Implemented Behavior / Verification Verdict |
+| Reviewer | release-readiness-reviewer | — | Release Verdict / Blockers / Test Status / Rollback Procedure |
+| Reviewer | security-and-privacy-reviewer | — | Critical Security Findings / Privacy Risks / Abuse Scenarios / Required Fixes |
+
+✅ = `thin_skill_projection.enabled: true`。`.claude/skills/<slug>/SKILL.md` と `.agents/skills/<slug>/SKILL.md` が `agent-core specialty project --all --provider all` で deterministic に生成される。**body は role-aware** (orchestrator → direct-Read、coder → `--role coder --specialty <slug>`、reviewer → `--role reviewer --specialty <slug>`)。
+
+### 8.8 .claude/commands/ (実行層)
+
+- `auto_orchestrate.sh`: メインのオーケストレータ engine (test/impl phase、state tracking、gate 実行、iteration 制御)
+- `lib/`: 14 shared library
+  - `state.sh` (state.json operations)
+  - `coder.sh` (Claude/Codex coder wrapper)
+  - `reviewer.sh` (Codex reviewer wrapper)
+  - `session.sh` (CLI session)
+  - `utils.sh` / `timeout.sh`
+  - `context_capsule.sh` / `context_analysis.sh` (semantic glue)
+  - `shadow_verify.sh` (mechanical gate)
+  - `orchestration_packet.sh` / `orchestration_policy.sh`
+  - `baseline_freeze.sh` (write amplification 防止)
+  - `task_contract.sh` (contract bind)
+  - `mcp_fallback.sh` (MCP 不通時 CLI fallback)
+
+---
+
+## 10. Hooks — エディタ→キュー→Rust の 3 段アダプタ
+
+`.claude/settings.json` の `PostToolUse` hook が Edit/Write 後に起動する 3 段構造:
+
+```
+Claude Code Edit/Write
+  │
+  ▼
+1. .claude/hooks/codex-review-hook.sh        ← shell adapter ingress (matcher: Edit|Write)
+  │   • repo-relative 正規化
+  │   • repo 外 skip
+  │   • 拡張子 allowlist 判定
+  ▼
+2. scripts/semantic-review-queue.sh enqueue  ← caller-facing queue ingress
+  │   • absolute shebang 起動
+  │   • trusted runtime dir allowlist 上の真の cargo を解決
+  │   • repo-local real-path validation
+  ▼
+3. harness-rust/crates/hook-review-queue     ← Rust durable engine
+      • trusted dir allowlist (real-user canonical home root)
+      • write-tool allowlist (Edit / Write)
+      • path canonicalize + symlink reject
+      • fail-closed: 未知 tool / 範囲外 / shim-only runtime / control-byte project_id
+```
+
+**fail-closed の条件 (全て exit non-zero):**
+
+- canonical wrapper / `harness-rust/Cargo.toml` / `crates/semantic-mcp/src/main.rs` のいずれかが不在 or repo 外解決
+- cargo lookup が shim/proxy しか返さない / allowlist 外 binary を返す
+- malformed / CR byte / multiline の `.shared/project_id`
+- entrypoint の実行ビット欠落
+
+`.claude/tmp/review_queue.json` への compatibility export はあるが、**authority は SQLite (`semantic.db`) 側**。
+
+---
+
+## 11. Auto-orchestration — `auto_orchestrate.sh` + lib
+
+### 基本オプション
+
+| オプション | 意味 |
+|---|---|
+| `--plan PATH` | ExecPlan 指定 (新規実行) |
+| `--phase PHASE` | test / impl / review / fix のいずれか |
+| `--resume STATE_FILE` | `.claude/tmp/<task>/state.json` から再開 |
+| `--run-coder` | Claude Code Coder を自動起動 |
+| `--fix-until LEVEL` | 修正対象レベル (high/medium/low/all) |
+| `--max-iterations N` | レビュー反復上限 (default: 5) |
+| `--reviewers LIST` | reviewer 一覧 (default: safety,perf,consistency) |
+| `--reviewer-strategy MODE` | fixed / auto |
+| `--agent-strategy MODE` | fixed / dynamic |
+| `--gate levelA\|B\|C` | quality gate level |
+| `--recover` | stale state recovery |
+| `--status` | state.json サマリー |
+
+**重要**: `--continue-session` / `--fork-session` は予約済みで **自動経路では fail-closed**。non-interactive invariant により対話 TTY 以外では実行されない。
+
+### state.json スキーマ
+
+```jsonc
 {
-  "mcpServers": {
-    "rev-scraping": {
-      "command": "/abs/path/to/target/release/stealth-mcp",
-      "args": [],
-      "env": {}
+  "version": "2.0.0",
+  "task": { "id": "<uuid>", "name": "task_name", "plan_path": "..." },
+  "status": "running|completed|error|blocked",
+  "phases": [
+    {
+      "name": "impl",
+      "status": "pending|running|review|fixing|completed|escalated",
+      "iteration": 1,
+      "max_iterations": 5,
+      "coder": { "session_id": "...", "output_file": "..." },
+      "reviews": [],
+      "fixes":   []
     }
-  }
+  ],
+  "sessions":     { "coder_sessions": [], "reviewer_sessions": [] },
+  "quality_gate": { "level": "levelB", "status": "passed|failed|skipped" },
+  "heartbeat":    { "last_updated": "...", "pid": 12345 },
+  "error":        null
 }
 ```
 
-#### codex `config.toml`
+### Native multi-agent (.codex/)
 
-```toml
-[mcp_servers.rev-scraping]
-command = "/abs/path/to/target/release/stealth-mcp"
-args = []
-```
-
-#### Exposed tools (`tools/list`)
-
-| Tool          | Description                                                  |
-| ------------- | ------------------------------------------------------------ |
-| `spider`      | AUP-gated stealth fetch + optional CF eval + relocate        |
-| `relocate`    | Adaptive element re-location (HTML file or URL)              |
-| `cf_evaluate` | Defender-side Cloudflare Turnstile resilience evaluation     |
-| `doctor`      | Pre-flight leak / kill-switch / DNS / IPv6 / WebRTC checks   |
-| `vpn_rotate`  | Surfshark / Gluetun rotation (lazy-on-fail)                  |
-
-### Exit codes
-
-| Code | Meaning                                                              |
-| ---- | -------------------------------------------------------------------- |
-| 0    | OK                                                                   |
-| 1    | User error / AUP rejection / bad args / invalid URL                  |
-| 2    | Transient error (network, VPN flap, navigation timeout — retryable) |
-| 3    | Permanent error (missing binary, unsupported, store I/O)             |
-| 7    | Leak detected / fail-closed (`doctor`)                               |
-| 8    | CF resilience evaluation: still blocked / probe inconclusive         |
-| 9    | Relocate miss (not found, or ambiguous in non-strict mode)           |
-| 10   | Relocate ambiguous + `--strict` (also: attrs_hash / neighbor_hash    |
-|      | divergence — structured warn always emitted)                         |
-
-### Credits & upstream licenses
-
-- **obscura** (`vendor/obscura/`) — Apache-2.0. Chrome145 TLS/HTTP2 FP
-  cache, 3520-entry blocklist, CDP-compatible WebSocket server.
-- **Scrapling** — BSD-3-Clause. Design influence on adaptive relocate
-  ideas; no verbatim port. Independent reimplementation in
-  `stealth-parse`.
-- **goscrapy** — BSL. **Design reference only**; zero lines of code.
-  Enforced by `scripts/check_bsl_contamination.sh`.
-
-### Defender-testbed disclaimer
-
-This stack is published as a **defender-side evaluation toolkit**.
-See the [Authorized Targets Only](#-authorized-targets-only--read-this-before-running-anything)
-section above for the binding statements on Cloudflare ToS §2.8,
-不正アクセス禁止法, and CFAA. AUP enforcement is implemented
-technically (S12) — there is no path through the CLI that reaches a
-network without the allowlist, env-ack, or `--i-have-authorization`
-flag being honored first.
-
-## §13 VPN Setup (Multi-Instance Gluetun)
-
-Phase 6a ships a 3-instance Gluetun pool that the `vpn-rotate` crate
-drives. Each instance is an isolated `qmcgaw/gluetun` container with a
-kill-switch firewall, forced DNS-over-TLS, and its own private bridge
-network — so a misconfigured rule cannot leak traffic between tunnels.
-
-IPv6 is disabled at two layers (Job E hardening): gluetun env
-`BLOCK_IPV6=on` drops IPv6 egress at the container firewall, and
-`sysctls.net.ipv6.conf.{all,default,lo}.disable_ipv6=1` turns IPv6 off
-in the kernel — the second layer is what `vpn-rotate::leak_guard`
-inspects via `HostConfig.Sysctls` to fail-closed on IPv6 leaks.
-
-### Topology
-
-| Instance | Container | HTTP proxy (host) | Control API (host) |
-|----------|-----------|-------------------|--------------------|
-| vpn-1    | `vpn-1`   | `127.0.0.1:8001`  | `127.0.0.1:8881`   |
-| vpn-2    | `vpn-2`   | `127.0.0.1:8002`  | `127.0.0.1:8882`   |
-| vpn-3    | `vpn-3`   | `127.0.0.1:8003`  | `127.0.0.1:8883`   |
-
-All ports are bound to `127.0.0.1` only — the pool is never exposed to
-the LAN.
-
-### Setup
-
-1. Copy the env template and fill in real credentials:
-
-   ```bash
-   cp .env.example .env.local        # preferred (gitignored)
-   chmod 600 .env.local
-   $EDITOR .env.local                # set VPN_USER, VPN_PASSWORD, VPN_COUNTRIES
-   ```
-
-   `scripts/load_env.sh` resolves env files in this order:
-
-   1. `$ENV_FILE` (explicit override)
-   2. `<repo>/.env.local` — **preferred** local secrets file
-   3. `<repo>/.env` — legacy fallback (still supported, but `.env.local`
-      is recommended so personal credentials never collide with a
-      shared/team `.env`)
-
-   Both `.env` and `.env.local` are gitignored.
-
-2. Bring up the pool:
-
-   ```bash
-   ./scripts/vpn_up.sh
-   ```
-
-   The script loads `.env`, runs `docker compose -f
-   src/infra/docker-compose.vpn.yml up -d`, waits for each control-API
-   healthcheck, probes the egress IP through the HTTP proxy, and writes
-   the result to `~/.rev_scraping/vpn_status.json` (chmod 600).
-
-3. Verify leak posture per instance:
-
-   ```bash
-   rev-stealth doctor --container vpn-1
-   rev-stealth doctor --container vpn-2
-   rev-stealth doctor --container vpn-3
-   ```
-
-4. Rotate an exit IP on demand (lazy-on-fail by default):
-
-   ```bash
-   rev-stealth vpn rotate --provider surfshark --strategy lazy-on-fail
-   ```
-
-5. Tear down:
-
-   ```bash
-   ./scripts/vpn_down.sh
-   ```
-
-### Security notes
-
-- **Never commit `.env` or `.env.local`.** Both are gitignored
-  alongside `.env.*.local`. `scripts/load_env.sh` auto-tightens the
-  resolved env file's mode to `0600` if it finds it more permissive.
-- **No `sudo` required.** Gluetun runs unprivileged: only `cap_add:
-  NET_ADMIN` and `/dev/net/tun` are granted. Do not add `privileged:
-  true`.
-- **Kill-switch is enforced** via `FIREWALL=on`. If the tunnel drops,
-  the container's egress is blackholed — clients hitting the HTTP proxy
-  will see connection failures instead of leaking to the clear net.
-- **DNS leak protection** is enforced via `DOT=on` with `cloudflare,
-  quad9` resolvers and `BLOCK_MALICIOUS=on`.
-- Each instance lives on its own bridge (`vpn1-net` / `vpn2-net` /
-  `vpn3-net`) — no inter-container traffic.
-
-### Linux (Ubuntu 22.04+) parity notes — v1.1.0 P6
-
-The toolkit targets macOS and Linux as first-class platforms. The
-Gluetun pool, `vpn-rotate`, `bollard`, and `stealth-auth` paths all
-work on Linux Docker (native `dockerd`) the same way they do on macOS
-Docker Desktop, with these differences worth knowing:
-
-- **Docker daemon**: macOS uses Docker Desktop's VM-hosted daemon at
-  `~/.docker/run/docker.sock`; Linux uses the native `/var/run/docker.sock`.
-  `bollard`'s `Docker::connect_with_local_defaults()` selects the right
-  socket automatically. If you run the Linux daemon rootless, the
-  socket path moves to `$XDG_RUNTIME_DIR/docker.sock`.
-- **`cap_add: NET_ADMIN` + `/dev/net/tun`**: identical semantics on
-  both platforms. On Linux, ensure the `tun` kernel module is loaded
-  (`lsmod | grep tun`; modern Ubuntu loads it on demand). No
-  `privileged: true` is needed — and Linux must not add it either.
-- **System Chrome**: on Linux the resolver walks `$PATH` for
-  `google-chrome`, `google-chrome-stable`, `chromium-browser`, then
-  `chromium` (in that order). Override with `--chrome-bin` or
-  `REV_AUTH_CHROME_BIN`. macOS uses the standard `/Applications/...`
-  bundles. The macOS-only `CFFIXED_USER_HOME` env var is not set on
-  Linux — Chrome on Linux respects `--user-data-dir` for all writes,
-  so no equivalent is needed.
-- **Keyring backend**: the `keyring` v3 crate resolves to **libsecret**
-  on Linux (D-Bus Secret Service), which means a running
-  `gnome-keyring-daemon` (or `kwalletd`, or `keepassxc` with the
-  Secret Service plugin) at run time. Headless Linux CI hosts that
-  lack a D-Bus session must use the **passphrase fallback** —
-  `cargo build --features passphrase-only` for the `stealth-auth`
-  crate, or set `REV_SCRAPING_AUTH_PASSPHRASE` to keep the cookie jar
-  encrypted with an Argon2id-derived key (see Phase 9a).
-  Build-time deps: `apt-get install -y libsecret-1-dev libdbus-1-dev`.
-- **File permissions**: `0600` for files, `0700` for directories under
-  `~/.rev_scraping/` — identical helper (`storage::set_file_permissions_0600`
-  / `set_dir_permissions_0700`) on both platforms, both verified by
-  the P6 Linux parity tests.
-- **`/dev/shm` size in containers**: when running Chrome inside a Docker
-  container on Linux CI, pass `--disable-dev-shm-usage` if the default
-  `/dev/shm` is < 256 MiB (the Chrome flag is already set by the
-  `obscura-bridge` builder).
-
-### Fail-closed VPN-required guard (Phase 6c)
-
-`spider`, `cf-evaluate`, and `relocate --url` are **fail-closed by
-default**: they refuse to send a single byte off-host unless the
-configured Gluetun pool passes a startup leak probe (kill-switch / DNS
-lock / IPv6 disabled / exit-IP country). Any failure exits **7
-(Leak)** with a JSON error.
-
-1. Install the policy template (once per machine):
-
-   ```bash
-   mkdir -p ~/.rev_scraping
-   cp templates/policy.toml ~/.rev_scraping/policy.toml
-   chmod 600 ~/.rev_scraping/policy.toml
-   $EDITOR ~/.rev_scraping/policy.toml   # tighten country / instances
-   ```
-
-2. Override precedence (highest wins):
-
-   1. `REV_SCRAPING_REQUIRE_VPN=1` (cannot be loosened by lower layers)
-   2. `--require-vpn` CLI flag
-   3. `--allow-no-vpn` CLI flag (ignored when env=1)
-   4. `policy.toml::require_vpn`
-   5. Built-in default = `true`
-
-   `REV_SCRAPING_REQUIRE_VPN=0` is **advisory only** — it never
-   loosens a policy that says `true`.
-
-3. `VPN_INSTANCES` env var
-   (`vpn-1:8001:8881,vpn-2:8002:8882,...`) overrides the
-   `[[vpn_instances]]` table when set, so a single `.env` can drive
-   both `docker-compose.vpn.yml` and the leak-guard probe.
-
-4. Pre-existing tests / smoke checks that intentionally run without
-   VPN must pass `--allow-no-vpn` explicitly. The default policy will
-   not silently let them through.
-
-## §14 Authenticated Scraping (Phase 9)
-
-> **One-time human-driven login → encrypted cookie capture → transparent
-> replay** by `spider` / `cf-evaluate` / `relocate` and MCP tools. No
-> credential, 2FA, or CAPTCHA automation. Acknowledgment: cookie-capture
-> pattern inspired by `rev_magic`.
-
-### Security model
-
-- Encryption: **XChaCha20-Poly1305** AEAD (24-byte nonce), key in OS
-  keyring (macOS Keychain / Linux Secret Service / Windows Credential
-  Manager). Argon2id passphrase fallback (`--passphrase-fd`,
-  fail-closed on headless Linux without explicit opt-in).
-- On-disk layout: `~/.config/rev_scraping/auth/<profile>.jar.enc`
-  (mode `0600`), parent dir `0700`. Atomic write + fsync.
-- AAD: `rev_scraping:stealth-auth:v1:<profile>` binds each blob to
-  its filename.
-- Delete = shred (`AuthStore::delete` overwrites then unlinks).
-- `#![forbid(unsafe_code)]` on the `stealth-auth` crate.
-- No `Password` / `TotpSecret` / `RecoveryCode` types in source.
-
-### CLI usage (canonical flow)
-
-```bash
-# 1. One-time setup: install policy + extend AUP.
-cp templates/policy.toml ~/.rev_scraping/policy.toml
-chmod 600 ~/.rev_scraping/policy.toml
-cat >> ~/.rev_scraping/authorized.toml <<'TOML'
-[[targets]]
-url_pattern = "example\\.com"
-auth_allowed = true
-TOML
-
-# 2. Interactive login (opens a headed browser via the rev-auth
-#    helper subprocess; you sign in manually).
-rev-stealth auth login \
-  --profile my_account \
-  --url    https://example.com/login \
-  --domain example.com
-
-# Optional: bypass the VPN-required guard for this login (env REV_SCRAPING_REQUIRE_VPN=1 still wins).
-rev-stealth auth login --profile my_account --url https://example.com/login --domain example.com --allow-no-vpn
-
-# 3. Replay during scraping. The session cookie + UA captured at
-#    login are transparently applied to both HTTP fetch and CDP.
-rev-stealth spider \
-  --url https://example.com/members/page \
-  --use-auth my_account
-
-# 4. Inspect, refresh, delete.
-rev-stealth auth list
-rev-stealth auth status --profile my_account   # exit 4 if AllExpired
-rev-stealth auth delete --profile my_account --force
-```
-
-### MCP usage (two-phase, human-in-the-loop)
-
-MCP cannot block for minutes waiting for a human, so login is a
-two-call sequence:
-
-```jsonc
-// 1. Agent calls auth_login_start. Server spawns rev-auth, opens a
-//    browser on the user's desktop, returns a session_token + a
-//    completion marker path.
-{"tool":"auth_login_start","arguments":{
-  "profile":"my_account",
-  "url":"https://example.com/login",
-  "domain":"example.com"
-}}
-
-// 2. User completes the login in their browser. rev-auth writes the
-//    encrypted jar and drops a marker file.
-
-// 3. Agent polls auth_login_complete with the session_token; the
-//    server returns success once the marker appears.
-{"tool":"auth_login_complete","arguments":{
-  "session_token":"<uuid from step 1>"
-}}
-```
-
-MCP invariants:
-
-- No tool ever returns cookie values. Every output envelope carries
-  `"cookie_values_returned": false`.
-- No `auth_export` over MCP. CLI-only, audited, TTY-gated.
-- Per-session consent token (TTL 1 hour).
-
-### Exit codes (auth-specific)
-
-| Code | Meaning                                     |
-|------|---------------------------------------------|
-| 0    | OK                                          |
-| 1    | UserError (AUP refusal, bad args)           |
-| 4    | **AuthExpired** (Phase 9 new, additive)     |
-| 7    | VPN leak / kill-switch trip                 |
-
-### ⚠️ Legal disclaimer
-
-**Use this feature only against accounts and properties you own or
-are explicitly authorized to access.**
-
-- **Japan:** 不正アクセス禁止法 (Act on Prohibition of Unauthorized
-  Computer Access, 不正アクセス禁止法). Using captured cookies to
-  reach a system you are not authorized to use is a criminal offence.
-- **United States:** Computer Fraud and Abuse Act (CFAA, 18 U.S.C.
-  § 1030). Authorized access only.
-- **Service Terms:** Most consumer SNS (Twitter/X, Meta/Facebook/
-  Instagram, LinkedIn, TikTok, …) prohibit automated cookie reuse in
-  their ToS. Even if technically possible, doing so may violate the
-  contract you accepted when you signed up. Default
-  `AuthRefusalPolicy::RefuseByDefault` ships for these hosts.
-- **EU / EEA:** GDPR — captured cookies may contain personal data
-  about you and third parties. Treat the encrypted jar as personal
-  data of the data subjects who logged in.
-
-The encryption posture above is strong, but **YOU are the data
-controller** for cookies you capture. Loss, leakage, or misuse is
-your responsibility.
-
-**Explicitly out of scope for Phase 9:**
-
-- Automated credential entry, 2FA solving, CAPTCHA solving.
-- Silent auto-refresh / daemonised re-login.
-- Passkey / WebAuthn replay.
-
-If you need any of these, you are outside the design envelope —
-stop, re-read this section, and reconsider.
+- `.codex/config.toml`: `gpt-5.5` + workspace-write sandbox、MCP server `semantic` 自動起動
+- `.codex/agents/*.toml`: 9 native subagent preset (coder / system_planner / security_reviewer / performance_reviewer / consistency_reviewer / plan_reviewer / alternative_reviewer / stack_upgrade_researcher / stack_upgrade_reviewer)。same-family delegation は wrapper を再帰起動せず内部で完結。
 
 ---
 
-## §15 Troubleshooting
+## 12. Tests — 1,600+ deterministic checks
 
-Common failures observed during v1.0.0-dev → v1.1.0 development. Each
-row links a symptom to a deterministic repair.
+### Rust (697 lib tests / 1,116 workspace cargo test total)
 
-| Symptom | Root cause | Repair |
-| ------- | ---------- | ------ |
-| `obscura: native dialog stole focus` during spider | Chrome 145 dialog handler races CDP attach (hotfix-2). | Upgrade to v1.1.0+; the bridge now dismisses dialogs via `Page.javascriptDialogOpening` before `Network.enable`. |
-| `vpn-rotate: docker daemon unreachable` | Gluetun container not running or wrong socket path. | `docker ps` to confirm; export `DOCKER_HOST=unix:///var/run/docker.sock`; see §13. |
-| `auth login: profile is locked` | A previous `rev-auth login` crashed without releasing the SQLite WAL lock. | `rm ~/.rev_scraping/auth/<profile>.lock` after confirming no other process holds it. |
-| `SPDX header missing` from `scripts/check_source_and_spdx.sh` | New `.rs` file added without the `// SPDX-License-Identifier: MIT` line. | Add the header as the first line of the file; re-run the check. |
-| `auth login` refuses to run without VPN | `REV_SCRAPING_REQUIRE_VPN=1` is the default for authenticated flows. | Either start the VPN (§13) or, on an explicitly authorized localhost / lab target, pass `--allow-no-vpn`. The env var always wins. |
-| `cargo-deny: license = "BSL-1.1"` | A transitive dep upgraded to BSL. | Pin or replace; goscrapy-style BSL is forbidden by `scripts/check_bsl_contamination.sh`. |
+| Crate | Lib tests | Integration tests | Notable suites |
+|---|---|---|---|
+| `agent-core` | 363 | 25 (secret_scan_cli) + 7 (semantic_gc_cli) + 10 (task_stamp) + 17 fixture-dir files | `specialty::` (R1-R15)、`envelope::`、`execplan::`、`contract::tests::serde_roundtrip_snapshot`、新規 `secret_scan::`、`semantic::` |
+| `semantic-mcp` | 183 | 17 files | top_k freshness、capsule SHA256 binding、FTS5 BM25 |
+| `tree-sitter-index` | 54 (default features) / 69 (`--features all-languages`) | 4 | extractor coverage per language |
+| `harness-cache` | 43 | — | LRU + token budget |
+| `hook-review-queue` | 13 | + integration | NormalizedPath validation |
+| `shared` | 41 | — | freshness snapshot、ranker、`semantic_gc::`、`semantic_lock::` |
+| **合計 (lib)** | **697** | **70+** | — |
 
-## §16 Production deployment (Contabo / Linux server)
+`cargo test --workspace` 実測: **1,116 passed** (lib + bin + integration + doc tests 合計)。
 
-`rev_scraping` v1.1.0 is verified on **Ubuntu 22.04 / 24.04 LTS** with
-the P6 Linux baseline (`.agent/active/v1_1_p6_linux_baseline.md`).
-Production install (single host, headless):
+Benchmark: `cargo bench -p semantic-mcp` (search_fts5、context_top_k)、`cargo bench -p tree-sitter-index` (index_files)。
 
-```bash
-# 1. System prerequisites (Debian/Ubuntu)
-sudo apt-get update
-sudo apt-get install -y build-essential pkg-config libssl-dev \
-    libsqlite3-dev ca-certificates chromium docker.io
+### Shell unit tests (517 across 9 files)
 
-# 2. Toolchain (rustup; pinned via rust-toolchain or workspace.rust-version=1.83)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-source "$HOME/.cargo/env"
+| File | Tests | 対象 |
+|---|---|---|
+| `test/unit/test-wrapper-specialty.sh` | 15 | codex-wrapper `--specialty`、`--specialty + --resume` reject |
+| `test/unit/test-delegation-metrics.sh` | 24 | JSONL schema、UUID、null token、duration_ms、collector aggregate、delta ratio |
+| `test/unit/test-classifier-specialty-surface.sh` | 7 | classifier specialty 経路 |
+| `test/unit/test-secret-guard.sh` | 16 | rev-harness-secret-guard.sh wrapper + hook install / uninstall / dry-run / restore |
+| `test/unit/test-cursor-wrapper.sh` | 30 | cursor-wrapper.sh `ask`/`agent`/`yolo` role、preflight + dual telemetry、ask diff gate、signal trap、vendoring guard |
+| `test/unit/test-outbound-deny.sh` | 13 | codex/claude wrapper の cursor-parent 拒否、二重 gate `REVHARNESS_TEST_HARNESS=1 + REV_HARNESS_PARENT_PROCESS_TEST`、`REV_HARNESS_CURSOR_OUTBOUND_ALLOW=1` opt-in |
+| `test/unit/test-cursor-rules-frontmatter.sh` | 18 | `.cursor/rules/revharness-{critical,detailed}.mdc` の MDC frontmatter spec、critical→detailed 重複検出 |
+| `test/unit/test-cursor-skills-compliance.sh` | 394 | `.claude/skills/*/SKILL.md` + `.agents/skills/*/SKILL.md` の Cursor 公式 Agent Skills spec compliance (name presence + description + lowercase + folder parity + YAML fence) |
+| `test/unit/test-matrix-vocabulary-sync.sh` | — | vocabulary hash 一致 (binary check) |
+| **合計** | **517** | — |
 
-# 3. Build obscura out-of-tree (Apache-2.0, see NOTICE)
-( cd vendor/obscura && cargo build --release )
-sudo install -m 0755 vendor/obscura/target/release/obscura /usr/local/bin/
+### Integration
 
-# 4. Build rev_scraping
-cargo build --release --workspace
+- `test/integration/harness_release_gate.sh --tier <quick\|local\|full>`: full tier に **42+ step** (本 round で `cursor_wrapper` / `cursor_rules_root` / `cursor_rules_frontmatter` / `cursor_outbound_deny` / `cursor_skills_compliance` / `secret_guard` を LOCAL + FULL に wire-in)
+- `test/integration/root_instructions_test.sh`: `AGENTS.md` / `CLAUDE.md` / `.claude/CLAUDE-LOCAL.md` migration smoke (Cursor auto-read leakage 防止)
+- `test/fixtures/fake-codex/codex`: shell fixture で CI を API budget zero に
+- `test/fixtures/fake-cursor/agent`: Cursor CLI semantic を mimic、`FAKE_CURSOR_ARGV_LOG` で argv 記録 + `FAKE_CURSOR_TOUCH_FILE` で write 試行 trigger
+- `test/fixtures/`: specialty_lint_fixtures、specialty_project_golden、execplan_lint_fixtures、envelope_lint_fixtures、secret_scan_fixtures
 
-# 5. Install binaries
-sudo install -m 0755 target/release/{rev-stealth,rev-auth,stealth-mcp} \
-    /usr/local/bin/
+### Deterministic verification model
 
-# 6. State directory (mode 0700 mandatory for AUP allowlist + auth jar)
-install -d -m 0700 ~/.rev_scraping
+```
+Coder → Shadow Verify → Reviewer
 ```
 
-- **Systemd unit** (optional): see `docs/release-checklist.md` for a
-  template `rev-stealth-mcp.service` (Type=simple, no privileged caps).
-- **Resource sizing**: 2 vCPU / 4 GB RAM per concurrent obscura
-  instance; SQLite WAL grows linearly with `relocate` history (auto-
-  pruned after 30 d).
-- **Reverse-proxying the MCP server is NOT supported** — MCP is stdio
-  by design (§8 #4). Run it as a child of the agent process.
+- **Shadow Verify** (`scripts/shadow_verify.sh` / `agent-core verify`): mechanical lint/test in ephemeral worktree
+- **QG-1**: `quality_gate.status in {failed, skipped}` → fail-closed
+- **QG-2**: 言語別必須コマンド (`pnpm|npm` / `cargo` / `pytest`) 不在 → fail-closed
+- **3 回失敗で escalation report 生成** (`.claude/tmp/task/escalation_report_*.md`)
 
-## §17 Performance tuning
+---
 
-| Knob | Default | Recommendation |
-| ---- | ------- | -------------- |
-| `--concurrency` (spider) | 1 | Increase **only** after measuring per-target politeness; stay ≤ 4 for authorized targets unless ToS explicitly permits otherwise. |
-| `stealth-parse` recipe cache | in-memory LRU 256 | Bump `REV_SCRAPING_PARSE_CACHE=1024` for long-running sweeps over a single target. |
-| SQLite WAL checkpoint | autocheckpoint 1000 pages | Run `PRAGMA wal_checkpoint(TRUNCATE);` weekly via cron for hot workloads. |
-| obscura process pool | 1 child per `rev-stealth` invocation | For parallel CLI runs, prefer fanning out at the agent layer — the bridge does not pool. |
-| `mobile-fp` preset reuse | per-invocation | Pin one preset for the duration of a session; switching mid-flight invalidates the TLS cache. |
+## 13. Truth Surfaces — `verification-truth-matrix` を中心とする正本
 
-Profile with `RUST_LOG=info,stealth_parse=debug` and the bundled
-`measure` deliverable; do **not** ship `RUST_LOG=trace` to production
-(captures cookies in traces).
+### `docs/manual/` (18 doc)
 
-## §18 Privacy & compliance
+| File | 正本 | 読み手 |
+|---|---|---|
+| **`verification-truth-matrix.md`** | task class profile、canonical schema、status/verdict state machine、final-reviewer gate、loop budget ledger、fail-closed conditions、completion language、reviewer LGTM validity | **全 role 必読 (最高位正本)** |
+| `orchestration-closure-playbook.md` | class closure sheet、adversarial pre-closure pass、sink universe adequacy、reset semantics | Coder (defect/root-cause)、Reviewer (late finding) |
+| `execplan-checklist-standard.md` | ExecPlan 必須セクション、specialty-using slice の conditional field | Orchestrator / Coder |
+| `common-task-contract.md` | task-contract.json envelope、goal boundary | Orchestrator / Coder intake |
+| `delegation-metrics-schema.md` | JSONL v1、field semantics、release-gate integration | metrics consumer (tool/CI) |
+| `agent-maintainer-guide.md` | harness maintenance playbook | maintainer |
+| `developer-customization-guide.md` | canonical operating model、daily workflow | developer |
+| `end-user-guide.md` | user-facing artifact trust | end user / product |
+| `agent_review_loop.md` | review iteration workflow | reviewer operator |
+| `skill-routing-matrix.md` | skill ↔ task mapping | Orchestrator |
+| `skill-integration.md` | skill contract、handoff format | skill developer |
+| `subscription-orchestration.md` | multi-model cost/capability、subscription lane | Orchestrator |
+| `matrix-vocabulary.json` | canonical enum / field names、`_policy.domain_local` namespaces (handoff_state, execplan_state) | 全 vocabulary consumer |
+| `harness-release-gate.md` | release gate verification、artifact integrity | release operator / CI |
+| `frontier-evidence.md` | frontier validation | explorer |
+| `self-evolution-proposal-queue.md` | self-improvement intake | self-optimizer |
+| `worldclass-harness-operating-model.md` | vision、operational/design constraints | architect |
+| `harness-user-guide.md` | user-facing operations | user |
+| `cursor-cli-integration.md` | Cursor CLI wrapper role、rules integration、telemetry、out-of-scope | Orchestrator / Cursor lane operator |
+| `cursor-rules-residual-risks.md` | Cursor rules integration の未保証領域と future hardening 候補 | Orchestrator / maintainer |
 
-`rev_scraping` is a **defender-facing evaluation toolkit**. Re-read
-[§ Authorized Targets Only](#-authorized-targets-only--read-this-before-running-anything)
-before every engagement.
+### `matrix-vocabulary.json` の役割
 
-- **Authorization is technical, not advisory.** The CLI cannot reach
-  the network without one of: (a) `~/.rev_scraping/authorized.toml`
-  (mode 0700) listing the host, (b) `REV_SCRAPING_I_HAVE_AUTHORIZATION=1`
-  acknowledgement, or (c) `--i-have-authorization` flag. S12 enforces
-  this in code paths, not docs.
-- **ToS reminders.** Cloudflare Terms §2.8; Japan 不正アクセス禁止法
-  (Act on Prohibition of Unauthorised Computer Access); U.S. CFAA
-  (18 U.S.C. §1030); EU NIS2 / GDPR. Cookie reuse on third-party
-  consumer SNS is contractually prohibited even when technically
-  possible — see §14.
-- **Data minimisation.** Captured cookies and HTML are stored only
-  under `~/.rev_scraping/` (mode 0700). Delete after the engagement
-  with `rev-auth wipe` and `rm -rf ~/.rev_scraping/parse.sqlite*`.
-- **Logging hygiene.** Default tracing redacts cookie values and
-  `Authorization` headers. Do not raise to `trace` in shared logs.
-- **Reporting vulnerabilities** in `rev_scraping` itself: see
-  [`SECURITY.md`](./SECURITY.md).
+- **canonical enum / field の唯一の正本**。新規 enum は **ここに登録するか `_policy.domain_local` namespace を宣言** しないと envelope lint で reject
+- `_policy.domain_local` namespace:
+  - `handoff_state` (`ready_for_next` / `needs_fix` / `needs_more_context` / `blocked`) — worker lifecycle が matrix review status と独立
+  - `execplan_state` (`proposed` / `accepted` / `superseded`) — artifact lifecycle
+- 同期ガード: `scripts/check-matrix-vocabulary-sync.sh` (CI gate)
 
-## §19 Upgrading from v1.0.0-dev
+### `verification-truth-matrix.md` (中核)
 
-| Area | v1.0.0-dev | v1.1.0 | Migration |
-| ---- | ---------- | ------ | --------- |
-| Crate count | 9 | 11 (`stealth-sites`, `stealth-auth` added) | Rebuild; new path deps resolve automatically. |
-| MCP transport | `rmcp 0.1` planned | Hand-rolled JSON-RPC 2.0 pinned to MCP 2024-11-05 | Re-run agent `tools/list`; tool names unchanged. |
-| `auth login` | always required VPN | `--allow-no-vpn` flag added (env still wins) | Update scripts that relied on the implicit refusal. |
-| `ProfileStatus` (stealth-auth) | `Active` / `Expired` | + `Stale`, `Revoked` (new variants) | Match exhaustively; default arm recommended for forward compat. |
-| JSON envelope | no `warn_level` | adds `warn_level: "info" | "warn" | "error"` | Consumers must tolerate unknown extra fields (we always did, now load-bearing). |
-| Supply chain | manual review | `cargo-deny` + `cargo-audit` + `gitleaks` in CI | None — informational. |
-| Removed | `wreq`, `rmcp` workspace deps (never wired) | dropped | None — no consumers existed. |
+- task class profile: light / standard / heavy → gate tier + schema profile + review/final-reviewer-gate required
+- **canonical schema** (heavy only): task id / lineage ledger / prior task id / slice id / prior slice id / review request target (INTERMEDIATE\|FINAL) / discovery owner / bug class candidate / change surface / required checks / evidence destination / completion boundary / class closure sheet / sheet status / owned sink universe / closed universe status & basis / **8 counters** (fix-review loops used、closure resets used、reviewer-found same-class finding、re-slice count、cumulative reviewer requests、cumulative late findings、cumulative closure resets、task-level stall-or-wall-time budget) / scope delta
+- canonical status machine: `in progress` → `pending review` → `pending verification` → `pending final review` → `pending acceptance` → `completed` | `blocked`
+- verdict mapping: LGTM / BLOCK / Request Changes / Needs verification / Needs Discussion
+- **final reviewer request gate** (6 conditions)
+- **fail-closed block conditions**: loop ceiling exceeded、budget exhausted、provenance missing、weak universe、identical relabel など
 
-Run `cargo clean && cargo build --release --workspace` after upgrade;
-recipe cache SQLite is forward-compatible.
+---
 
-## §20 Contributing
+## 14. Roles — Orchestrator / Coder / Reviewer
 
-Pull requests are welcome. Before opening one, please read:
+### Orchestrator (統括)
 
-1. [`CONTRIBUTING.md`](./CONTRIBUTING.md) — dev setup, SPDX header
-   rule, test naming, PR format.
-2. [`SECURITY.md`](./SECURITY.md) — never file a security issue
-   publicly; use the private channel listed there.
-3. [`docs/CODE_OF_CONDUCT.md`](./docs/CODE_OF_CONDUCT.md) —
-   Contributor Covenant 2.1.
+- **Allowed**: task classification、acceptance/LGTM/completion 判定 (matrix 根拠)、ExecPlan/SOW 作成、Coder/Reviewer への narrow slice handoff、status state machine 遷移
+- **Forbidden**: code/docs/`.agent_rules/`/`.claude/` 編集、reviewer LGTM だけでの早期 completion、broad task 未分解 handoff
+- **Required envelope**: task class、schema profile、change surface、required checks、completion boundary、(heavy のみ) task lineage ledger、prior task id、scope delta、fresh budget recheck
 
-The `rev` short binary alias (e.g. `rev spider ...` aliasing
-`rev-stealth spider ...`) is on the **v1.2 roadmap**; it is
-deliberately not in v1.1.0 to keep the bin surface area small.
+### Coder (実装、Claude/Codex 両方可)
+
+- **Allowed**: blueprint-first + TDD、ExecPlan 草稿、Class Closure Sheet (defect/root-cause fix)、Adversarial pre-closure pass、`pending verification` 復帰時の verification、`blocked` 再開時の re-slice
+- **Forbidden**: `completed` / `pending acceptance` 自己宣言、soft closeout、`light-change-record` なしの `light` handoff、`heavy` の不完全 packet
+- **Required envelope**: `status` (pending review / pending verification / pending final review / blocked)、`worker outcome` (DIFF/NO-CHANGE/BLOCK)、slice contract、scope delta
+
+### Reviewer (**Codex 固定**, `--role reviewer`)
+
+- **Allowed**: multi-dimensional evaluation (security/perf/consistency/test/DX)、`pending review` / `pending final review` intake、verdict 発行、late same-class finding detection + closure reset 指示、final reviewer gate compliance
+- **Forbidden**: `pending verification` のまま intake、generic completion wording、reviewer を same-class discovery primary 扱い、`FINAL` review で scope delta=none 不確認 LGTM
+- **Required envelope**: incoming request status、worker outcome、evidence reviewed、verification commands/results、next status mapping、(heavy/standard) budget status fresh check
+
+---
+
+## 15. Governance — Truth Read Order と Fail-Closed Boundaries
+
+```
+User instruction
+   │
+   ▼
+CLAUDE.md  (Orchestrator Hard Rules、wrapper 契約、4 層 context model)
+   │
+   ▼
+.agent_rules/RULES.md  (Phase 0-5、core mandates、Class-First contract)
+   │
+   ▼
+docs/roles/<role>.md  (3 canonical role definitions)
+   │
+   ▼
+docs/manual/verification-truth-matrix.md  (deterministic checks、state machine、gate)
+   │
+   ▼
+Runtime entrypoint  (codex-wrapper.sh、launch-semantic-mcp.sh、auto_orchestrate.sh)
+```
+
+**Acceptance authority は常に `verification-truth-matrix.md` の deterministic check** であり、wrapper 準拠や reviewer LGTM だけでは代替できません。
+
+### AGENTS.md / .cursor/rules contract
+
+`AGENTS.md` は vendor-neutral cross-agent invariants の置き場です。acceptance authority、evidence convention、secret redaction、cross-family delegation、change discipline のように、Claude / Codex / Cursor のいずれが読んでも矛盾しないルールだけを置きます。
+
+Cursor-specific guidance は `.cursor/rules/` に分離します。`.cursor/rules/revharness-critical.mdc` は always-attached fail-closed invariants、`.cursor/rules/revharness-detailed.mdc` は description-based operational guidance です。Cursor official docs は CLI が project-root `AGENTS.md` / `CLAUDE.md` と `.cursor/rules` を rules として読むと説明しています: https://docs.cursor.com/en/cli/using and https://docs.cursor.com/en/context/rules。
+
+Cursor Agent Skills は Rules とは別の task-specific capability surface です。RevHarness の既存 `.agents/skills/` と `.claude/skills/` は Cursor discovery / legacy compatibility の対象で、`.cursor/skills/` は canonical Cursor provider path として予約済みです。Skill を追加・移動する場合は `SKILL.md` の fenced frontmatter、`name:`、`description:`、folder-name parity を維持し、`.agents/skills/` 側との provider parity を崩さないでください。
+
+`CLAUDE.md` は vendor-neutral bootstrap、`.claude/CLAUDE-LOCAL.md` は Claude-specific operating rules です。Root に vendor-specific instruction を混ぜず、runtime 固有の detail は各 vendor-local surface に置きます。
+
+### 主要 fail-closed boundary
+
+| 境界 | 条件 | 結果 |
+|---|---|---|
+| wrapper canonical | 非 canonical path / role escape / `--specialty + --resume` | exit non-zero (fail-closed) |
+| matrix vocabulary sync | hash 不一致 / marker count error | `check-matrix-vocabulary-sync.sh` exit 1 |
+| envelope lint | required field missing / enum off / domain-local boundary 逸脱 / specialty heading 欠落 | `envelope.*` rule_id error |
+| execplan lint | specialty_id missing / canonical_role mismatch / invocation_path 不正 / manifest_hash stale / selection_reason thin | `execplan.*` rule_id error/warning |
+| specialty lint | R1-R15 (manifest schema / role-aware body / placeholder-only / missing-example / deprecated-alias) | `specialty.*` rule_id error/warning |
+| hook ingress | shim-only runtime / 範囲外 path / control-byte project_id | exit non-zero |
+| semantic capsule | context_token 失効 / file_sha_rollup drift / INDEX_VERSION mismatch | sem.capsule 拒否 |
+| QG-1 / QG-2 | quality_gate failed/skipped / 言語必須コマンド不在 | shadow verify fail-closed |
+
+---
+
+## 16. Operator Troubleshooting — 症状別レシピ
+
+Section 4 で説明した runtime data plane のどこかが詰まったときの diagnostic レシピ。すべて read-only で書き換え操作は最後の手段。
+
+### 16.1 「sem.* が空応答 / pending_count: 0 / 何も返らない」
+
+最頻出。原因は 5 つ:
+
+| 仮説 | 確認 | 対処 |
+|---|---|---|
+| **Rust db が未 migration** (schema が 4 tables だけで registry/symbol が無い) | `sqlite3 ~/Library/Application\ Support/Revharness/semantic-mcp/v1/$(cat .shared/project_id)/semantic.db ".tables" \| wc -w` で 16 でなければ未 migration | `bash scripts/launch-semantic-mcp.sh` を 1 回起動 (initialize JSON-RPC を送れば自動 migration、Ctrl-C で抜けても schema は保持) |
+| **symbols テーブルが空** (db schema は OK だが indexer 未実行) | `sqlite3 "$DB" "SELECT COUNT(*) FROM symbols"` が 0 | [section 4.5 step 5](#45-bootstrap-order-新規-adopter-向け) の `agent-core context update` + `index-symbols` を実行 |
+| **wrong project_id** (caller と server が別 id を見ている) | `cat .shared/project_id` と server stderr の `project_id=...` を照合 | identity を直す。`.shared/project_id` は immutable なので、間違っている場合は `scripts/project-id.sh bootstrap` 再実行ではなく orchestrator 側を直す |
+| **context_token expired** (sem.context.top_k と sem.capsule の間に 30 分以上空いた) | sem.capsule error が `context_token TTL expired` | sem.context.top_k から取り直す |
+| **changed_files が repo 外** (絶対 path / parent traversal) | server error `path validation failed` | 全 `changed_files` を repo-relative に直す |
+
+### 16.2 「identity-check (advisory): source-style project_id outside the official source checkout」
+
+`canonical-guard.sh` (0.0.12 default-warn) が ambiguous-copy を検知した時の advisory。
+
+| 状況 | 何を意味するか | 対処 |
+|---|---|---|
+| `revharness-*` で始まる project_id を持っているが、official git remote (`github.com/sasuketorii/rev_harness.git`) でも canonical path (`$HOME/dev/rev_harness`) でもない | RevHarness の source-dev 用 id を adopter checkout が保持している (= 通常 init-project が起こす状態) | adoption であれば `scripts/project-id.sh bootstrap <your-name>` で target id を発行。source 開発であれば `export REV_HARNESS_CANONICAL_ROOT=$PWD` |
+| 警告だけで wrapper は exit 0 で動く | 0.0.12 default が warn だから (release-gate と `harness-doctor --strict` のみ strict) | 本番 / CI では `REV_HARNESS_VENDOR_CHECK=strict` を export して fail-close に戻せる |
+
+### 16.3 「identity-check (strict): repo identity is missing or malformed」 — fail-closed 終了
+
+`invalid` 識別子 (project_id 欠落 / control char / 多重行) のときの strict-by-default 警告。downstream (semantic-mcp / queue / capsule) の data corruption を防ぐため必ず止まる。
+
+```bash
+cat .shared/project_id     # 欠損 or 化けてないか
+ls -la .shared/             # ファイル権限 (600 期待)
+hexdump -C .shared/project_id | head -3   # 不可視 control char 確認
+```
+
+直し方:
+
+1. 別 checkout / バックアップから正しい id を復元 (immutable design なので「正しい元の値」が存在する前提)
+2. それでも無い場合、最終手段は `scripts/project-id.sh bootstrap <new-name>` で**新規 id** を生成 — ただし `~/Library/.../v1/<old-pid>/` の db は孤児化するので、別途 `sem.admin.gc` で消す
+
+### 16.4 「harness-doctor --quick が UNKNOWN を返す」
+
+| unknown 内容 | 意味 | 対処 |
+|---|---|---|
+| `latest release-gate pointer is missing: .claude/tmp/harness-release-gate/latest.json` | release-gate を 1 回も走らせていない (新規 repo / adoption 直後) | 必要なら `bash test/integration/harness_release_gate.sh --tier quick`。adopter 環境では unknown のままで OK |
+| `task lineage ledger is missing or unsafe: .agent/active/sow/task-lineage-ledger.md` | active task の系譜が無い (まだタスクを走らせていない) | 通常運用で task を 1 つでも回せば自動生成 |
+| `dirty worktree detected: N changed/untracked paths` | git status が dirty (普通の作業中) | 警告のみ。commit/stash 進めば消える |
+
+UNKNOWN は **acceptance authority ではない** (advisory-only)。LGTM や release 判定にはこの doctor 出力を使わず、必ず `docs/manual/verification-truth-matrix.md` の deterministic check を根拠にすること。
+
+### 16.5 ディスク使用量が膨らんだ
+
+```bash
+# 4 repo 合計の db サイズ
+du -sh ~/Library/Application\ Support/Revharness/semantic-mcp/v1/*/
+du -sh ~/.semantic-mcp/*/
+
+# 古い orphan project (使っていない id) の dry-run リスト
+./harness-rust/target/release/semantic-mcp gc --older-than-days 30 --dry-run
+
+# 実削除 (--dry-run 外す、RSEM marker のある db だけ対象)
+./harness-rust/target/release/semantic-mcp gc --older-than-days 30 --force
+```
+
+過去の `queueruntime-*` (テスト用 db) も `~/.semantic-mcp/` に大量に残るので、定期的に gc 推奨。
+
+### 16.6 「`tsc: command not found`」 / dependency 不足
+
+| エラー | 原因 | 対処 |
+|---|---|---|
+| `tsc: command not found` | `scripts/semantic-mcp-server/dist/` 未 build | `cd scripts/semantic-mcp-server && npm install && npm run build` または `bash scripts/semantic-bootstrap.sh` (自動 build) |
+| `cargo: command not found` | Rust toolchain 未インストール | https://rustup.rs/ |
+| `node: command not found` | Node 20+ 未インストール | https://nodejs.org/ (`engines: node 20.x \|\| 22.x \|\| 23.x \|\| 24.x \|\| 25.x`) |
+| `sqlite3: command not found` | SQLite CLI 未インストール (macOS は system 同梱、Linux は `apt install sqlite3`) | OS 依存 |
+
+`scripts/harness-doctor.sh --quick` を最初に走らせれば dependency 不足を JSON 形式で一括検出します。
+
+### 16.7 「`launch-semantic-mcp.sh` が即時 exit する」
+
+stderr を見れば多くは判明 (`2>&1 | tail -20`)。よくある原因:
+
+- `.shared/project_id` 欠損 → 16.3 参照
+- Rust binary 未 build → `cd harness-rust && cargo build -p semantic-mcp`
+- 別 server プロセスが同 db を locking 中 → `lsof | grep semantic.db` で確認、不要なら kill。`SemanticDbLock` は advisory なので強制的に並列起動はできるが、後発側は書き込みを行わない設計
+
+---
+
+## 17. Project Structure
+
+```
+rev_harness/
+├── README.md                          ← 本ファイル
+├── AGENTS.md                          ← vendor-neutral root invariants
+├── CLAUDE.md                          ← vendor-neutral bootstrap
+├── .cursor/rules/                     ← Cursor project rules (critical + detailed MDC)
+├── .cursor/skills/                    ← Cursor canonical Agent Skills path (reserved)
+├── .claude/CLAUDE-LOCAL.md            ← Claude-specific local operating rules
+├── .agent_rules/RULES.md              ← Layer 0 ground truth (Phase 0-5, core mandates)
+├── .shared/project_id                 ← immutable repo identity
+│
+├── harness-rust/                      ← Rust workspace (6 crates, ~44k LOC, 1,116 cargo test)
+│   ├── Cargo.toml
+│   └── crates/
+│       ├── agent-core/                ← 22-subcommand CLI (envelope/specialty/execplan lint, task-stamp, secret scan, semantic gc, ...)
+│       ├── semantic-mcp/              ← stdio MCP server (8 tools, FTS5, capsule)
+│       ├── tree-sitter-index/         ← 6-language symbol indexer
+│       ├── hook-review-queue/         ← hook ingress (Rust binary)
+│       ├── harness-cache/             ← SQLite cache (LRU + token budget)
+│       └── shared/                    ← foundation (error, freshness, lock, logging, ranker, semantic_gc, semantic_lock)
+│
+├── scripts/                           ← 50+ shell scripts (11 categories)
+│   ├── codex-wrapper.sh               ← canonical Codex entrypoint (parent-process deny for cursor-agent origin)
+│   ├── claude-wrapper.sh              ← deprecated 2026-07-14 (parent-process deny同様)
+│   ├── cursor-wrapper.sh              ← Cursor `agent` CLI entrypoint (ask/agent/yolo roles)
+│   ├── _outbound-deny.sh              ← parent-process check helper (cursor→codex/claude wrapper の machine-level 拒否)
+│   ├── rev-harness-secret-guard.sh    ← agent-core secret scan passthrough + git hook installer
+│   ├── launch-semantic-mcp.sh         ← MCP server launcher
+│   ├── rev-harness-task-classifier.sh ← intent/files → task_class JSON
+│   ├── collect-delegation-metrics.sh  ← JSONL aggregator
+│   ├── compute-completion-delta.sh    ← baseline vs post delta
+│   ├── ... (50+ more)
+│   └── semantic-mcp-server/           ← Node.js compat surface (legacy)
+│
+├── .claude/                           ← Claude Code 用 (provider parity with .agents/)
+│   ├── settings.json                  ← PostToolUse hook config
+│   ├── commands/
+│   │   ├── auto_orchestrate.sh        ← orchestration engine
+│   │   └── lib/                       ← 14 shared lib (state.sh, coder.sh, reviewer.sh, ...)
+│   ├── hooks/
+│   │   └── codex-review-hook.sh       ← shell hook adapter ingress
+│   ├── skills/                        ← 32 SKILL.md (Claude provider)
+│   └── tmp/                           ← run state (state.json, capsule cache, evidence)
+│
+├── .agents/skills/                    ← 32 SKILL.md (cross-platform / Codex provider, parity)
+│
+├── .codex/                            ← Codex CLI 用
+│   ├── config.toml                    ← model, sandbox, MCP server
+│   └── agents/*.toml                  ← 9 native subagent preset
+│
+├── docs/
+│   ├── roles/                         ← 3 canonical role docs + 16 specialty files
+│   │   ├── orchestrator.md
+│   │   ├── coder.md
+│   │   ├── reviewer.md
+│   │   ├── orchestrator/specialties/  ← 6 specialty (scope-guard, slice-designer, ...)
+│   │   ├── coder/specialties/         ← 6 specialty (production-function-implementer, ...)
+│   │   └── reviewer/specialties/      ← 4 specialty (staff-code-reviewer, ...)
+│   ├── manual/                        ← 18 truth doc + matrix-vocabulary.json
+│   │   ├── verification-truth-matrix.md  ← 最高位正本
+│   │   ├── matrix-vocabulary.json     ← canonical vocabulary
+│   │   ├── execplan-checklist-standard.md
+│   │   ├── delegation-metrics-schema.md
+│   │   └── ... (14 more)
+│   └── prompts/                       ← role-operating-templates + 過去依頼の archive
+│
+├── test/
+│   ├── unit/                          ← 9 shell unit suites / 517 件 (wrapper-specialty / delegation-metrics / classifier / matrix-vocab / secret-guard / cursor-wrapper / outbound-deny / cursor-rules-frontmatter / cursor-skills-compliance)
+│   ├── integration/
+│   │   ├── harness_release_gate.sh    ← LOCAL/FULL tier + cursor / secret-guard wire-in
+│   │   └── root_instructions_test.sh  ← AGENTS.md / CLAUDE.md / CLAUDE-LOCAL.md migration smoke
+│   └── fixtures/
+│       ├── fake-codex/codex           ← CI API-budget-zero fixture
+│       └── fake-cursor/agent          ← Cursor CLI semantic mimic (argv log + write-attempt hooks)
+│
+├── .agent/
+│   ├── PROJECT_CONTEXT.md             ← project-specific context
+│   ├── active/                        ← 進行中 plan / sow / prompts
+│   │   ├── plan_YYYYMMDD_*.md
+│   │   ├── sow/
+│   │   └── prompts/
+│   └── archive/                       ← 完了済み
+│
+├── setup/
+│   └── setup_rules.md                 ← bootstrap 手順
+│
+└── src/                               ← Product workspace (新規 project 用、optional)
+```
+
+---
+
+## 18. Maturity & Status
+
+### crate / subsystem 別
+
+| Subsystem | Maturity | 根拠 |
+|---|---|---|
+| `agent-core` | **High** | 22 subcommand、363 lib + 50+ integration tests、6 specialty が projection 有効、4 lint subsystem (envelope/execplan/specialty/...) で R1-R15 + 5 hard rules、新規 `secret scan` Rust scanner + `semantic gc` CLI |
+| `semantic-mcp` | **High** | 8 MCP tool、FTS5 BM25、context_token replay-resistance、capsule SHA256 binding、183 lib tests + benchmark |
+| `tree-sitter-index` | **High** | 6 言語 grammar version tracking、incremental cache、54 default / 69 all-languages tests |
+| `harness-cache` | **High** | LRU + 220 token cap、_cache_meta versioning、43 lib tests |
+| `hook-review-queue` | **Medium** | 単目的 binary、強い path validation、13 lib tests。tracing なし |
+| `shared` | **High** | 全 crate 共通、freshness invariant の中心、`semantic_gc` / `semantic_lock` 抽出、41 lib tests |
+| Shell scripts | **High** | 35+ fail-closed、canonical guard + outbound deny + shim log、Rust 側に委譲済み |
+| Skills + specialties | **High** | 100% provider parity (`.claude/skills` ↔ `.agents/skills` + `.cursor/skills/` canonical path)、394 件 SKILL.md Cursor 公式 spec compliance test、6 projected with role-aware body、structural lint R13/R14/R15 |
+| Cursor integration | **High** | Cursor 公式 Rules system (`.cursor/rules/*.mdc` alwaysApply + description) + Agent Skills system 経路 documented、wrapper preflight + dual telemetry + ask diff gate + parent-process outbound deny |
+| Truth docs | **High** | 18 manual doc + cursor-rules-residual-risks.md、3 role doc、matrix-vocabulary.json (sync guard) |
+| Tests | **High** | 1,633+ deterministic check (Rust 1,116 + shell 517+)、fake-codex / fake-cursor で CI 0-cost |
+
+### 直近の検証 (2026-05-21)
+
+- Opus 4.7 × Codex (gpt-5.5) 4 ラウンドの substantive grading で 9 / 9 項目 ≥90 を両 grader で達成
+- End-to-end acceptance drill (`task-stamp` CLI を 6 slice ExecPlan で実装) で **15 / 15 LGTM 条件 PASS**
+  - 全 role (orchestrator + research + coder + high-coder + reviewer × 2) 経路、specialty 4 種、semantic capsule (`context_token` 一致 + `FILE_SHA_ROLLUP`)、execplan/specialty/envelope lint 全 clean、metrics 全 wrapper invocation で 1 行/回、review/fix loop (BLOCK → fix → LGTM) 全部実走
+- main 直近の 4 PR (merge commit):
+  - `910ee38` PR #5 envelope toolchain + specialty projection (19 commits / 115 files / +9,974 LOC)
+  - `9f940f3` PR #6 cursor wrapper (round 1-4、ask/agent/yolo roles align to Cursor 公式 mode)
+  - `1a146df` PR #7 gap-fix (semantic-gc CLI + secret-scan Rust scanner + git hook installer)
+  - `d8f9ec0` PR #8 cursor rules integration (round 5、`.cursor/rules/` + `.cursor/skills/` + AGENTS.md + CLAUDE-LOCAL.md migration + outbound deny + ask diff gate)、双方 grader 5/5 axes ≥9.0/10
+
+### 既知の制約
+
+- `claude-wrapper.sh` は 2026-07-14 で削除予定 (legacy shim)
+- `scripts/semantic-mcp-server/` (Node.js compat) は新規利用非推奨、Rust 側に統合済み
+- GitHub Actions CI は別途 billing 設定が必要 (PR #5 では billing 未解決のため local 検証のみで merge)
+- semantic-mcp の `file_parse_cache` populate には `agent-core context index-symbols` の事前実行が必要
+
+---
+
+## 19. Customization & Contributing
+
+### Adding a new specialty
+
+1. `docs/roles/<role>/specialties/<slug>.md` を作成 (先頭に embedded JSON manifest、続けて required output sections の本文)
+2. `cargo run -p agent-core -- specialty lint <file>` で R1-R15 を pass
+3. `thin_skill_projection.enabled: true` にすれば `cargo run -p agent-core -- specialty project --all --provider all` で `.claude/skills/` + `.agents/skills/` に role-aware SKILL.md が自動生成
+
+### Adding a vocabulary key
+
+1. `docs/manual/matrix-vocabulary.json` に追加 (or `_policy.domain_local.<namespace>` に declare)
+2. `scripts/check-matrix-vocabulary-sync.sh` を通す (hash 同期)
+3. `verification-truth-matrix.md` の vocabulary-rev marker を更新
+
+### Adding a wrapper role
+
+`scripts/codex-wrapper.sh` の role 解決を拡張し、`test/unit/test-wrapper-specialty.sh` に test を追加。non-canonical path / role escape は fail-closed のまま維持。
+
+### Adding a Cursor rule
+
+`.cursor/rules/` に `.mdc` file を追加する場合は、既存の `revharness-critical.mdc` / `revharness-detailed.mdc` と同じ frontmatter contract に揃え、`bash test/unit/test-cursor-rules-frontmatter.sh` で deterministic subset を固定してください。Vendor-neutral invariant は `AGENTS.md`、Cursor-only guidance は `.cursor/rules/` に置きます。
+
+### Adding a Cursor skill
+
+Cursor Agent Skills は `.agents/skills/`、`.claude/skills/` (legacy compatibility)、`.cursor/skills/` の 3 path を意識して扱います。新規 skill は `SKILL.md` frontmatter に `name:` と `description:` を持たせ、`name:` は parent folder と一致させ、`bash test/unit/test-cursor-skills-compliance.sh` を通してください。既存 knowledge-pack compatibility alias 以外の新規 alias は別 slice で命名方針を更新してから追加します。`.cursor/skills/` に直接置く場合も `.agents/skills/` との provider parity を維持します。
+
+### Install secret-scan hook
+
+pre-push で staged/ref tuple ベースの secret scan を有効化するには、managed hook を install します。既存 hook がある場合は marker を確認し、non-managed hook は上書きせず手動統合手順を表示します。
+
+```bash
+scripts/rev-harness-secret-guard.sh install-hook --type pre-push
+```
+
+### Pointers
+
+- 全体運用方針: `docs/manual/worldclass-harness-operating-model.md`
+- maintainer 向け playbook: `docs/manual/agent-maintainer-guide.md`
+- 新規 customization: `docs/manual/developer-customization-guide.md`
+- skill 統合契約: `docs/manual/skill-integration.md` + `docs/manual/skill-routing-matrix.md`
+
+---
+
+## License & Distribution
+
+新しい GitHub URL / release tag / package coordinates / distribution channel は **TBD**。本 README は repo rename / push / tag / package publish が完了したとは主張しません。
+
+Canonical machine name は **`rev_harness`**、display name は **`Revharness`**。`agent_base` / `agent-base` は legacy alias として、既存 checkout / migration detection / 検索性のために維持されています。
