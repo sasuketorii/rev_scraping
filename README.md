@@ -1028,12 +1028,14 @@ stderr を見れば多くは判明 (`2>&1 | tail -20`)。よくある原因:
 Codex CLI 側の **silent no-op 失敗モード**。RevHarness 側で再現可能、RevHarness 側で
 未修復 (Codex CLI 本体の挙動)。
 
-**incident context (語彙定義)**: 当該セッションでは並列実行ジョブを *Lane A* から
-*Lane E* と呼んで個別管理していた。各 Lane は別 prompt + 別 Codex プロセス + 別 log
-file (`/tmp/lane_<id>_codex.log`) で 1 task を駆動する想定だった。本セクションが
-*Lane A* / *Lane B* と書くのは、この incident 固有の lane 番号付け規約に
-従ったもので、一般的な RevHarness 概念ではない (fresh adopter が「Lane って何？」
-となる前に明記)。検出 / 対処レシピ自体は lane 命名と独立。
+#### incident context (語彙定義)
+
+当該セッションでは並列実行ジョブを *Lane A* から *Lane E* と呼んで個別管理していた。
+各 Lane は別 prompt + 別 Codex プロセス + 別 log file (`/tmp/lane_<id>_codex.log`)
+で 1 task を駆動する想定だった。本セクションが *Lane A* / *Lane B* と書くのは、
+この incident 固有の lane 番号付け規約に従ったもので、一般的な RevHarness 概念
+ではない (fresh adopter が「Lane って何？」となる前に明記)。検出 / 対処レシピ
+自体は lane 命名と独立。
 
 トリガー条件・症状・検出コマンドはどの並列実行戦略でも適用可能なので、自分の
 セッションでは `lane_*` を別の prefix (`worker_*` / `job_*` 等) に読み替えて使う。
@@ -1072,6 +1074,9 @@ find /tmp -maxdepth 2 -name 'lane_*_codex.log' \
 
 # 2) wrapper 経由起動なら metric line が出ているはず。出ていないと無音失敗
 grep -h "REV_HARNESS_DELEGATION_METRIC" /tmp/lane_*.log 2>/dev/null | head
+# サンプル出力 (実機 2026-05-21):
+#   REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"7b4f3b7e-...","timestamp":"2026-05-21T11:34:35Z","wrapper_role":"coder","specialty":null,"manifest_hash":null,"exit_code":0,"duration_ms":18,"tokens_in":null,"tokens_out":null,"total_tokens":null,"dry_run":true,"specialty_status":"none"}
+# 行が 1 つも出てこない = wrapper bypass = 失敗検知の手掛かり消失
 
 # 3) 親 orchestrator が hang 検出していない場合の救出
 #    起動から N 時間経過 (BSD ps では `etime` で判定)
@@ -1101,8 +1106,8 @@ find /tmp -maxdepth 2 -name 'lane_*_codex.log' -mmin +20 -size -1k 2>/dev/null
 
 #### 既知 (まだ自動化していない)
 
-- wrapper 側で prompt size を測って **≥ 5KB × high effort の組合せを警告** する pre-check (0.0.17 候補)
-- 上記 `find /tmp -name 'lane_*_codex.log' ...` を `harness-doctor --strict` に統合 (0.0.17 候補)
+- wrapper 側で prompt size を測って **≥ 5KB × high effort の組合せを警告** する pre-check (0.0.18 候補)
+- 上記 `find /tmp -name 'lane_*_codex.log' ...` を `harness-doctor --strict` に統合 (0.0.18 候補)
 
 #### 関連 audit
 
