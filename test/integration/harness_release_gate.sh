@@ -402,6 +402,12 @@ parse_args "$@"
 [[ -x "$BASH_BIN" && ! -d "$BASH_BIN" ]] || release_gate_die "release-gate bash runtime not executable: $BASH_BIN"
 apply_test_steps_override
 
+# 0.0.12: release-gate is the canonical strict surface for identity checks.
+# Runtime wrappers default to warn (advisory) so adoption isn't blocked, but
+# release acceptance must fail-close on ambiguous-copy / invalid. CI and local
+# release-gate share this entrypoint, so exporting here keeps the two in sync.
+export REV_HARNESS_VENDOR_CHECK="${REV_HARNESS_VENDOR_CHECK:-strict}"
+
 if [[ "$RELEASE_GATE_METRICS_SMOKE_ONLY" == "YES" ]]; then
   run_delegation_metrics_smoke
   exit 0

@@ -6,11 +6,12 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MODE=""
 JSON_ONLY="false"
+STRICT_MODE="false"
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/harness-doctor.sh --quick [--json]
+  scripts/harness-doctor.sh --quick [--json] [--strict]
   scripts/harness-doctor.sh --check-vendoring [--path <project_root>] [--allow-vendored]
 
 Modes:
@@ -19,6 +20,14 @@ Modes:
       The quick doctor is not acceptance authority and does not replace
       reviewer LGTM, truth matrix rules, deterministic checks, or
       release-gate evidence.
+
+  --strict (with --quick)
+      Promotes the runtime identity-check (canonical-guard) from
+      advisory to strict for this invocation by exporting
+      REV_HARNESS_VENDOR_CHECK=strict and invoking the guard against
+      this checkout. ambiguous-copy / invalid identity classes become
+      fail-close (exit 70) instead of warn. Use this on release-gate
+      and CI surfaces; runtime wrappers stay advisory by default.
 
   --check-vendoring
       Scans <project_root> (default: current working directory) for
@@ -491,6 +500,10 @@ while [[ "$#" -gt 0 ]]; do
       JSON_ONLY="true"
       shift
       ;;
+    --strict)
+      STRICT_MODE="true"
+      shift
+      ;;
     --help|-h)
       usage
       exit 0
@@ -507,6 +520,19 @@ if [[ "$MODE" == "check-vendoring" ]]; then
 fi
 
 [[ "$MODE" == "quick" ]] || die "--quick or --check-vendoring is required"
+
+# 0.0.12: --strict promotes canonical-guard from advisory to fail-close for this
+# invocation. Runtime wrappers default to warn so adoption isn't blocked; doctor
+# --strict and release-gate are the explicit deep-check surfaces.
+if [[ "$STRICT_MODE" == "true" ]]; then
+  export REV_HARNESS_VENDOR_CHECK="strict"
+  # canonical-guard derives repo_root from BASH_SOURCE[1] (the script sourcing
+  # it). Sourcing here means scripts/.. == PROJECT_ROOT, which matches the
+  # wrapper invocation path. exit 70 propagates out of doctor.
+  # shellcheck source=scripts/_canonical-guard.sh
+  source "$SCRIPT_DIR/_canonical-guard.sh"
+  rev_harness_assert_canonical_root harness-doctor-strict
+fi
 
 require_quick_dependencies
 

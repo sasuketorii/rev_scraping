@@ -4,32 +4,35 @@
 # RevHarness wrapper の runtime identity guard。`claude-wrapper.sh` /
 # `codex-wrapper.sh` / `cursor-wrapper.sh` から source される共通ライブラリ。
 #
-# Design (round 5 redesign, Codex + Opus 合意):
-#   Vendor guard を **path whitelist** から **identity class guard** に変更する。
-#   RevHarness は多 repo で使う開発基盤なので「rev_harness 本家配下から起動された
-#   wrapper だけ実行許可」では adoption 自体が block される。
-#   代わりに `.shared/project_id` のクラスで合法 / 不正を区別する。
+# Design (0.0.12 default-warn redesign, Opus×Codex 合意):
+#   RevHarness は「多 repo で使う開発基盤」なので、wrapper が repo に copy
+#   されること自体は **正規の adoption** (盗作ではない)。runtime guard は
+#   advisory に下げ、deep drift/provenance check は `harness-doctor.sh --strict`
+#   と `test/integration/harness_release_gate.sh` に集約する。
 #
-#   識別クラス:
-#     canonical-dev     : `revharness-*` project_id + (canonical path 一致 OR
-#                         official git remote 一致) → pass
-#     managed-adopter   : 有効な非 `revharness-*` project_id (target repo が
-#                         自身の identity を持つ) → pass
-#     ambiguous-copy    : `revharness-*` だが canonical path にも official remote
-#                         にも該当しない → fail-closed (本家の中身を path だけ
-#                         移した stale/vendored copy が該当)
-#     invalid           : project_id 欠落 / malformed / 制御文字混入 → fail-closed
+#   Identity class:
+#     canonical-dev   : `revharness-*` project_id + (canonical path OR
+#                       official git remote 一致) → pass silent
+#     managed-adopter : 有効な非 `revharness-*` project_id → pass silent
+#     ambiguous-copy  : `revharness-*` だが official 外
+#                       → default WARN (advisory)。`REV_HARNESS_VENDOR_CHECK=strict` で fail-close (exit 70)
+#     invalid         : project_id 欠落 / malformed (control char / multiline 等)
+#                       → identity-dependent な downstream (semantic DB / queue /
+#                         capsule path) が後で破綻するため、setup error として
+#                         **default で fail-close**。`REV_HARNESS_VENDOR_CHECK=warn` で
+#                         advisory に降りる (debug/migration 用)。
 #
-#   Stale-copy drift (wrapper hash mismatch / version skew) の検出は wrapper
-#   実行毎ではなく `harness-doctor.sh` / release gate 側で扱う (分離)。
+#   downstream の identity-dependent path (semantic-mcp DB namespace 等) は
+#   wrapper guard が warn でも独立に project_id を validate して fail-close
+#   すべき (Codex 0.0.12 design partner note 参照)。
 #
 # 公開関数:
 #   rev_harness_assert_canonical_root <wrapper_basename>
 #
 # 環境変数:
-#   REV_HARNESS_CANONICAL_ROOT  override canonical source-checkout path
-#                               (default: $HOME/dev/rev_harness)
-#   REV_HARNESS_VENDOR_CHECK    "strict" (default) | "warn" (deprecated migration aid)
+#   REV_HARNESS_CANONICAL_ROOT  source-checkout path override (default: $HOME/dev/rev_harness)
+#   REV_HARNESS_VENDOR_CHECK    "warn" (default) | "strict"
+#                               strict は CI / release gate / harness-doctor --strict が opt-in で設定
 #
 # 互換性: macOS bash 3.x (associative array 不使用)
 
@@ -62,32 +65,54 @@ _rev_harness_official_remote_match() {
   return 1
 }
 
-_rev_harness_emit_guard_error() {
-  local class="$1"; shift
-  local wrapper="$1"; shift
-  local repo_root="$1"; shift
-  case "$class" in
-    ambiguous-copy)
-      printf '[rev-harness] VENDOR GUARD: ambiguous RevHarness identity at %s\n' "$repo_root" >&2
-      printf '              wrapper=%s project_id starts with revharness- but this is not the\n' "$wrapper" >&2
-      printf '              official source checkout (path / git remote mismatch).\n' >&2
-      printf '              Resolution: for adoption, bootstrap a target project_id via\n' >&2
-      printf '              scripts/init-project.sh; for source dev, set\n' >&2
-      printf '              REV_HARNESS_CANONICAL_ROOT to your checkout path.\n' >&2
-      ;;
-    invalid)
-      printf '[rev-harness] VENDOR GUARD: missing or invalid repo identity at %s\n' "$repo_root" >&2
-      printf '              wrapper=%s could not read a usable .shared/project_id.\n' "$wrapper" >&2
-      printf '              Resolution: run scripts/init-project.sh to bootstrap an\n' >&2
-      printf '              adopter project_id, or set REV_HARNESS_CANONICAL_ROOT for a\n' >&2
-      printf '              source checkout.\n' >&2
+# REV_HARNESS_VENDOR_CHECK を canonical な小文字値に正規化:
+#   "warn" | "strict"。不明な値は warn 扱い (advisory 警告も出す)。
+_rev_harness_resolve_mode() {
+  local raw="${REV_HARNESS_VENDOR_CHECK:-warn}"
+  case "$raw" in
+    strict) printf 'strict' ;;
+    warn|"") printf 'warn' ;;
+    *)
+      printf '[rev-harness] identity-check (advisory): unknown REV_HARNESS_VENDOR_CHECK=%s; falling back to warn\n' "$raw" >&2
+      printf 'warn'
       ;;
   esac
 }
 
+_rev_harness_emit_guard_notice() {
+  local class="$1"; shift
+  local wrapper="$1"; shift
+  local repo_root="$1"; shift
+  local label="$1"  # "advisory" or "strict"
+
+  case "$class" in
+    ambiguous-copy)
+      printf '[rev-harness] identity-check (%s): source-style project_id outside the official source checkout\n' "$label" >&2
+      printf '              wrapper=%s repo=%s\n' "$wrapper" "$repo_root" >&2
+      printf '              project_id starts with revharness- but this checkout does not match\n' >&2
+      printf '              REV_HARNESS_CANONICAL_ROOT or the official git remote.\n' >&2
+      printf '              For adoption, run scripts/init-project.sh to create a target project_id.\n' >&2
+      printf '              For source development, set REV_HARNESS_CANONICAL_ROOT to your checkout.\n' >&2
+      ;;
+    invalid)
+      printf '[rev-harness] identity-check (%s): repo identity is missing or malformed\n' "$label" >&2
+      printf '              wrapper=%s repo=%s\n' "$wrapper" "$repo_root" >&2
+      printf '              .shared/project_id could not be read as a valid RevHarness identity.\n' >&2
+      printf '              Identity-dependent commands (semantic-mcp / queue / capsule) will fail closed\n' >&2
+      printf '              downstream until repaired. Run scripts/init-project.sh or fix .shared/project_id.\n' >&2
+      ;;
+  esac
+
+  if [[ "$label" == "strict" ]]; then
+    printf '              [rev-harness] strict: refusing to continue. Set REV_HARNESS_VENDOR_CHECK=warn only for local debug.\n' >&2
+  fi
+}
+
 rev_harness_assert_canonical_root() {
   local wrapper="${1:-rev_harness}"
-  local mode="${REV_HARNESS_VENDOR_CHECK:-strict}"
+  local mode
+  mode=$(_rev_harness_resolve_mode)
+
   local script_dir repo_root
   local expected expected_resolved
   local project_id
@@ -106,31 +131,43 @@ rev_harness_assert_canonical_root() {
   # Identity class derivation
   project_id=$(_rev_harness_read_project_id "$repo_root")
 
-  if [[ -z "$project_id" ]]; then
-    _rev_harness_emit_guard_error invalid "$wrapper" "$repo_root"
-    [[ "$mode" == "warn" ]] && return 0
-    exit 70
+  # ---- invalid: setup error, default strict ----
+  # downstream (semantic-mcp DB namespace 等) が project_id 必須なので、
+  # default は fail-close。`REV_HARNESS_VENDOR_CHECK=warn` を明示した時のみ
+  # advisory に降りる (debug / migration 用)。`ambiguous-copy` の default-warn
+  # とは非対称: invalid は setup error なので、unset でも strict 扱い。
+  if [[ -z "$project_id" ]] || [[ ! "$project_id" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+    local invalid_mode="${REV_HARNESS_VENDOR_CHECK:-strict}"
+    case "$invalid_mode" in
+      warn)
+        _rev_harness_emit_guard_notice invalid "$wrapper" "$repo_root" advisory
+        return 0
+        ;;
+      *)
+        _rev_harness_emit_guard_notice invalid "$wrapper" "$repo_root" strict
+        exit 70
+        ;;
+    esac
   fi
 
-  # Format sanity: ASCII printable, char class limited
-  if [[ ! "$project_id" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-    _rev_harness_emit_guard_error invalid "$wrapper" "$repo_root"
-    [[ "$mode" == "warn" ]] && return 0
-    exit 70
-  fi
-
+  # ---- managed-adopter: target が自身の identity を持つ → silent pass ----
   if [[ "$project_id" != revharness-* ]]; then
-    # managed-adopter: target が自身の identity を持つ → pass
     return 0
   fi
 
-  # project_id starts with revharness-: must be the official source checkout
+  # ---- revharness-*: source-checkout か否か ----
   if _rev_harness_official_remote_match "$repo_root"; then
     return 0  # canonical-dev via git remote
   fi
 
-  # ambiguous-copy
-  _rev_harness_emit_guard_error ambiguous-copy "$wrapper" "$repo_root"
-  [[ "$mode" == "warn" ]] && return 0
-  exit 70
+  # ---- ambiguous-copy: framework copy のうち source-style id を持つもの ----
+  # 0.0.12 design partner debate (Opus×Codex 合意) で「framework は copy する
+  # ためのもの」を前提に default を warn (advisory) に下げる。strict 強制が
+  # 必要な surface (release gate / doctor --strict) は env で opt-in。
+  if [[ "$mode" == "strict" ]]; then
+    _rev_harness_emit_guard_notice ambiguous-copy "$wrapper" "$repo_root" strict
+    exit 70
+  fi
+  _rev_harness_emit_guard_notice ambiguous-copy "$wrapper" "$repo_root" advisory
+  return 0
 }
