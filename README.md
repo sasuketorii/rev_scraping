@@ -1022,6 +1022,63 @@ stderr を見れば多くは判明 (`2>&1 | tail -20`)。よくある原因:
 - Rust binary 未 build → `cd harness-rust && cargo build -p semantic-mcp`
 - 別 server プロセスが同 db を locking 中 → `lsof | grep semantic.db` で確認、不要なら kill。`SemanticDbLock` は advisory なので強制的に並列起動はできるが、後発側は書き込みを行わない設計
 
+### 16.8 「Codex CLI が計画文 1 行だけ吐いて exit / 実装 0 ファイル」 — 大型 prompt × high effort bail-out
+
+2026-05-21 に multi-lane orchestration (Lane A–E parallel dispatch) で実機検出された
+Codex CLI 側の **silent no-op 失敗モード**。RevHarness 側で再現可能、RevHarness 側で
+未修復 (Codex CLI 本体の挙動)。
+
+#### トリガー条件 (3 つ揃うと発火しやすい)
+
+1. prompt size **≥ 5–7 KB** (slice-designer skill の推奨上限を超える)
+2. effort 設定が **high** (`--role high-coder` / `--role reviewer` / `--effort high`)
+3. self-driven multi sub-phase の連鎖を 1 prompt に詰め込んでいる
+   (= 「8 sub-phase を順に自己駆動でやって」型の指示)
+
+#### 症状
+
+- smoke test (1-line prompt) では **再現しない** — 短 prompt は普通に通る
+- 該当条件下では Codex が「計画書きました」相当の **1–3 行だけ** 吐いて exit 0
+- 実装ファイル 0、変更 diff 0
+- log file (`/tmp/lane_*_codex.log` 等) は存在するがサイズが 1KB 以下で打ち切られている
+- 親の orchestrator は「正常終了」と誤認するので、reviewer ロールに進まないと気付けない
+- 最悪ケース: process が 12+ 時間 silent hang (実際の事例あり)
+
+#### 検出 (機械的に判定)
+
+```bash
+# 20 分以上書き込みなし & サイズ < 1KB の lane log = bail-out 強疑い
+find /tmp -maxdepth 2 -name 'lane_*_codex.log' -mmin +20 -size -1k 2>/dev/null
+
+# wrapper 経由起動なら metric line が出ているはず。出ていないと無音失敗
+grep -h "REV_HARNESS_DELEGATION_METRIC" /tmp/lane_*.log 2>/dev/null | head
+
+# 親 orchestrator が hang 検出していない場合の救出
+ps aux | grep -E 'codex.*exec' | grep -v grep   # 12 時間放置プロセスが残ってないか
+```
+
+#### 対処 (3 段階)
+
+1. **prompt を分割** (canonical): `slice-designer` skill のガイドに従って
+   1 sub-phase = 1 prompt、目安 **≤ 2 KB / 1 file** に切る。Lane B 診断はこれで解消。
+2. **長 prompt は coder を Claude Opus に振る**: `claude-wrapper.sh --role coder`
+   は同じ大きさでも完走する (Opus は長 prompt 耐性が高い)。reviewer は Codex 固定
+   (`codex-wrapper.sh --role reviewer`、`docs/roles/reviewer.md` 参照)。
+3. **必ず canonical wrapper 経由**: raw `codex exec` を直接叩くと
+   `REV_HARNESS_DELEGATION_METRIC` JSON line が出ず、失敗検知の手掛かりが消える。
+   0.0.12+ canonical-guard は raw bypass に advisory 警告を出すが fail-close は
+   しないので、orchestrator 側で wrapper 強制が必要。
+
+#### 既知 (まだ自動化していない)
+
+- wrapper 側で prompt size を測って **≥ 5KB × high effort の組合せを警告** する pre-check (0.0.17 候補)
+- 上記 `find /tmp -name 'lane_*_codex.log' ...` を `harness-doctor --strict` に統合 (0.0.17 候補)
+
+#### 関連 audit
+
+- Lane B 診断 (2026-05-21): 7KB prompt × high effort で plan 1 行 → silent exit 再現
+- Lane A 12 時間 hang (2026-05-21): 同条件で process が抜けず、SIGTERM 必要
+
 ---
 
 ## 17. Project Structure
