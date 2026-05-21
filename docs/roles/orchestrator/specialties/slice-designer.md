@@ -63,6 +63,17 @@ Define exactly one reviewable slice unless the request is intentionally split in
 
 When the request needs multiple slices, each slice must have a separate owner, allowed surface, and verification boundary. Do not use a single generic contract for unrelated Rust code, wrapper policy, generated artifacts, and documentation changes.
 
+### Prompt size budget per sub-phase
+
+Each sub-phase prompt dispatched to a worker (coder or reviewer wrapper invocation) must stay within a bounded size envelope so that downstream CLI tools do not silently truncate or bail out. The empirical 2026-05-21 incident (see README §16.8) showed Codex CLI exiting with a plan-only 1-line stub when a single prompt combined ≥ 5–7 KB body with `high` effort and multi sub-phase self-driven instructions.
+
+- **Recommended upper bound: ≤ 2 KB per sub-phase prompt** (Markdown body the worker receives via wrapper `--stdin`).
+- **Hard reject: > 5 KB combined with `high` effort.** Re-slice into smaller sub-phases or shift to Claude Opus (`claude-wrapper.sh --role coder`) which is empirically tolerant of larger prompts.
+- The budget is *per sub-phase invocation*, not per slice. A slice may legitimately drive multiple sub-phase wrapper calls in sequence; each call individually obeys the budget.
+- Boilerplate (canonical handoff envelope, role manifest reminders, lint-failure context) counts toward the budget. Strip non-essential framing before dispatch.
+
+If a sub-phase cannot fit the budget after honest compression, the slice is too broad; re-classify and split. Do not bypass the budget with `--no-verify` or by removing canonical envelope sections.
+
 ### Worked Example
 
 Request: add a new specialty file with manifest, lint check, and wrapper integration.
