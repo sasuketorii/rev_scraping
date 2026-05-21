@@ -1024,9 +1024,19 @@ stderr を見れば多くは判明 (`2>&1 | tail -20`)。よくある原因:
 
 ### 16.8 「Codex CLI が計画文 1 行だけ吐いて exit / 実装 0 ファイル」 — 大型 prompt × high effort bail-out
 
-2026-05-21 に multi-lane orchestration (Lane A–E parallel dispatch) で実機検出された
+2026-05-21 に rev_harness 上の multi-lane orchestration セッションで実機検出された
 Codex CLI 側の **silent no-op 失敗モード**。RevHarness 側で再現可能、RevHarness 側で
 未修復 (Codex CLI 本体の挙動)。
+
+**incident context (語彙定義)**: 当該セッションでは並列実行ジョブを *Lane A* から
+*Lane E* と呼んで個別管理していた。各 Lane は別 prompt + 別 Codex プロセス + 別 log
+file (`/tmp/lane_<id>_codex.log`) で 1 task を駆動する想定だった。本セクションが
+*Lane A* / *Lane B* と書くのは、この incident 固有の lane 番号付け規約に
+従ったもので、一般的な RevHarness 概念ではない (fresh adopter が「Lane って何？」
+となる前に明記)。検出 / 対処レシピ自体は lane 命名と独立。
+
+トリガー条件・症状・検出コマンドはどの並列実行戦略でも適用可能なので、自分の
+セッションでは `lane_*` を別の prefix (`worker_*` / `job_*` 等) に読み替えて使う。
 
 #### トリガー条件 (3 つ揃うと発火しやすい)
 
@@ -1046,21 +1056,41 @@ Codex CLI 側の **silent no-op 失敗モード**。RevHarness 側で再現可�
 
 #### 検出 (機械的に判定)
 
-```bash
-# 20 分以上書き込みなし & サイズ < 1KB の lane log = bail-out 強疑い
-find /tmp -maxdepth 2 -name 'lane_*_codex.log' -mmin +20 -size -1k 2>/dev/null
+mtime ベースの単純検出だけでは、Codex プロセスが **一度も log を書かずに即時 bail-out
+したケース** (mtime ≈ ctime ≈ 起動時刻のまま) を弱く判定してしまう。対策として
+**起動直後に sentinel marker を log file へ書き込み、20 分後に mtime/サイズの両方
+で判定**する 2 段アプローチを推奨。
 
-# wrapper 経由起動なら metric line が出ているはず。出ていないと無音失敗
+```bash
+# 0) (dispatch 直前) sentinel を仕込む — 起動時刻を明示固定
+LANE_LOG=/tmp/lane_b_codex.log
+echo "[$(date -u +%FT%TZ)] dispatch sentinel: $$ pid=$BASHPID" >"$LANE_LOG"
+
+# 1) bail-out 判定: 20 分後にサイズが sentinel 行のみ (< 200B) なら 強疑い
+find /tmp -maxdepth 2 -name 'lane_*_codex.log' \
+  -mmin +20 \( -size -1k -o -size -200c \) 2>/dev/null
+
+# 2) wrapper 経由起動なら metric line が出ているはず。出ていないと無音失敗
 grep -h "REV_HARNESS_DELEGATION_METRIC" /tmp/lane_*.log 2>/dev/null | head
 
-# 親 orchestrator が hang 検出していない場合の救出
-ps aux | grep -E 'codex.*exec' | grep -v grep   # 12 時間放置プロセスが残ってないか
+# 3) 親 orchestrator が hang 検出していない場合の救出
+#    起動から N 時間経過 (BSD ps では `etime` で判定)
+ps -eo pid,etime,command | grep -E 'codex.*exec' | grep -v grep | \
+  awk '$2 ~ /-/ || ($2 ~ /^[0-9]+:[0-9]+:[0-9]+$/ && $2 !~ /^00:/){print}'
+  # etime 形式: "MM:SS" (<1h) / "HH:MM:SS" (≥1h) / "D-HH:MM:SS" (≥1d)
+  # 上の条件は (D-付き = 1+ 日) もしくは (HH:MM:SS で HH != 00 = 1+ 時間) を採用
+
+# 4) sentinel が無い既存 log を救済判定 (古い session 用 fallback)
+find /tmp -maxdepth 2 -name 'lane_*_codex.log' -mmin +20 -size -1k 2>/dev/null
 ```
 
 #### 対処 (3 段階)
 
-1. **prompt を分割** (canonical): `slice-designer` skill のガイドに従って
-   1 sub-phase = 1 prompt、目安 **≤ 2 KB / 1 file** に切る。Lane B 診断はこれで解消。
+1. **prompt を分割** (canonical): `slice-designer` skill (canonical source:
+   `docs/roles/orchestrator/specialties/slice-designer.md` §"Prompt size budget
+   per sub-phase") が **≤ 2 KB per sub-phase** をハードガイドラインとして規定
+   している。1 sub-phase = 1 wrapper invocation でこの予算を守る。incident で
+   起きた silent exit は **5–7 KB × high effort** で再現する閾値帯。
 2. **長 prompt は coder を Claude Opus に振る**: `claude-wrapper.sh --role coder`
    は同じ大きさでも完走する (Opus は長 prompt 耐性が高い)。reviewer は Codex 固定
    (`codex-wrapper.sh --role reviewer`、`docs/roles/reviewer.md` 参照)。
@@ -1076,8 +1106,20 @@ ps aux | grep -E 'codex.*exec' | grep -v grep   # 12 時間放置プロセスが
 
 #### 関連 audit
 
-- Lane B 診断 (2026-05-21): 7KB prompt × high effort で plan 1 行 → silent exit 再現
-- Lane A 12 時間 hang (2026-05-21): 同条件で process が抜けず、SIGTERM 必要
+incident-specific 内部 artifact (rev_harness session 2026-05-21):
+
+- **Lane B 診断**: 7KB prompt × high effort で Codex が plan 1 行 → silent exit
+  再現。incident log は `.agent/active/prompts/grade_016_strict.md` に grading
+  形式で要約済。
+- **Lane A 12 時間 hang**: 同条件で Codex process が抜けず、SIGTERM 必要。
+  検出時の `ps aux \| grep codex` 出力は session 内 evidence 扱い
+  (private、外部配布対象外)。
+- **対策設計合意**: `.claude/tmp/multi-repo-sync/codex_016_strict_grade.md`
+  に Opus 4.7 xhigh × Codex gpt-5.5 xhigh 双方の strict grading が記録され、
+  両者 ≥ 70 で本セクションを ship 判定。
+
+外部 adopter は incident artifact を直接読む必要はない — 上の検出 / 対処レシピで
+十分自己診断できる構成にしている。
 
 ---
 
