@@ -22,7 +22,14 @@ Cargo.lock.bak
 workspace/
 .shared/
 .claude/tmp/
+.claude/scheduled_tasks.lock
+.claude/*.lock
 .npm-cache/
+
+# Node build artifacts (semantic-mcp-server)
+node_modules/
+dist/
+build/
 .semantic-mcp/*/semantic.db
 .agent/project_id
 .agent/tmp/
