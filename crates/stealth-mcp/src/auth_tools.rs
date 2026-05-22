@@ -28,6 +28,7 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use serde_json::{json, Value};
+use stealth_agent_contracts::{ErrorEnvelope, ErrorKind};
 use stealth_auth::auth_aup::{self, AuthAupDecision};
 use stealth_auth::{storage, AuthStore, ProfileStatus};
 use uuid::Uuid;
@@ -62,6 +63,37 @@ pub enum AuthToolError {
     LoginFailed(String),
     Store(String),
     Spawn(String),
+}
+
+impl AuthToolError {
+    /// Map this in-process error onto the wire-format [`ErrorEnvelope`]
+    /// (P4.3). Cookie values and other secrets are never included; only the
+    /// pre-formatted `Display` message is propagated.
+    pub fn to_envelope(&self) -> ErrorEnvelope {
+        let msg = self.to_string();
+        match self {
+            AuthToolError::MissingField(_) | AuthToolError::InvalidInput(_) => {
+                ErrorEnvelope::new(ErrorKind::Validation, msg)
+            }
+            AuthToolError::AupRejected(_) => ErrorEnvelope::new(ErrorKind::Aup, msg)
+                .with_hint("verify authorized.toml entry for this domain"),
+            AuthToolError::SessionNotFound => {
+                ErrorEnvelope::new(ErrorKind::AuthSessionNotFound, msg)
+                    .with_hint("re-run auth_login_start")
+            }
+            AuthToolError::SessionConsumed => {
+                ErrorEnvelope::new(ErrorKind::AuthSessionNotFound, msg)
+                    .with_hint("session_token is single-use; start a new login")
+            }
+            AuthToolError::LoginTimeout => ErrorEnvelope::new(ErrorKind::AuthSessionExpired, msg)
+                .with_hint("user did not finish login in the allotted window")
+                .retryable(Some(1_000)),
+            AuthToolError::LoginFailed(_) => ErrorEnvelope::new(ErrorKind::Auth, msg),
+            AuthToolError::Store(_) => ErrorEnvelope::new(ErrorKind::Internal, msg),
+            AuthToolError::Spawn(_) => ErrorEnvelope::new(ErrorKind::BrowserNotFound, msg)
+                .with_hint("ensure rev-auth helper is on PATH"),
+        }
+    }
 }
 
 impl std::fmt::Display for AuthToolError {
@@ -498,9 +530,12 @@ pub fn handle_auth_list(cfg: &AuthToolConfig) -> Result<Value, AuthToolError> {
 pub fn handle_auth_status(args: &Value, cfg: &AuthToolConfig) -> Result<Value, AuthToolError> {
     let profile = require_str(args, "profile")?.to_string();
     if !cfg.auth_dir.exists() {
+        // Always emit `cookie_values_returned:false` so the contract marker is
+        // uniform across all branches (matches docs/json-schemas/auth_status.output.json).
         return Ok(json!({
             "profile": profile,
             "status": "Missing",
+            "cookie_values_returned": false,
         }));
     }
     let store = AuthStore::open(&cfg.auth_dir).map_err(|e| AuthToolError::Store(e.to_string()))?;
@@ -524,7 +559,7 @@ fn status_str(s: ProfileStatus) -> &'static str {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use secrecy::SecretString;
     use stealth_auth::{Cookie, SameSite};
@@ -574,7 +609,7 @@ mod tests {
         std::fs::write(aup_dir.join("authorized.toml"), body).unwrap();
     }
 
-    fn env_test_lock() -> &'static std::sync::Mutex<()> {
+    pub(crate) fn env_test_lock() -> &'static std::sync::Mutex<()> {
         static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
         LOCK.get_or_init(|| std::sync::Mutex::new(()))
     }

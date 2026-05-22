@@ -77,6 +77,14 @@ pub(crate) struct DoctorArgs {
     /// `--deep` adds non-leak diagnostic WARN/FAIL items.
     #[arg(long, default_value_t = false)]
     pub deep: bool,
+
+    /// P10.3: run VPS deploy readiness checks (systemd unit prerequisites,
+    /// dedicated user, /var/log + /var/lib dir permissions, credstore,
+    /// chrome/xvfb-run on PATH, docker + gluetun image, DISPLAY env).
+    /// FAIL items exit 3 (permanent); WARN-only stays exit 0. Independent
+    /// from the leak-fail-closed contract used by the base checks.
+    #[arg(long, default_value_t = false)]
+    pub vps: bool,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -234,19 +242,81 @@ async fn run_doctor(args: DoctorArgs) -> Result<bool, ExitCode> {
         None
     };
 
-    emit_report(&report, args.format)?;
+    // P10.3: optional --vps deploy readiness diagnostics. Reuses the
+    // DeepCheck row shape for JSON parity with --deep.
+    let vps_report = if args.vps {
+        Some(run_vps_checks())
+    } else {
+        None
+    };
+
+    // P10.3 JSON output contract: when --vps is set with JSON format,
+    // emit a single top-level JSON array of DeepCheck rows so downstream
+    // consumers can pipe through `jq` / `json.tool` without "Extra data"
+    // errors and rely on a stable array shape. If --deep is also set,
+    // deep rows are concatenated ahead of vps rows in the same array.
+    // The base leak/doctor report is intentionally NOT merged into the
+    // JSON payload — leak verdicts are surfaced via exit code 7. Text
+    // mode keeps its multi-section human-readable format. The plain
+    // (no-vps) JSON path keeps the historical multi-document shape so
+    // existing --deep consumers are not broken.
+    if args.vps && matches!(args.format, DoctorFormat::Json) {
+        let mut combined: Vec<DeepCheck> = Vec::new();
+        if let Some(d) = deep_report.as_ref() {
+            combined.extend(deep_report_rows(d));
+        }
+        if let Some(v) = vps_report.as_ref() {
+            combined.extend(v.iter().cloned());
+        }
+        match serde_json::to_string_pretty(&combined) {
+            Ok(s) => println!("{s}"),
+            Err(e) => {
+                eprintln!("[ERROR] doctor --vps: serialise rows: {e}");
+                return Err(ExitCode::PermanentError);
+            }
+        }
+    } else {
+        emit_report(&report, args.format)?;
+        if let Some(d) = deep_report.as_ref() {
+            emit_deep_report(d, args.format)?;
+        }
+    }
+    // Text-mode --vps still prints its own section (the JSON envelope
+    // path above already covered JSON).
+    if args.vps && matches!(args.format, DoctorFormat::Text) {
+        if let Some(v) = vps_report.as_ref() {
+            emit_vps_report(v, args.format)?;
+        }
+    }
+
+    // Exit code aggregation (shared across JSON + Text):
+    // * --deep FAIL with leak checks passing → exit 3.
+    // * --vps  FAIL with leak checks passing → exit 3.
+    // Leak failures still take precedence (exit 7) via Ok(false) below.
     if let Some(d) = deep_report.as_ref() {
-        emit_deep_report(d, args.format)?;
-        // FAIL items in the deep report do not flip the leak-fail-closed
-        // exit code (that stays at 7 only for kill-switch / DNS / IPv6
-        // / exit-IP). FAILs here surface as exit 3 (permanent). WARNs
-        // stay at exit 0.
         if d.has_fail() && report.all_pass() {
-            // Bypass the standard ExitCode::Ok mapping when deep fails.
+            std::process::exit(3);
+        }
+    }
+    if let Some(v) = vps_report.as_ref() {
+        if vps_has_fail(v) && report.all_pass() {
             std::process::exit(3);
         }
     }
     Ok(report.all_pass())
+}
+
+/// P10.3 JSON-array helper: flatten a `DeepReport` into its row vec in
+/// the canonical declaration order so `--deep --vps` can emit a single
+/// top-level array combining deep + vps rows.
+fn deep_report_rows(d: &DeepReport) -> Vec<DeepCheck> {
+    vec![
+        d.obscura_binary.clone(),
+        d.vpn_pool_instances.clone(),
+        d.sites_recipes.clone(),
+        d.auth_profiles.clone(),
+        d.auth_key_source.clone(),
+    ]
 }
 
 /// v1.1.0 (P16): extended doctor diagnostic result.
@@ -567,6 +637,329 @@ fn print_text(r: &DoctorReport) {
     }
 }
 
+// ---- P10.3: doctor --vps deploy readiness checks ----
+//
+// These checks reuse the `DeepCheck` row shape from --deep so JSON
+// consumers see one consistent schema across both feature flags. The
+// check set targets a Linux VPS (systemd + dedicated `rev-stealth` user
+// + chroot-friendly paths under /var/lib + /var/log + an encrypted
+// credstore + docker host with gluetun image pulled). Each check is
+// pure-host-introspection: no docker exec, no network probe, so it is
+// safe to run from CI / Makefile smoke without side effects.
+
+/// Run all VPS-deploy readiness checks. Returns a list of DeepCheck
+/// rows in stable order. Pure function over the host environment;
+/// dependency-injected helpers (`run_cmd`, `stat_dir`) are isolated so
+/// unit tests can drive failure paths without touching real /var.
+pub(crate) fn run_vps_checks() -> Vec<DeepCheck> {
+    vec![
+        vps_check_systemd(),
+        vps_check_user("rev-stealth"),
+        vps_check_dir_perm("/var/log/rev-stealth", 0o750, "rev-stealth"),
+        vps_check_dir_perm("/var/lib/rev-stealth", 0o700, "rev-stealth"),
+        vps_check_credstore("/etc/credstore.encrypted"),
+        vps_check_chrome_xvfb(),
+        vps_check_docker(),
+        vps_check_gluetun_image(),
+        vps_check_display_env(),
+    ]
+}
+
+pub(crate) fn vps_has_fail(rows: &[DeepCheck]) -> bool {
+    rows.iter().any(|c| c.status == DeepStatus::Fail)
+}
+
+fn vps_check_systemd() -> DeepCheck {
+    let name = "systemd".to_string();
+    match run_cmd("systemctl", &["--version"]) {
+        Some((true, out)) => {
+            let first = out.lines().next().unwrap_or("").trim().to_string();
+            DeepCheck {
+                name,
+                status: DeepStatus::Pass,
+                detail: if first.is_empty() {
+                    "systemctl present".into()
+                } else {
+                    first
+                },
+            }
+        }
+        _ => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: "systemctl not found (host is not systemd-based; unit files will not load)"
+                .into(),
+        },
+    }
+}
+
+fn vps_check_user(user: &str) -> DeepCheck {
+    let name = format!("user_{user}");
+    match run_cmd("getent", &["passwd", user]) {
+        Some((true, out)) => {
+            let line = out.lines().next().unwrap_or("").to_string();
+            // passwd format: user:x:uid:gid:gecos:home:shell
+            let shell = line.split(':').next_back().unwrap_or("").trim();
+            let nologin = shell.contains("nologin") || shell.contains("false");
+            if nologin {
+                DeepCheck {
+                    name,
+                    status: DeepStatus::Pass,
+                    detail: format!("{user} present with nologin shell ({shell})"),
+                }
+            } else {
+                DeepCheck {
+                    name,
+                    status: DeepStatus::Warn,
+                    detail: format!("{user} present but shell '{shell}' is interactive"),
+                }
+            }
+        }
+        _ => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: format!("{user} user not found (create via dist/systemd/ install script)"),
+        },
+    }
+}
+
+fn vps_check_dir_perm(path: &str, want_mode: u32, want_owner: &str) -> DeepCheck {
+    let name = format!("dir_{}", path.replace('/', "_"));
+    match stat_dir(path) {
+        Some(info) => {
+            let mode_ok = info.mode_octal == want_mode;
+            let owner_ok = info.owner == want_owner;
+            if mode_ok && owner_ok {
+                DeepCheck {
+                    name,
+                    status: DeepStatus::Pass,
+                    detail: format!(
+                        "{path} mode={:o} owner={}",
+                        info.mode_octal, info.owner
+                    ),
+                }
+            } else {
+                DeepCheck {
+                    name,
+                    status: DeepStatus::Fail,
+                    detail: format!(
+                        "{path} mode={:o} (want {:o}) owner={} (want {})",
+                        info.mode_octal, want_mode, info.owner, want_owner
+                    ),
+                }
+            }
+        }
+        None => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: format!("{path} not found (run dist/systemd/install.sh on the VPS)"),
+        },
+    }
+}
+
+fn vps_check_credstore(path: &str) -> DeepCheck {
+    let name = "credstore".to_string();
+    match stat_dir(path) {
+        Some(info) if info.mode_octal == 0o700 => DeepCheck {
+            name,
+            status: DeepStatus::Pass,
+            detail: format!("{path} mode=700 owner={}", info.owner),
+        },
+        Some(info) => DeepCheck {
+            name,
+            status: DeepStatus::Fail,
+            detail: format!(
+                "{path} mode={:o} (want 700) owner={}",
+                info.mode_octal, info.owner
+            ),
+        },
+        None => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: format!("{path} not found (encrypted credstore not provisioned)"),
+        },
+    }
+}
+
+fn vps_check_chrome_xvfb() -> DeepCheck {
+    let name = "chrome_xvfb".to_string();
+    let chrome = which_any(&["google-chrome", "chromium", "chromium-browser"]);
+    let xvfb = which_any(&["xvfb-run"]);
+    match (chrome, xvfb) {
+        (Some(c), Some(x)) => DeepCheck {
+            name,
+            status: DeepStatus::Pass,
+            detail: format!("chrome={c} xvfb-run={x}"),
+        },
+        (Some(c), None) => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: format!("chrome={c}; xvfb-run missing (headless-only mode required)"),
+        },
+        (None, _) => DeepCheck {
+            name,
+            status: DeepStatus::Fail,
+            detail: "no chrome/chromium binary on PATH".into(),
+        },
+    }
+}
+
+fn vps_check_docker() -> DeepCheck {
+    let name = "docker".to_string();
+    let d = run_cmd("docker", &["--version"]);
+    let c = run_cmd("docker", &["compose", "version"]);
+    match (d, c) {
+        (Some((true, dv)), Some((true, cv))) => DeepCheck {
+            name,
+            status: DeepStatus::Pass,
+            detail: format!(
+                "{} / {}",
+                dv.lines().next().unwrap_or("docker"),
+                cv.lines().next().unwrap_or("compose")
+            ),
+        },
+        (Some((true, dv)), _) => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: format!(
+                "{} present; `docker compose` plugin missing",
+                dv.lines().next().unwrap_or("docker")
+            ),
+        },
+        _ => DeepCheck {
+            name,
+            status: DeepStatus::Fail,
+            detail: "docker not on PATH".into(),
+        },
+    }
+}
+
+fn vps_check_gluetun_image() -> DeepCheck {
+    let name = "gluetun_image".to_string();
+    match run_cmd("docker", &["image", "ls", "--format", "{{.Repository}}", "qmcgaw/gluetun"]) {
+        Some((true, out)) if out.lines().any(|l| l.trim() == "qmcgaw/gluetun") => DeepCheck {
+            name,
+            status: DeepStatus::Pass,
+            detail: "qmcgaw/gluetun image present".into(),
+        },
+        Some((true, _)) => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: "qmcgaw/gluetun image not pulled (docker compose pull required)".into(),
+        },
+        _ => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: "docker image ls failed (daemon not reachable from this user)".into(),
+        },
+    }
+}
+
+fn vps_check_display_env() -> DeepCheck {
+    let name = "display_env".to_string();
+    match std::env::var("DISPLAY") {
+        Err(_) => DeepCheck {
+            name,
+            status: DeepStatus::Pass,
+            detail: "DISPLAY unset (headless or Xvfb-managed; recommended on VPS)".into(),
+        },
+        Ok(v) => DeepCheck {
+            name,
+            status: DeepStatus::Warn,
+            detail: format!("DISPLAY={v} — interactive X server attached (unexpected on VPS)"),
+        },
+    }
+}
+
+// --- low-level helpers (injection seams for tests) ---
+
+/// Run a command and capture (success, stdout). Returns None if the
+/// binary is not on PATH or the spawn itself failed. Test code can
+/// rely on the fact that a missing binary → None → Warn/Fail without
+/// touching the real process.
+fn run_cmd(bin: &str, args: &[&str]) -> Option<(bool, String)> {
+    let out = std::process::Command::new(bin).args(args).output().ok()?;
+    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+    Some((out.status.success(), stdout))
+}
+
+fn which_any(candidates: &[&str]) -> Option<String> {
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        for bin in candidates {
+            let candidate = dir.join(bin);
+            if candidate.is_file() {
+                return Some(candidate.display().to_string());
+            }
+        }
+    }
+    None
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DirStat {
+    pub mode_octal: u32,
+    pub owner: String,
+}
+
+fn stat_dir(path: &str) -> Option<DirStat> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let md = std::fs::metadata(path).ok()?;
+        if !md.is_dir() {
+            return None;
+        }
+        let mode_octal = md.mode() & 0o777;
+        let uid = md.uid();
+        let owner = uid_to_name(uid).unwrap_or_else(|| uid.to_string());
+        Some(DirStat { mode_octal, owner })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        None
+    }
+}
+
+#[cfg(unix)]
+fn uid_to_name(uid: u32) -> Option<String> {
+    // `getent passwd <uid>` is the most portable way without pulling
+    // libc nss bindings. Failure → fall back to numeric uid.
+    let (ok, out) = run_cmd("getent", &["passwd", &uid.to_string()])?;
+    if !ok {
+        return None;
+    }
+    out.lines().next().and_then(|l| l.split(':').next().map(|s| s.to_string()))
+}
+
+fn emit_vps_report(rows: &[DeepCheck], format: DoctorFormat) -> Result<(), ExitCode> {
+    match format {
+        DoctorFormat::Json => match serde_json::to_string_pretty(rows) {
+            Ok(s) => {
+                println!("{s}");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("[ERROR] doctor --vps: serialise: {e}");
+                Err(ExitCode::PermanentError)
+            }
+        },
+        DoctorFormat::Text => {
+            println!("rev-stealth doctor --vps report");
+            for c in rows {
+                let tag = match c.status {
+                    DeepStatus::Pass => "PASS",
+                    DeepStatus::Warn => "WARN",
+                    DeepStatus::Fail => "FAIL",
+                };
+                println!("  [{tag}] {:<24} {}", c.name, c.detail);
+            }
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,5 +1212,235 @@ mod tests {
     fn exit_leak_detected_is_seven() {
         // Lock the contract: callers / agents key off this number.
         assert_eq!(EXIT_LEAK_DETECTED, 7);
+    }
+
+    // ---- P10.3 SHOULD: doctor --vps ----
+
+    mod vps {
+        use super::*;
+
+        #[test]
+        fn vps_check_systemd_present_or_warns() {
+            // Either the test host has systemctl (Pass) or it doesn't
+            // (Warn). FAIL is not a valid output for this check; the
+            // function must never panic regardless of host.
+            let c = super::vps_check_systemd();
+            assert_eq!(c.name, "systemd");
+            assert!(
+                matches!(c.status, DeepStatus::Pass | DeepStatus::Warn),
+                "systemd check returned unexpected status {:?}",
+                c.status
+            );
+            assert!(!c.detail.is_empty());
+        }
+
+        #[test]
+        fn vps_check_rev_stealth_user_returns_warn_when_missing() {
+            // Use a username that definitely does not exist on any
+            // CI/dev host. `getent` returns non-zero exit and the
+            // check must collapse to Warn (not Fail, since the user
+            // can fix this by running install.sh).
+            let c = super::vps_check_user("rev-stealth-nonexistent-xyz-abc");
+            assert_eq!(c.name, "user_rev-stealth-nonexistent-xyz-abc");
+            // Either Warn (binary present, user missing) or Warn
+            // (binary missing entirely). Never Pass.
+            assert_eq!(c.status, DeepStatus::Warn);
+            assert!(c.detail.contains("rev-stealth-nonexistent-xyz-abc"));
+        }
+
+        #[test]
+        fn vps_check_dir_perm_detects_wrong_mode() {
+            // Drive the helper against a real tempdir whose mode is
+            // 0o755 (rust default on most umasks). Want 0o750 +
+            // owner=rev-stealth → both mismatch → Fail row with the
+            // observed values surfaced in `detail`.
+            let tmp = std::env::temp_dir().join(format!(
+                "rev-stealth-vps-test-{}",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_dir_all(&tmp);
+            std::fs::create_dir(&tmp).expect("create tempdir");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))
+                    .expect("chmod");
+            }
+            let c = super::vps_check_dir_perm(
+                tmp.to_str().expect("tmp utf-8"),
+                0o750,
+                "rev-stealth-nonexistent-xyz-abc",
+            );
+            assert!(c.name.starts_with("dir_"));
+            #[cfg(unix)]
+            {
+                assert_eq!(
+                    c.status,
+                    DeepStatus::Fail,
+                    "wrong mode + wrong owner must fail: detail={}",
+                    c.detail
+                );
+                assert!(c.detail.contains("want 750"));
+            }
+            #[cfg(not(unix))]
+            {
+                // Non-unix hosts can only return Warn (dir-stat
+                // unsupported); that's acceptable for the contract.
+                assert!(matches!(c.status, DeepStatus::Warn | DeepStatus::Fail));
+            }
+            let _ = std::fs::remove_dir_all(&tmp);
+        }
+
+        #[test]
+        fn vps_doctor_exit_code_aggregates_correctly() {
+            // The `vps_has_fail` aggregator is what `run_doctor`
+            // consults to decide between exit 0 and exit 3. Pin its
+            // contract:
+            //   * all Pass → false (exit 0)
+            //   * Warn-only → false (exit 0)
+            //   * any Fail → true  (exit 3)
+            let mk = |s: DeepStatus| DeepCheck {
+                name: "x".into(),
+                status: s,
+                detail: "".into(),
+            };
+            assert!(!super::vps_has_fail(&[mk(DeepStatus::Pass), mk(DeepStatus::Pass)]));
+            assert!(!super::vps_has_fail(&[mk(DeepStatus::Warn), mk(DeepStatus::Pass)]));
+            assert!(super::vps_has_fail(&[mk(DeepStatus::Pass), mk(DeepStatus::Fail)]));
+            assert!(super::vps_has_fail(&[mk(DeepStatus::Fail)]));
+            assert!(!super::vps_has_fail(&[]));
+        }
+
+        #[test]
+        fn vps_check_set_has_at_least_nine_rows_in_stable_order() {
+            // Snapshot the names of every row emitted by run_vps_checks
+            // so downstream consumers (JSON parsers, dashboards) can
+            // rely on the order. New checks must be appended, not
+            // inserted in the middle.
+            let rows = super::run_vps_checks();
+            assert!(
+                rows.len() >= 9,
+                "P10.3 contract: ≥9 vps checks, got {}",
+                rows.len()
+            );
+            let names: Vec<&str> = rows.iter().map(|c| c.name.as_str()).collect();
+            assert_eq!(names[0], "systemd");
+            assert_eq!(names[1], "user_rev-stealth");
+            assert!(names[2].starts_with("dir_"));
+            assert!(names[3].starts_with("dir_"));
+            assert_eq!(names[4], "credstore");
+            assert_eq!(names[5], "chrome_xvfb");
+            assert_eq!(names[6], "docker");
+            assert_eq!(names[7], "gluetun_image");
+            assert_eq!(names[8], "display_env");
+            // Every row must carry a non-empty detail and a valid status.
+            for r in &rows {
+                assert!(!r.detail.is_empty(), "row {} has empty detail", r.name);
+                assert!(matches!(
+                    r.status,
+                    DeepStatus::Pass | DeepStatus::Warn | DeepStatus::Fail
+                ));
+            }
+        }
+
+        #[test]
+        fn vps_json_output_is_single_top_level_array() {
+            // P10.3 reviewer regression: when --vps is set, the JSON
+            // stdout must be ONE top-level array of DeepCheck rows so
+            // `jq` / json.tool can parse it and downstream consumers
+            // can iterate without unwrapping an envelope. The base
+            // leak/doctor report is intentionally not merged here —
+            // leak status is surfaced via exit code 7.
+            let vps_rows = vec![
+                DeepCheck {
+                    name: "systemd".into(),
+                    status: DeepStatus::Pass,
+                    detail: "systemd 255".into(),
+                },
+                DeepCheck {
+                    name: "credstore".into(),
+                    status: DeepStatus::Fail,
+                    detail: "mode=755".into(),
+                },
+            ];
+            let s = serde_json::to_string(&vps_rows).unwrap();
+            assert!(s.starts_with('['), "JSON must start with '[' (array): {s}");
+            let v: serde_json::Value = serde_json::from_str(&s).expect("single parseable json");
+            assert!(v.is_array(), "top-level JSON must be an array");
+            let arr = v.as_array().unwrap();
+            assert_eq!(arr.len(), 2);
+            assert_eq!(arr[0]["name"], "systemd");
+            assert_eq!(arr[0]["status"], "pass");
+            assert_eq!(arr[1]["name"], "credstore");
+            assert_eq!(arr[1]["status"], "fail");
+        }
+
+        #[test]
+        fn deep_plus_vps_json_concatenates_rows_in_order() {
+            // P10.3: when --deep and --vps are both set, the JSON
+            // output must be a single flat array containing deep rows
+            // followed by vps rows. Validates the deep_report_rows
+            // helper preserves DeepReport declaration order.
+            let mk = |name: &str| DeepCheck {
+                name: name.into(),
+                status: DeepStatus::Pass,
+                detail: "ok".into(),
+            };
+            let deep = DeepReport {
+                obscura_binary: mk("obscura_binary"),
+                vpn_pool_instances: mk("vpn_pool_instances"),
+                sites_recipes: mk("sites_recipes"),
+                auth_profiles: mk("auth_profiles"),
+                auth_key_source: mk("auth_key_source"),
+            };
+            let vps = [mk("systemd"), mk("credstore")];
+            let mut combined: Vec<DeepCheck> = super::deep_report_rows(&deep);
+            combined.extend(vps.iter().cloned());
+            let s = serde_json::to_string(&combined).unwrap();
+            assert!(s.starts_with('['));
+            let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+            let names: Vec<&str> = v
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| r["name"].as_str().unwrap())
+                .collect();
+            assert_eq!(
+                names,
+                vec![
+                    "obscura_binary",
+                    "vpn_pool_instances",
+                    "sites_recipes",
+                    "auth_profiles",
+                    "auth_key_source",
+                    "systemd",
+                    "credstore",
+                ]
+            );
+        }
+
+        #[test]
+        fn vps_rows_serialise_to_array_of_objects() {
+            // JSON parity with --deep: each row has {name,status,detail}
+            // with status as a lower-case string.
+            let rows = vec![
+                DeepCheck {
+                    name: "systemd".into(),
+                    status: DeepStatus::Pass,
+                    detail: "systemd 255".into(),
+                },
+                DeepCheck {
+                    name: "credstore".into(),
+                    status: DeepStatus::Fail,
+                    detail: "mode=755".into(),
+                },
+            ];
+            let s = serde_json::to_string(&rows).unwrap();
+            assert!(s.starts_with('['));
+            assert!(s.contains("\"name\":\"systemd\""));
+            assert!(s.contains("\"status\":\"pass\""));
+            assert!(s.contains("\"status\":\"fail\""));
+            assert!(s.contains("\"detail\":\"mode=755\""));
+        }
     }
 }

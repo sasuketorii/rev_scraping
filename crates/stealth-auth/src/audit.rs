@@ -13,6 +13,8 @@ pub struct AuditEvent {
     pub ts: DateTime<Utc>,
     pub profile: String,
     pub action: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_mode: Option<String>,
 }
 
 pub fn append_jsonl(path: &Path, event: &AuditEvent) -> Result<()> {
@@ -37,11 +39,30 @@ mod tests {
                 ts: Utc::now(),
                 profile: "work".to_string(),
                 action: "save".to_string(),
+                display_mode: None,
             },
         )
         .unwrap();
         let contents = std::fs::read_to_string(path).unwrap();
         assert!(contents.contains("\"profile\":\"work\""));
         assert!(!contents.contains("SUPER_SECRET_VALUE_XYZ"));
+    }
+
+    #[test]
+    fn audit_jsonl_append_can_include_display_mode() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("audit.jsonl");
+        append_jsonl(
+            &path,
+            &AuditEvent {
+                ts: Utc::now(),
+                profile: "work".to_string(),
+                action: "auth_login_start".to_string(),
+                display_mode: Some("headless".to_string()),
+            },
+        )
+        .unwrap();
+        let contents = std::fs::read_to_string(path).unwrap();
+        assert!(contents.contains("\"display_mode\":\"headless\""));
     }
 }

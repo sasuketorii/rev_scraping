@@ -1,0 +1,187 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "doctor.output",
+  "description": "Doctor health-diagnostic report emitted as the raw DoctorReport struct (NOT wrapped in the {ok,operation,result} envelope). Each check is a boolean; `errors` carries human-readable detail on failure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kill_switch",
+    "dns_lock",
+    "ipv6_disabled",
+    "webrtc_guard_present",
+    "exit_ip_ok"
+  ],
+  "properties": {
+    "kill_switch": {
+      "type": "boolean",
+      "description": "True when an OS-level kill-switch (firewall rule blocking non-VPN egress) is active.",
+      "examples": [
+        true,
+        false
+      ]
+    },
+    "dns_lock": {
+      "type": "boolean",
+      "description": "True when resolv.conf / systemd-resolved is pinned to the VPN DNS endpoint.",
+      "examples": [
+        true,
+        false
+      ]
+    },
+    "ipv6_disabled": {
+      "type": "boolean",
+      "description": "True when IPv6 is disabled or fully tunneled (so it cannot leak around the v4 VPN).",
+      "examples": [
+        true,
+        false
+      ]
+    },
+    "webrtc_guard_present": {
+      "type": "boolean",
+      "description": "True when the WebRTC guard (browser-side or kernel-side) is installed.",
+      "examples": [
+        true,
+        false
+      ]
+    },
+    "exit_ip_ok": {
+      "type": "boolean",
+      "description": "Exit-IP probe verdict. True on success, skipped probes, or no expected_country constraint. False on country mismatch, ASN-deny, or probe failure.",
+      "examples": [
+        true,
+        false
+      ]
+    },
+    "exit_ip": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "IpInfo block describing the observed VPN egress (address, country, ASN). Null when probe was skipped or failed.",
+      "additionalProperties": true
+    },
+    "errors": {
+      "type": "array",
+      "description": "Per-check failure messages. Empty on full PASS; populated only when at least one check failed.",
+      "items": {
+        "type": "string"
+      },
+      "examples": [
+        [
+          "exit_ip: country mismatch (got US, expected JP)"
+        ]
+      ]
+    },
+    "_meta": {
+      "type": "object",
+      "description": "P13.4: sanitize-pass metadata attached by stealth-mcp before this payload becomes LLM-visible. Always present; agents can ignore it unless inspecting prompt-injection telemetry. Shape stable per `stealth-sanitize::SanitizationReport` (schema_version=1).",
+      "additionalProperties": true,
+      "properties": {
+        "sanitize": {
+          "type": "object",
+          "description": "Resolved sanitize report. See `stealth_sanitize::SanitizationReport` for the canonical shape.",
+          "additionalProperties": true,
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "examples": [
+                1
+              ]
+            },
+            "policy_name": {
+              "type": "string",
+              "examples": [
+                "strict",
+                "balanced",
+                "passthrough"
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "enforce"
+              ],
+              "examples": [
+                "warn"
+              ]
+            },
+            "bytes_in": {
+              "type": "integer",
+              "examples": [
+                128
+              ]
+            },
+            "bytes_out": {
+              "type": "integer",
+              "examples": [
+                180
+              ]
+            },
+            "truncated": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "aborted": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "layers_applied": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "examples": [
+                [
+                  "L4:unicode",
+                  "L2:envelope",
+                  "L7:meta"
+                ]
+              ]
+            },
+            "canary_hits": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "examples": [
+                []
+              ]
+            },
+            "sanitize_id": {
+              "type": "string",
+              "description": "64-bit hex nonce.",
+              "examples": [
+                "a1b2c3d4e5f60718"
+              ]
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "sanitize": {
+            "schema_version": 1,
+            "policy_name": "balanced",
+            "mode": "warn",
+            "bytes_in": 12,
+            "bytes_out": 60,
+            "truncated": false,
+            "aborted": false,
+            "layers_applied": [
+              "L2:envelope",
+              "L7:meta"
+            ],
+            "canary_hits": [],
+            "sanitize_id": "a1b2c3d4e5f60718"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use base64::Engine;
 use serde_json::{json, Value};
+use stealth_agent_contracts::{ErrorEnvelope, ErrorKind};
 use stealth_sites::{Endpoint, SiteRecipe, SiteRecipeStore, SitesError};
 
 /// Set of in-process tool names. Used by the server dispatcher to branch
@@ -41,6 +42,28 @@ pub enum RecipeError {
     Json(String),
     Base64(String),
     NotFound(String),
+}
+
+impl RecipeError {
+    /// Map this in-process error onto the wire-format [`ErrorEnvelope`]
+    /// (P4.3). The on-disk site recipes do not contain secrets, but we still
+    /// only propagate the pre-formatted Display message.
+    pub fn to_envelope(&self) -> ErrorEnvelope {
+        let msg = self.to_string();
+        match self {
+            RecipeError::MissingField(_) => ErrorEnvelope::new(ErrorKind::Validation, msg),
+            RecipeError::NotFound(_) => ErrorEnvelope::new(ErrorKind::RecipeNotFound, msg)
+                .with_hint("check `recipe_list` for available domains"),
+            RecipeError::Json(_) | RecipeError::Base64(_) => {
+                ErrorEnvelope::new(ErrorKind::RecipeInvalid, msg)
+            }
+            RecipeError::Sites(SitesError::SecretRejected(_)) => {
+                ErrorEnvelope::new(ErrorKind::Validation, msg)
+                    .with_hint("strip secret-like fields before saving")
+            }
+            RecipeError::Sites(_) => ErrorEnvelope::new(ErrorKind::Internal, msg),
+        }
+    }
 }
 
 impl std::fmt::Display for RecipeError {

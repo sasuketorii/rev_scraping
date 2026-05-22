@@ -83,7 +83,8 @@ fn mcp_stdio_conformance() {
     let tools = responses[1]["result"]["tools"]
         .as_array()
         .expect("tools array");
-    assert_eq!(tools.len(), 5);
+    // P9.1: bumped from earlier-era 5 → current 16 (added session_show).
+    assert_eq!(tools.len(), 16);
 
     // tools/call with missing required arg → JSON-RPC error -32602.
     assert_eq!(responses[2]["id"], 3);

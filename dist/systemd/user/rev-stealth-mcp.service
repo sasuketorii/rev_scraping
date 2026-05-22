@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-mcp.service (user scope)
+# Runs the stealth-mcp daemon under the invoking user account - NOT root.
+# Install via: systemctl --user link <path>/rev-stealth-mcp.service
+# Override REV_STEALTH_BIN through ~/.config/systemd/user/rev-stealth-mcp.service.d/override.conf
+
+[Unit]
+Description=REV Stealth MCP daemon (user scope)
+Documentation=https://github.com/sasuketorii/rev_scraping
+After=default.target
+
+[Service]
+Type=simple
+Environment=REV_STEALTH_BIN=%h/.local/bin/stealth-mcp
+Environment=RUST_LOG=info
+WorkingDirectory=%h/.local/share/rev-stealth
+ExecStart=/bin/sh -c 'exec "${REV_STEALTH_BIN:-%h/.local/bin/stealth-mcp}" serve --config %h/.config/rev-stealth/mcp.toml'
+Restart=on-failure
+RestartSec=5s
+
+LimitNOFILE=65536
+PrivateTmp=yes
+ProtectSystem=strict
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

@@ -23,8 +23,13 @@ mod aup;
 mod browser_cmd;
 mod captcha_cmd;
 mod commands;
+#[cfg(not(test))]
+pub mod config_io;
 mod doctor;
+#[cfg(not(test))]
 mod policy;
+#[cfg(test)]
+pub use stealth_cli::{config_io, policy};
 mod vpn_cmd;
 mod vpn_guard;
 mod vpn_selector;
@@ -90,6 +95,12 @@ enum Command {
     /// v1.1.0 (P15): local fingerprint diagnostics for monitoring.
     /// External SaaS calls are opt-in via `--enable-external`.
     Measure(commands::measure::MeasureArgs),
+    /// v1.2.0 (P6.1): inspect the layered config
+    /// (`show` / `paths` / `validate` / `diff` / `get`).
+    Config(commands::config_cli::ConfigArgs),
+    /// v1.2.0 (P7.3): manage the Hermes plugin scaffold
+    /// (`install` / `uninstall` / `verify`).
+    Hermes(commands::hermes::HermesArgs),
 }
 
 fn init_tracing(verbose: u8) {
@@ -123,6 +134,8 @@ async fn main() {
         Command::CfEvaluate(args) => commands::cf_evaluate::run(cli.format, args).await,
         Command::Auth(args) => commands::auth::run(cli.format, args).await,
         Command::Measure(args) => commands::measure::run(cli.format, args).await,
+        Command::Config(args) => commands::config_cli::run(cli.format, args).await,
+        Command::Hermes(args) => commands::hermes::run(cli.format, args).await,
     };
 
     std::process::exit(exit_code);
@@ -261,6 +274,42 @@ mod cli_tests {
             help.contains("cf-evaluate"),
             "help missing cf-evaluate:\n{help}"
         );
+    }
+
+    #[test]
+    fn config_subcommand_parses_with_global_format() {
+        // P6.1 round-2 reviewer finding: `rev-stealth config` previously
+        // panicked at runtime because the config-local `--format` flag
+        // reused Clap arg id `format`, colliding with the global
+        // `Cli.format`. After renaming to `--output-format` with id
+        // `config_output_format`, both `config validate` and
+        // `--format json config validate` must parse without panic.
+        let cli = Cli::try_parse_from(["rev-stealth", "config", "validate"])
+            .expect("`config validate` must parse");
+        assert!(matches!(cli.command, Command::Config(_)));
+        let cli = Cli::try_parse_from(["rev-stealth", "--format", "json", "config", "validate"])
+            .expect("global --format json + config validate must parse");
+        assert!(matches!(cli.command, Command::Config(_)));
+        let cli = Cli::try_parse_from([
+            "rev-stealth",
+            "config",
+            "--output-format",
+            "json",
+            "validate",
+        ])
+        .expect("config --output-format must parse");
+        match cli.command {
+            Command::Config(args) => {
+                assert_eq!(
+                    args.format
+                        .to_possible_value()
+                        .expect("variant has a value")
+                        .get_name(),
+                    "json",
+                );
+            }
+            other => panic!("expected Config subcommand, got {other:?}"),
+        }
     }
 
     #[test]

@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "recipe_import.output",
+  "description": "Response from `recipe_import`. Reports how many of the decoded recipes were persisted and which were rejected (secret-leak, path-traversal, schema errors).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "imported",
+    "rejected",
+    "total"
+  ],
+  "properties": {
+    "imported": {
+      "type": "integer",
+      "description": "Count of recipes accepted and atomically written to the recipe directory.",
+      "examples": [
+        0,
+        7
+      ]
+    },
+    "rejected": {
+      "type": "array",
+      "description": "Per-recipe rejection records. Empty when every recipe was accepted.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "error"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Domain of the recipe that was rejected.",
+            "examples": [
+              "bad.example.com"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "description": "Human-readable rejection reason (redacted of secret values).",
+            "examples": [
+              "secret-leak: api_token field present"
+            ]
+          }
+        }
+      },
+      "examples": [
+        []
+      ]
+    },
+    "total": {
+      "type": "integer",
+      "description": "Total recipes decoded from the payload. Equals imported + rejected.length.",
+      "examples": [
+        0,
+        7
+      ]
+    },
+    "_meta": {
+      "type": "object",
+      "description": "P13.4: sanitize-pass metadata attached by stealth-mcp before this payload becomes LLM-visible. Always present; agents can ignore it unless inspecting prompt-injection telemetry. Shape stable per `stealth-sanitize::SanitizationReport` (schema_version=1).",
+      "additionalProperties": true,
+      "properties": {
+        "sanitize": {
+          "type": "object",
+          "description": "Resolved sanitize report. See `stealth_sanitize::SanitizationReport` for the canonical shape.",
+          "additionalProperties": true,
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "examples": [
+                1
+              ]
+            },
+            "policy_name": {
+              "type": "string",
+              "examples": [
+                "strict",
+                "balanced",
+                "passthrough"
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "enforce"
+              ],
+              "examples": [
+                "warn"
+              ]
+            },
+            "bytes_in": {
+              "type": "integer",
+              "examples": [
+                128
+              ]
+            },
+            "bytes_out": {
+              "type": "integer",
+              "examples": [
+                180
+              ]
+            },
+            "truncated": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "aborted": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "layers_applied": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "examples": [
+                [
+                  "L4:unicode",
+                  "L2:envelope",
+                  "L7:meta"
+                ]
+              ]
+            },
+            "canary_hits": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "examples": [
+                []
+              ]
+            },
+            "sanitize_id": {
+              "type": "string",
+              "description": "64-bit hex nonce.",
+              "examples": [
+                "a1b2c3d4e5f60718"
+              ]
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "sanitize": {
+            "schema_version": 1,
+            "policy_name": "balanced",
+            "mode": "warn",
+            "bytes_in": 12,
+            "bytes_out": 60,
+            "truncated": false,
+            "aborted": false,
+            "layers_applied": [
+              "L2:envelope",
+              "L7:meta"
+            ],
+            "canary_hits": [],
+            "sanitize_id": "a1b2c3d4e5f60718"
+          }
+        }
+      ]
+    }
+  }
+}

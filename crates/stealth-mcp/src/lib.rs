@@ -18,7 +18,9 @@ pub mod auth_tools;
 pub mod cli;
 pub mod protocol;
 pub mod recipe_tools;
+pub mod reference;
 pub mod server;
+pub mod session_tools;
 pub mod tools;
 
 pub use protocol::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, RpcId};

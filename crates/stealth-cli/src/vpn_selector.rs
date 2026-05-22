@@ -374,6 +374,7 @@ mod tests {
 
     fn mk_policy(n: usize) -> Policy {
         Policy {
+            schema_version: 1,
             require_vpn: true,
             vpn_required_country: None,
             vpn_instances: (1..=n)

@@ -29,6 +29,7 @@ reqwest = { workspace = true, optional = true }
 dashmap = "6"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 async-trait = { workspace = true }
+secrecy = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

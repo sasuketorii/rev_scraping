@@ -81,6 +81,7 @@ mod tests {
     #[tokio::test]
     async fn require_vpn_true_no_instances_returns_leak() {
         let pol = Policy {
+            schema_version: 1,
             require_vpn: true,
             vpn_required_country: None,
             vpn_instances: vec![],

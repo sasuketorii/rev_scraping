@@ -19,10 +19,14 @@ members = [
     "crates/stealth-mcp",
     "crates/stealth-sites",
     "crates/stealth-auth",
+    # Lane C P1: shared cross-crate contract types
+    "crates/stealth-agent-contracts",
+    # Lane F P13: prompt-injection defense sanitizer
+    "crates/stealth-sanitize",
 ]
 
 [workspace.package]
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 rust-version = "1.83"
 license = "MIT"
@@ -41,6 +45,8 @@ stealth-parse = { path = "crates/stealth-parse" }
 stealth-mcp = { path = "crates/stealth-mcp" }
 stealth-sites = { path = "crates/stealth-sites" }
 stealth-auth = { path = "crates/stealth-auth" }
+stealth-agent-contracts = { path = "crates/stealth-agent-contracts" }
+stealth-sanitize = { path = "crates/stealth-sanitize" }
 
 # Async runtime / utility
 tokio = { version = "1", features = ["full"] }
@@ -62,6 +68,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
+
+# Concurrent collections
+dashmap = "6"
 
 # IDs / strings
 uuid = { version = "1", features = ["v4", "serde"] }

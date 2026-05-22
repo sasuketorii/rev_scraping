@@ -233,6 +233,7 @@ mod tests {
     #[tokio::test]
     async fn test_envelope_pool_healthy_count_reflects_actual_pool() {
         let policy = crate::policy::Policy {
+            schema_version: 1,
             require_vpn: false,
             vpn_required_country: None,
             vpn_instances: (1..=3)

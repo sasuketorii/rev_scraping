@@ -272,6 +272,139 @@ jobs:
             target/**/*.stderr
           if-no-files-found: ignore
 
+  mcp-schema-lint:
+    # Lane E P11: freshness gate for docs/MCP_REFERENCE.md.
+    #
+    # The generator binary (`stealth-mcp/src/bin/gen_reference.rs`) renders
+    # the reference document from `tool_definitions()` and
+    # `all_error_kind_docs()`. In `--check` mode it exits 1 if the committed
+    # file disagrees with a fresh render. This complements (does not
+    # replace) the `mcp_reference_freshness` regression test in the workspace
+    # test suite; running it as its own job gives a clearer failure surface
+    # when a contributor forgets to regenerate the doc.
+    name: MCP reference freshness
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo run -p stealth-mcp --bin gen_reference -- --check
+        run: cargo run -p stealth-mcp --bin gen_reference -- --check
+
+  config-cli-smoke:
+    # Lane E P11: smoke-test `rev-stealth config init --target=policy
+    # --non-interactive --force` inside a throwaway $HOME so the CI verifies
+    # the non-interactive init path stays exit-0 on a fresh profile. The
+    # `--non-interactive` flag is the contract documented in P6.2 and must
+    # never block on stdin.
+    name: config CLI non-interactive smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo build -p stealth-cli --bin rev-stealth
+        run: cargo build -p stealth-cli --bin rev-stealth
+      - name: config init --target=policy --non-interactive --force
+        run: |
+          set -euxo pipefail
+          TMPHOME="$(mktemp -d)"
+          export HOME="$TMPHOME"
+          ./target/debug/rev-stealth config init \
+            --target=policy --non-interactive --force
+          # Verify the policy file was materialized inside the throwaway HOME.
+          test -f "$TMPHOME/.rev_scraping/policy.toml"
+
+  hermes-contract:
+    # Lane E P11: run the Hermes (rev-scraping-mcp) plugin contract tests.
+    # 20-test python suite under dist/hermes/rev-scraping-mcp/tests/ that
+    # gates the stealth-mcp <-> Hermes wire shape (lifecycle, schema bridge,
+    # tool proxy). Pure stdlib `unittest`; no extra pip install needed.
+    name: Hermes plugin contract tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: python3 -m unittest discover dist/hermes/rev-scraping-mcp/tests
+        run: python3 -m unittest discover dist/hermes/rev-scraping-mcp/tests
+
+  systemd-analyze:
+    # Lane E P11: lint the shipped systemd units.
+    #
+    # We pin `ubuntu-24.04` (systemd 255) because the shipped VPN unit at
+    # `dist/systemd/system/rev-stealth-vpn@.service` uses
+    # `LoadCredentialEncrypted=` and the `%d` credential specifier, both of
+    # which require systemd >=252. `ubuntu-22.04` (systemd 249) would let
+    # the directives parse as unknown and still report success in some
+    # cases, masking real breakage. See `docs/deploy/vps.md` for the
+    # runtime requirement that mirrors this CI pin.
+    #
+    # `verify` is run against every `.service` AND `.timer` file we ship so
+    # the doctor timer is also covered, not just the services.
+    name: systemd-analyze verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm systemd >= 252
+        run: |
+          set -euxo pipefail
+          ver="$(systemctl --version | awk 'NR==1{print $2}')"
+          echo "host systemd version: $ver"
+          if [ "$ver" -lt 252 ]; then
+            echo "systemd $ver too old for LoadCredentialEncrypted= / %d" >&2
+            exit 1
+          fi
+      - name: systemd-analyze verify (services + timer)
+        run: |
+          set -euxo pipefail
+          # Collect every unit file we ship under dist/systemd/system/. We
+          # globstar both *.service and *.timer so the doctor timer is in
+          # scope alongside the services.
+          shopt -s nullglob
+          units=( dist/systemd/system/*.service dist/systemd/system/*.timer )
+          if [ "${#units[@]}" -eq 0 ]; then
+            echo "no systemd units found under dist/systemd/system/" >&2
+            exit 1
+          fi
+          echo "verifying: ${units[*]}"
+          systemd-analyze verify "${units[@]}"
+
+  headless-auth:
+    # Lane E P11: headless authenticated-spider smoke. The real test path
+    # needs Chrome + Xvfb on Linux (or macOS), which the basic ubuntu
+    # runner can support, but the underlying coverage is gated on harness
+    # bits not yet in this lane. We keep the job as a placeholder so the
+    # workflow matrix exposes "headless-auth" in the run graph and the
+    # follow-up lane can flip `if: false` to enable it without renaming a
+    # required check.
+    name: headless authenticated smoke (skipped)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Annotate skip reason
+        run: |
+          echo "::notice title=headless-auth::skipped; opt-in gated below."
+      - name: placeholder (opt-in)
+        if: false
+        run: |
+          echo "headless-auth would run here"
+
   test-spider-fallback:
     name: E2E e2e_spider_fallback
     needs: build-obscura

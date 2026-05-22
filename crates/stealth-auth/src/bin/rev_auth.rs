@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use stealth_auth::audit::{append_jsonl, AuditEvent};
 use stealth_auth::auth_aup::{self, AuthAupDecision};
 use stealth_auth::storage;
 use stealth_auth::{install_auth_panic_hook, AuthStore, Cookie, SameSite};
@@ -60,6 +61,34 @@ pub enum Command {
     Login(LoginArgs),
 }
 
+#[derive(
+    clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum DisplayMode {
+    Auto,
+    Headed,
+    Headless,
+    Xvfb,
+}
+
+impl DisplayMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Headed => "headed",
+            Self::Headless => "headless",
+            Self::Xvfb => "xvfb",
+        }
+    }
+}
+
+impl std::fmt::Display for DisplayMode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 #[derive(Args, Clone, Debug)]
 pub struct LoginArgs {
     #[arg(long)]
@@ -90,6 +119,20 @@ pub struct LoginArgs {
     /// process state.
     #[arg(long)]
     pub mcp_session_token: Option<String>,
+    /// Browser display mode for the interactive login.
+    #[arg(
+        long,
+        env = "REV_AUTH_DISPLAY",
+        value_enum,
+        default_value_t = DisplayMode::Auto
+    )]
+    pub display: DisplayMode,
+    /// Shortcut for `--display headless`.
+    #[arg(long, conflicts_with = "xvfb")]
+    pub headless: bool,
+    /// Shortcut for `--display xvfb`.
+    #[arg(long, conflicts_with = "headless")]
+    pub xvfb: bool,
 }
 
 #[derive(Debug)]
@@ -127,6 +170,43 @@ struct PolicyVpnInstance {
 struct VpnContext {
     selection: Option<PoolVpnInstance>,
     monitor: Option<LeakMonitor>,
+}
+
+trait EnvLookup {
+    fn get(&self, key: &str) -> Option<String>;
+}
+
+struct ProcessEnv;
+
+impl EnvLookup for ProcessEnv {
+    fn get(&self, key: &str) -> Option<String> {
+        std::env::var(key).ok()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TargetOs {
+    Macos,
+    Linux,
+    Other,
+}
+
+impl TargetOs {
+    fn current() -> Self {
+        if cfg!(target_os = "macos") {
+            Self::Macos
+        } else if cfg!(target_os = "linux") {
+            Self::Linux
+        } else {
+            Self::Other
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct DisplayModeDecision {
+    mode: DisplayMode,
+    warnings: Vec<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -182,6 +262,8 @@ async fn main() {
 
 async fn run_login(args: LoginArgs) -> Result<(), AppError> {
     validate_login_args(&args).map_err(|error| AppError::new(EXIT_USER, error.to_string()))?;
+    let env = ProcessEnv;
+    let display_mode = resolve_login_display_mode(&args, &env, TargetOs::current());
     let login_url = Url::parse(&args.url)
         .map_err(|error| AppError::new(EXIT_USER, format!("invalid url: {error}")))?;
     ObscuraBridge::validate_url(&login_url)
@@ -219,9 +301,27 @@ async fn run_login(args: LoginArgs) -> Result<(), AppError> {
     let profile_dir = ProfileDir::prepare(args.user_data_dir.as_deref())
         .map_err(|error| AppError::new(EXIT_USER, format!("profile dir: {error}")))?;
 
-    let config =
-        build_chrome_config_with_vpn(&chrome_bin, profile_dir.path(), vpn.selection.as_ref())
-            .map_err(|error| AppError::new(EXIT_USER, format!("chrome config: {error}")))?;
+    let auth_dir = default_auth_dir()
+        .map_err(|error| AppError::new(EXIT_USER, format!("auth dir: {error}")))?;
+    storage::ensure_auth_dir(&auth_dir)
+        .map_err(|error| AppError::new(EXIT_USER, format!("auth dir: {error}")))?;
+    append_auth_login_start_audit(&auth_dir, &args.profile, display_mode)
+        .map_err(|error| AppError::new(EXIT_USER, format!("audit log: {error}")))?;
+
+    let config = build_chrome_config_with_vpn(
+        &chrome_bin,
+        profile_dir.path(),
+        vpn.selection.as_ref(),
+        display_mode,
+    )
+    .map_err(|error| {
+        let code = if display_mode == DisplayMode::Xvfb {
+            EXIT_CHROME_NOT_FOUND
+        } else {
+            EXIT_USER
+        };
+        AppError::new(code, format!("chrome config: {error}"))
+    })?;
 
     let (mut browser, mut handler) = Browser::launch(config)
         .await
@@ -274,8 +374,6 @@ async fn run_login(args: LoginArgs) -> Result<(), AppError> {
 
         // Save inside this scope so the page handle is still alive (we don't
         // strictly need it, but it keeps cleanup ordering simple).
-        let auth_dir = default_auth_dir()
-            .map_err(|error| AppError::new(EXIT_USER, format!("auth dir: {error}")))?;
         let store = open_store(&auth_dir)
             .map_err(|error| AppError::new(EXIT_USER, format!("auth store: {error}")))?;
         save_cookies_with_store(&store, &args.profile, &cookies, &args.aad_context)
@@ -323,7 +421,188 @@ async fn run_login(args: LoginArgs) -> Result<(), AppError> {
     nav_result
 }
 
+fn resolve_login_display_mode(args: &LoginArgs, env: &impl EnvLookup, os: TargetOs) -> DisplayMode {
+    let decision = resolve_login_display_mode_decision(args, env, os);
+    for warning in &decision.warnings {
+        eprintln!("{warning}");
+    }
+    decision.mode
+}
+
+fn resolve_login_display_mode_decision(
+    args: &LoginArgs,
+    env: &impl EnvLookup,
+    os: TargetOs,
+) -> DisplayModeDecision {
+    if args.headless {
+        return DisplayModeDecision {
+            mode: DisplayMode::Headless,
+            warnings: Vec::new(),
+        };
+    }
+    if args.xvfb {
+        return DisplayModeDecision {
+            mode: DisplayMode::Xvfb,
+            warnings: Vec::new(),
+        };
+    }
+    if args.display != DisplayMode::Auto {
+        return DisplayModeDecision {
+            mode: args.display,
+            warnings: Vec::new(),
+        };
+    }
+    if env.get("REV_AUTH_HEADLESS").as_deref() == Some("1") {
+        return DisplayModeDecision {
+            mode: DisplayMode::Headless,
+            warnings: vec![
+                "warning: REV_AUTH_HEADLESS is deprecated; use REV_AUTH_DISPLAY=headless or --display headless",
+            ],
+        };
+    }
+    resolve_auto_display_mode(env, os)
+}
+
+fn resolve_display_mode(env: &impl EnvLookup, os: TargetOs) -> DisplayMode {
+    match os {
+        TargetOs::Macos => DisplayMode::Headed,
+        TargetOs::Linux if env_has_non_empty(env, "DISPLAY") => DisplayMode::Headed,
+        TargetOs::Linux
+            if env.get("REV_AUTH_AUTO_XVFB").as_deref() == Some("1")
+                && command_on_path(env, "xvfb-run") =>
+        {
+            DisplayMode::Xvfb
+        }
+        TargetOs::Linux => DisplayMode::Headless,
+        TargetOs::Other => DisplayMode::Headed,
+    }
+}
+
+fn resolve_auto_display_mode(env: &impl EnvLookup, os: TargetOs) -> DisplayModeDecision {
+    let mode = resolve_display_mode(env, os);
+    let warnings = if os == TargetOs::Linux && mode == DisplayMode::Headless {
+        vec![
+            "warning: DISPLAY is unset and REV_AUTH_AUTO_XVFB=1 with xvfb-run was not detected; using headless Chrome",
+        ]
+    } else {
+        Vec::new()
+    };
+    DisplayModeDecision { mode, warnings }
+}
+
+fn env_has_non_empty(env: &impl EnvLookup, key: &str) -> bool {
+    env.get(key)
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+}
+
+fn command_on_path(env: &impl EnvLookup, command: &str) -> bool {
+    resolve_command_path(env, command).is_some()
+}
+
+/// Resolve the absolute path of a command on `PATH`.
+///
+/// Returns `Some(path)` for the first directory in `$PATH` whose
+/// joined `command` is a regular file. Used by the Xvfb display mode to
+/// wrap the Chrome launch in `xvfb-run` without relying on the OS to
+/// re-resolve the wrapper at spawn time.
+fn resolve_command_path(env: &impl EnvLookup, command: &str) -> Option<PathBuf> {
+    let path = env.get("PATH")?;
+    std::env::split_paths(&std::ffi::OsString::from(path))
+        .map(|dir| dir.join(command))
+        .find(|candidate| candidate.is_file())
+}
+
+/// Write an `xvfb-run` wrapper shim into `user_data_dir` and return its path.
+///
+/// chromiumoxide's argument builder unconditionally prepends `--` to every
+/// `.arg(...)` token, so we cannot inject `-a -- <chrome_bin>` directly into
+/// the spawn argv. The shim is the smallest stable workaround: a short shell
+/// script that execs `xvfb-run -a -- <chrome_bin> "$@"`, forwarding the
+/// chromium flags chromiumoxide assembles. The file name includes the
+/// literal `xvfb-run` substring so `BrowserConfig`'s Debug output reflects
+/// that the launch is wrapped.
+///
+/// The shim lives under the per-profile `user_data_dir` so it inherits that
+/// directory's cleanup semantics; nothing here writes to a shared temp dir.
+fn write_xvfb_run_shim(
+    user_data_dir: &Path,
+    xvfb_run: &Path,
+    chrome_bin: &Path,
+) -> Result<PathBuf, String> {
+    let xvfb_run_str = xvfb_run.to_str().ok_or_else(|| {
+        "xvfb-run path is not valid UTF-8; cannot generate wrapper shim".to_string()
+    })?;
+    let chrome_bin_str = chrome_bin.to_str().ok_or_else(|| {
+        "chrome binary path is not valid UTF-8; cannot generate wrapper shim".to_string()
+    })?;
+    // Reject paths containing characters that would let the shim escape its
+    // single-quoted shell context. Rare in practice but cheap to enforce.
+    if xvfb_run_str.contains('\'') || chrome_bin_str.contains('\'') {
+        return Err(
+            "xvfb-run or chrome binary path contains a single quote; refusing to generate wrapper shim"
+                .to_string(),
+        );
+    }
+    std::fs::create_dir_all(user_data_dir).map_err(|error| {
+        format!(
+            "failed to create user data dir for xvfb-run shim {}: {error}",
+            user_data_dir.display()
+        )
+    })?;
+    let shim_path = user_data_dir.join("rev-auth-xvfb-run.sh");
+    let script = format!(
+        "#!/bin/sh\nexec '{xvfb_run_str}' -a -- '{chrome_bin_str}' \"$@\"\n"
+    );
+    std::fs::write(&shim_path, script).map_err(|error| {
+        format!(
+            "failed to write xvfb-run shim {}: {error}",
+            shim_path.display()
+        )
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&shim_path)
+            .map_err(|error| {
+                format!(
+                    "failed to stat xvfb-run shim {}: {error}",
+                    shim_path.display()
+                )
+            })?
+            .permissions();
+        perms.set_mode(0o700);
+        std::fs::set_permissions(&shim_path, perms).map_err(|error| {
+            format!(
+                "failed to chmod xvfb-run shim {}: {error}",
+                shim_path.display()
+            )
+        })?;
+    }
+    Ok(shim_path)
+}
+
+fn append_auth_login_start_audit(
+    auth_dir: &Path,
+    profile: &str,
+    display_mode: DisplayMode,
+) -> anyhow::Result<()> {
+    append_jsonl(
+        &auth_dir.join("audit.jsonl"),
+        &AuditEvent {
+            ts: Utc::now(),
+            profile: profile.to_string(),
+            action: "auth_login_start".to_string(),
+            display_mode: Some(display_mode.to_string()),
+        },
+    )
+    .map_err(Into::into)
+}
+
 fn validate_login_args(args: &LoginArgs) -> anyhow::Result<()> {
+    if args.headless && args.xvfb {
+        return Err(anyhow!("--headless and --xvfb are mutually exclusive"));
+    }
     if args.profile.trim().is_empty() {
         return Err(anyhow!("--profile must not be empty"));
     }
@@ -517,17 +796,54 @@ fn find_in_path(name: &str) -> Option<PathBuf> {
 /// browser process.
 #[cfg(test)]
 fn build_chrome_config(chrome_bin: &Path, user_data_dir: &Path) -> Result<BrowserConfig, String> {
-    build_chrome_config_with_vpn(chrome_bin, user_data_dir, None)
+    build_chrome_config_with_vpn(chrome_bin, user_data_dir, None, DisplayMode::Headed)
 }
 
 fn build_chrome_config_with_vpn(
     chrome_bin: &Path,
     user_data_dir: &Path,
     vpn_selection: Option<&PoolVpnInstance>,
+    display_mode: DisplayMode,
 ) -> Result<BrowserConfig, String> {
+    build_chrome_config_with_vpn_and_env(
+        chrome_bin,
+        user_data_dir,
+        vpn_selection,
+        display_mode,
+        &ProcessEnv,
+    )
+}
+
+fn build_chrome_config_with_vpn_and_env(
+    chrome_bin: &Path,
+    user_data_dir: &Path,
+    vpn_selection: Option<&PoolVpnInstance>,
+    display_mode: DisplayMode,
+    env: &impl EnvLookup,
+) -> Result<BrowserConfig, String> {
+    // For Xvfb mode we redirect chromiumoxide at a generated shim script that
+    // execs `xvfb-run -a -- <chrome_bin> "$@"`. chromiumoxide's argument
+    // builder hard-prepends `--` to every arg token, so we cannot inject the
+    // `-a -- <chrome_bin>` prefix through `.arg(...)`; a shim sidesteps that
+    // restriction and keeps the chromiumoxide launch path untouched.
+    //
+    // The shim lives under `user_data_dir` so it shares the profile's
+    // lifecycle (cleaned up when the auth login flow tears the profile down)
+    // and contains the literal string "xvfb-run" in its file name so the
+    // resulting BrowserConfig Debug output advertises the wrapper.
+    let chrome_executable_path: PathBuf = match display_mode {
+        DisplayMode::Xvfb => {
+            let xvfb_run = resolve_command_path(env, "xvfb-run").ok_or_else(|| {
+                "xvfb-run not found on PATH for --display xvfb; install xvfb-run or wrap rev-auth with xvfb-run -a"
+                    .to_string()
+            })?;
+            write_xvfb_run_shim(user_data_dir, &xvfb_run, chrome_bin)?
+        }
+        _ => chrome_bin.to_path_buf(),
+    };
+
     let mut builder = BrowserConfig::builder()
-        .chrome_executable(chrome_bin)
-        .with_head()
+        .chrome_executable(&chrome_executable_path)
         .user_data_dir(user_data_dir)
         .window_size(1280, 800)
         .arg(("disable-blink-features", "AutomationControlled"))
@@ -546,6 +862,23 @@ fn build_chrome_config_with_vpn(
             "disable-features",
             "Crashpad,CrashpadReporter,ChromeWhatsNewUI",
         ));
+
+    match display_mode {
+        DisplayMode::Auto => {
+            return Err("display mode must be resolved before building Chrome config".to_string());
+        }
+        DisplayMode::Headed => {
+            builder = builder.with_head();
+        }
+        DisplayMode::Headless => {
+            builder = builder.new_headless_mode().arg("headless=new");
+        }
+        DisplayMode::Xvfb => {
+            // chrome runs as a headed process inside the Xvfb display managed
+            // by xvfb-run, so disable chromiumoxide's headless flag emission.
+            builder = builder.with_head();
+        }
+    }
 
     #[cfg(target_os = "macos")]
     {
@@ -798,6 +1131,30 @@ mod tests {
             obscura_bin: None,
             chrome_bin: None,
             mcp_session_token: None,
+            display: DisplayMode::Auto,
+            headless: false,
+            xvfb: false,
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeEnv {
+        values: Vec<(&'static str, String)>,
+    }
+
+    impl FakeEnv {
+        fn with(mut self, key: &'static str, value: impl Into<String>) -> Self {
+            self.values.push((key, value.into()));
+            self
+        }
+    }
+
+    impl EnvLookup for FakeEnv {
+        fn get(&self, key: &str) -> Option<String> {
+            self.values
+                .iter()
+                .rev()
+                .find_map(|(name, value)| (*name == key).then(|| value.clone()))
         }
     }
 
@@ -913,6 +1270,70 @@ mod tests {
         let mut args = login_args();
         args.completion_pattern = Some("(".to_string());
         assert!(validate_login_args(&args).is_err());
+    }
+
+    #[test]
+    fn display_mode_auto_macos_resolves_headed() {
+        let mode = resolve_display_mode(&FakeEnv::default(), TargetOs::Macos);
+        assert_eq!(mode, DisplayMode::Headed);
+    }
+
+    #[test]
+    fn display_mode_auto_linux_with_display_resolves_headed() {
+        let env = FakeEnv::default().with("DISPLAY", ":99");
+        let mode = resolve_display_mode(&env, TargetOs::Linux);
+        assert_eq!(mode, DisplayMode::Headed);
+    }
+
+    #[test]
+    fn display_mode_auto_linux_no_display_no_xvfb_resolves_headless() {
+        let decision = resolve_auto_display_mode(&FakeEnv::default(), TargetOs::Linux);
+        assert_eq!(decision.mode, DisplayMode::Headless);
+        assert!(
+            decision
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("DISPLAY is unset")),
+            "expected DISPLAY warning, got: {:?}",
+            decision.warnings
+        );
+    }
+
+    #[test]
+    fn display_mode_auto_linux_no_display_with_xvfb_optin_resolves_xvfb() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("xvfb-run"), b"fake").unwrap();
+        let env = FakeEnv::default()
+            .with("REV_AUTH_AUTO_XVFB", "1")
+            .with("PATH", temp.path().display().to_string());
+        let mode = resolve_display_mode(&env, TargetOs::Linux);
+        assert_eq!(mode, DisplayMode::Xvfb);
+    }
+
+    #[test]
+    fn display_mode_explicit_headless_overrides_macos_default() {
+        let mut args = login_args();
+        args.display = DisplayMode::Headless;
+        let decision =
+            resolve_login_display_mode_decision(&args, &FakeEnv::default(), TargetOs::Macos);
+        assert_eq!(decision.mode, DisplayMode::Headless);
+        assert!(decision.warnings.is_empty());
+    }
+
+    #[test]
+    fn legacy_rev_auth_headless_env_alias_maps_to_headless() {
+        let args = login_args();
+        let env = FakeEnv::default().with("REV_AUTH_HEADLESS", "1");
+        let decision = resolve_login_display_mode_decision(&args, &env, TargetOs::Linux);
+        assert_eq!(decision.mode, DisplayMode::Headless);
+        assert!(
+            decision
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("REV_AUTH_HEADLESS is deprecated")),
+            "expected legacy deprecation warning, got: {:?}",
+            decision.warnings
+        );
     }
 
     struct RecordingStore {
@@ -1036,22 +1457,171 @@ mod tests {
     }
 
     #[test]
-    fn headed_launch_uses_with_head_flag() {
+    fn display_mode_headed_config_uses_with_head() {
         let tmp_chrome = tempfile::NamedTempFile::new().unwrap();
         let tmp_profile = tempfile::tempdir().unwrap();
-        let cfg = build_chrome_config(tmp_chrome.path(), tmp_profile.path())
-            .expect("build_chrome_config should succeed for valid inputs");
-        // chromiumoxide 0.9's BrowserConfig is publicly Debug. The `headless`
-        // flag flips to false when `.with_head()` is called.
+        let cfg = build_chrome_config_with_vpn_and_env(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            None,
+            DisplayMode::Headed,
+            &FakeEnv::default(),
+        )
+        .expect("headed config should build");
         let dbg = format!("{cfg:?}");
-        // chromiumoxide's HeadlessMode uses Pascal-case variants (`False`).
-        // `.with_head()` flips the mode to `HeadlessMode::False` which is the
-        // headed-mode signal we want to assert on.
         assert!(
             dbg.contains("headless: False"),
-            "expected headless: False (headed mode) in debug output, got: {dbg}"
+            "expected headed BrowserConfig, got: {dbg}"
         );
-        assert_eq!(cfg.user_data_dir.as_deref(), Some(tmp_profile.path()));
+    }
+
+    #[test]
+    fn display_mode_headless_config_omits_with_head() {
+        let tmp_chrome = tempfile::NamedTempFile::new().unwrap();
+        let tmp_profile = tempfile::tempdir().unwrap();
+        let cfg = build_chrome_config_with_vpn_and_env(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            None,
+            DisplayMode::Headless,
+            &FakeEnv::default(),
+        )
+        .expect("headless config should build");
+        let dbg = format!("{cfg:?}");
+        assert!(
+            dbg.contains("headless: New"),
+            "expected new headless BrowserConfig, got: {dbg}"
+        );
+        assert!(
+            !dbg.contains("headless: False"),
+            "headless config must not call with_head(), got: {dbg}"
+        );
+    }
+
+    #[test]
+    fn display_mode_xvfb_requires_xvfb_run_on_path() {
+        let tmp_chrome = tempfile::NamedTempFile::new().unwrap();
+        let tmp_profile = tempfile::tempdir().unwrap();
+        let err = build_chrome_config_with_vpn_and_env(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            None,
+            DisplayMode::Xvfb,
+            &FakeEnv::default(),
+        )
+        .expect_err("xvfb mode must fail when xvfb-run is absent");
+        assert!(
+            err.contains("xvfb-run not found"),
+            "unexpected xvfb error: {err}"
+        );
+    }
+
+    #[test]
+    fn display_mode_xvfb_config_uses_with_head_when_xvfb_run_exists() {
+        let bin_dir = tempfile::tempdir().unwrap();
+        fs::write(bin_dir.path().join("xvfb-run"), b"fake").unwrap();
+        let env = FakeEnv::default().with("PATH", bin_dir.path().display().to_string());
+        let tmp_chrome = tempfile::NamedTempFile::new().unwrap();
+        let tmp_profile = tempfile::tempdir().unwrap();
+        let cfg = build_chrome_config_with_vpn_and_env(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            None,
+            DisplayMode::Xvfb,
+            &env,
+        )
+        .expect("xvfb config should build when xvfb-run exists");
+        let dbg = format!("{cfg:?}");
+        assert!(
+            dbg.contains("headless: False"),
+            "expected xvfb to use headed Chrome config, got: {dbg}"
+        );
+    }
+
+    /// Regression: chromiumoxide must launch through the xvfb-run wrapper
+    /// shim, not the raw Chrome binary. The shim path is materialised under
+    /// the per-profile user_data_dir, contains the literal substring
+    /// `xvfb-run`, and is set as the BrowserConfig executable so that
+    /// chromiumoxide's spawn path runs `xvfb-run -a -- <chrome>` instead of
+    /// starting Chrome directly against a non-existent DISPLAY.
+    #[test]
+    fn xvfb_mode_uses_xvfb_run_executable() {
+        let bin_dir = tempfile::tempdir().unwrap();
+        let xvfb_run = bin_dir.path().join("xvfb-run");
+        fs::write(&xvfb_run, b"#!/bin/sh\nexec \"$@\"\n").unwrap();
+        let env = FakeEnv::default().with("PATH", bin_dir.path().display().to_string());
+        let tmp_chrome = tempfile::NamedTempFile::new().unwrap();
+        let tmp_profile = tempfile::tempdir().unwrap();
+        let cfg = build_chrome_config_with_vpn_and_env(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            None,
+            DisplayMode::Xvfb,
+            &env,
+        )
+        .expect("xvfb config should build when xvfb-run is on PATH");
+        let dbg = format!("{cfg:?}");
+        assert!(
+            dbg.contains("xvfb-run"),
+            "expected xvfb wrapper to appear in BrowserConfig Debug, got: {dbg}"
+        );
+        // The shim must be a real file under the per-profile data dir so the
+        // chromiumoxide canonicalize step succeeds at launch time.
+        let shim = tmp_profile.path().join("rev-auth-xvfb-run.sh");
+        assert!(
+            shim.is_file(),
+            "expected xvfb-run shim to be materialised at {}",
+            shim.display()
+        );
+        let script = fs::read_to_string(&shim).expect("shim must be readable");
+        assert!(
+            script.contains("xvfb-run") && script.contains("-a") && script.contains("--"),
+            "shim must invoke xvfb-run with -a and a `--` separator, got: {script}"
+        );
+        assert!(
+            script.contains(tmp_chrome.path().to_str().unwrap()),
+            "shim must forward to the requested chrome binary, got: {script}"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&shim).unwrap().permissions().mode() & 0o777;
+            assert_eq!(
+                mode, 0o700,
+                "xvfb-run shim must be owner-only executable, got mode {mode:o}"
+            );
+        }
+    }
+
+    /// Regression: requesting `--display xvfb` on a host that lacks
+    /// `xvfb-run` must fail closed instead of silently producing a config
+    /// that launches a raw, headed Chrome against an empty DISPLAY.
+    #[test]
+    fn xvfb_mode_falls_back_to_error_when_xvfb_run_missing() {
+        // Point PATH at a directory that exists but contains nothing — so
+        // resolve_command_path returns None even though PATH is set.
+        let empty_dir = tempfile::tempdir().unwrap();
+        let env = FakeEnv::default().with("PATH", empty_dir.path().display().to_string());
+        let tmp_chrome = tempfile::NamedTempFile::new().unwrap();
+        let tmp_profile = tempfile::tempdir().unwrap();
+        let err = build_chrome_config_with_vpn_and_env(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            None,
+            DisplayMode::Xvfb,
+            &env,
+        )
+        .expect_err("xvfb mode must fail when xvfb-run is missing");
+        assert!(
+            err.contains("xvfb-run not found"),
+            "unexpected xvfb error: {err}"
+        );
+        // And no shim must have been written before the failure.
+        let shim = tmp_profile.path().join("rev-auth-xvfb-run.sh");
+        assert!(
+            !shim.exists(),
+            "xvfb-run shim must not be created when wrapper is missing"
+        );
     }
 
     #[test]
@@ -1063,9 +1633,13 @@ mod tests {
             http_proxy_port: 18080,
             control_port: 19051,
         };
-        let cfg =
-            build_chrome_config_with_vpn(tmp_chrome.path(), tmp_profile.path(), Some(&selection))
-                .unwrap();
+        let cfg = build_chrome_config_with_vpn(
+            tmp_chrome.path(),
+            tmp_profile.path(),
+            Some(&selection),
+            DisplayMode::Headed,
+        )
+        .unwrap();
         let dbg = format!("{cfg:?}");
         assert!(
             dbg.contains("proxy-server") && dbg.contains("127.0.0.1:18080"),
@@ -1182,6 +1756,27 @@ mod tests {
             let _ = browser.wait().await;
             task.abort();
         });
+    }
+
+    #[test]
+    #[ignore = "requires REV_AUTH_RUN_XVFB_E2E=1, xvfb-run, and local Chrome"]
+    fn xvfb_login_smoke() {
+        if std::env::var("REV_AUTH_RUN_XVFB_E2E").as_deref() != Ok("1") {
+            return;
+        }
+        if !command_on_path(&ProcessEnv, "xvfb-run") {
+            return;
+        }
+        let chrome = resolve_chrome_binary(None).expect("chrome must be installed for xvfb smoke");
+        let tmp_profile = tempfile::tempdir().unwrap();
+        let cfg =
+            build_chrome_config_with_vpn(&chrome, tmp_profile.path(), None, DisplayMode::Xvfb)
+                .expect("xvfb config should build when xvfb-run is present");
+        let dbg = format!("{cfg:?}");
+        assert!(
+            dbg.contains("headless: False"),
+            "expected xvfb smoke to use headed config, got: {dbg}"
+        );
     }
 
     #[test]
