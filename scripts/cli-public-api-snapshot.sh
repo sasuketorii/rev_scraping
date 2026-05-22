@@ -7,14 +7,25 @@
 #   ./scripts/cli-public-api-snapshot.sh           # regenerate snapshot
 #   ./scripts/cli-public-api-snapshot.sh --check   # exit 1 if drift detected
 #
-# Public-surface coverage (per v1.3 ExecPlan Lane I.1):
+# Public-surface coverage (per v1.3 ExecPlan Lane I.1 + R2 expansion):
 #   - every subcommand + nested subcommand (depth 1 & 2)
 #   - every flag (long + short), default value, value-set when enum,
 #     env-var binding (captured across wrapped help lines)
 #   - every documented env var (REV_STEALTH_OBSCURA, REV_SCRAPING_*, etc.)
 #   - every documented exit code from --help bodies (0/1/3/7/10)
-#   - MCP tool surface (16 tools: names + required input-schema fields)
+#   - MCP tool surface (16 tools: names + required input-schema fields +
+#     R2: input-schema enum constraints + output-schema top-level property
+#     names + output-schema enum constraints sourced from
+#     docs/json-schemas/<tool>.output.json)
+#   - R2: full 26-variant ErrorKind closed-set (wire_name strings) extracted
+#     from crates/stealth-agent-contracts/src/error.rs
+#   - R2: every `#[deprecated]` attribute's `replace_with=…` (or "Use …" /
+#     "Prefer …" / "replaced by …") replacement hint, indexed by source
+#     path:line so silent removal of the replacement string is caught.
 #   - rev-stealth --version string
+#
+# Schema version: R2 bumps `$schema_version` from 2 → 3 (additive — fields
+# only appended). Snapshot consumers must re-parse on bump.
 #
 # Schema-stable JSON: keys sorted alphabetically at every level. Drift = any
 # byte-level diff against the committed snapshot.
@@ -29,7 +40,7 @@ BIN="${REV_STEALTH_BIN:-./target/debug/rev-stealth}"
 
 if [[ ! -x "$BIN" ]]; then
   echo "[snapshot] building stealth-cli (debug)..." >&2
-  cargo build -p stealth-cli >&2
+  cargo build -p rev-stealth >&2
 fi
 
 # All top-level subcommands declared in the workspace today. We use `__` as the
@@ -276,11 +287,235 @@ def extract_required(src, name):
         return []
     return sorted(set(re.findall(r'"([a-zA-Z_][a-zA-Z0-9_]*)"', candidates[0])))
 
-mcp_tool_schemas = {name: {"required": extract_required(tools_src, name)}
-                    for name in tool_names}
+# R2: extract per-tool input-schema enum constraints (property → values).
+# A narrowing of an enum's value-set (e.g. removing a `Pending` variant)
+# is a breaking change for callers, so we capture the full {property:
+# sorted([values])} map per tool. We parse the tool's input_schema block
+# the same way `extract_required` does.
+def extract_input_enums(src, name):
+    m = re.search(r'name:\s*"' + re.escape(name) + r'"', src)
+    if not m:
+        return {}
+    tail = src[m.end():]
+    js = re.search(r'input_schema:\s*json!\(\{', tail)
+    if not js:
+        return {}
+    start = js.end() - 1
+    depth = 0
+    end = None
+    for i in range(start, min(len(tail), start + 20000)):
+        c = tail[i]
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is None:
+        return {}
+    schema = tail[start:end + 1]
+    # Walk properties looking for `"<prop>": { ... "enum": [...] ... }` at any
+    # depth. Record property name + sorted values. We deliberately flatten
+    # nesting (recipe_propose_endpoint.endpoint.method becomes "endpoint.method"
+    # so a tightening anywhere is caught).
+    enums = {}
+    # Heuristic: scan `"enum": [ ... ]` literals and walk backwards from each
+    # match to find the enclosing "<prop>": { context. Property nesting depth
+    # is approximated by the brace-stack closest to the enum.
+    for m_enum in re.finditer(r'"enum"\s*:\s*\[([^\]]*)\]', schema):
+        values = sorted(set(re.findall(r'"([^"\\]*)"', m_enum.group(1))))
+        if not values:
+            continue
+        # Walk back from the enum match for the nearest preceding
+        # `"<prop>": {` at brace-depth 0 from the enum's standpoint.
+        prefix = schema[: m_enum.start()]
+        prop_match = list(re.finditer(r'"([a-zA-Z_][a-zA-Z0-9_]*)"\s*:\s*\{', prefix))
+        if not prop_match:
+            continue
+        prop_name = prop_match[-1].group(1)
+        enums[prop_name] = values
+    return enums
+
+
+# R2: extract per-tool output-schema field names + enum constraints from
+# docs/json-schemas/<tool>.output.json. The MCP layer references these via
+# include_str!, so the file IS the source of truth for the response shape.
+def extract_output_schema_summary(tool_name):
+    p = Path(f"docs/json-schemas/{tool_name}.output.json")
+    if not p.exists():
+        return {"properties": [], "enums": {}, "required": []}
+    try:
+        schema = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return {"properties": [], "enums": {}, "required": []}
+
+    props = schema.get("properties", {}) or {}
+    top_level_props = sorted(props.keys())
+    top_required = sorted(schema.get("required", []) or [])
+
+    # Walk the schema recursively, recording any `enum` arrays we find at any
+    # depth. Property path is dotted (e.g. "result.outcome", "result.diff.kind").
+    enums = {}
+    def walk(node, path):
+        if isinstance(node, dict):
+            if "enum" in node and isinstance(node["enum"], list):
+                values = sorted(str(v) for v in node["enum"])
+                enums[path or "<root>"] = values
+            for k, v in node.items():
+                if k == "properties" and isinstance(v, dict):
+                    for prop, sub in v.items():
+                        walk(sub, f"{path}.{prop}" if path else prop)
+                elif k in ("items", "additionalProperties") and isinstance(v, dict):
+                    walk(v, f"{path}.{k}")
+                elif k == "oneOf" or k == "anyOf" or k == "allOf":
+                    if isinstance(v, list):
+                        for i, sub in enumerate(v):
+                            walk(sub, f"{path}.{k}[{i}]")
+        # Skip non-dict nodes — only object schemas can carry enums/properties.
+    walk(schema, "")
+    return {
+        "properties": top_level_props,
+        "required": top_required,
+        "enums": {k: enums[k] for k in sorted(enums)},
+    }
+
+
+mcp_tool_schemas = {
+    name: {
+        "required": extract_required(tools_src, name),
+        "input_enums": extract_input_enums(tools_src, name),
+        "output": extract_output_schema_summary(name),
+    }
+    for name in tool_names
+}
+
+# R2: 26 ErrorKind variants. Parse the closed enum directly from
+# crates/stealth-agent-contracts/src/error.rs. The enum is serialized via
+# `#[serde(rename_all = "snake_case")]`, so we emit both the Rust variant
+# names AND their wire (snake_case) forms — a rename in either direction is
+# a breaking change.
+def to_snake_case(camel):
+    out = []
+    for i, c in enumerate(camel):
+        if c.isupper() and i > 0 and not camel[i - 1].isupper():
+            out.append("_")
+        out.append(c.lower())
+    return "".join(out)
+
+
+error_src = Path("crates/stealth-agent-contracts/src/error.rs").read_text()
+# Locate `pub enum ErrorKind {` … matching `}`.
+ek_match = re.search(r"pub enum ErrorKind\s*\{", error_src)
+error_kinds: list[dict] = []
+if ek_match:
+    depth = 0
+    start = ek_match.end() - 1
+    end = None
+    for i in range(start, len(error_src)):
+        c = error_src[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is not None:
+        body = error_src[start + 1:end]
+        # Strip doc comments + attributes; only collect variant identifiers.
+        for raw in body.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("//") or line.startswith("#["):
+                continue
+            tok = re.match(r"([A-Z][A-Za-z0-9]*)", line)
+            if tok:
+                variant = tok.group(1)
+                error_kinds.append({
+                    "variant": variant,
+                    "wire_name": to_snake_case(variant),
+                })
+# Sort by variant name so the snapshot remains deterministic across reorderings
+# of the enum body (the enum order is significant for human review but not
+# for the public-surface contract; we sort the snapshot copy for stability).
+error_kinds.sort(key=lambda d: d["variant"])
+
+# R2: collect every `#[deprecated(...)]` attribute's replacement hint.
+# Walk crates/*/src/ for .rs files (skipping tests/), regex each attribute,
+# and record path:line:since:note:replace_with so a silent regression
+# (someone removes the replacement string from the note) shows up as drift.
+def collect_deprecated_attrs():
+    found = []
+    skip_dirs = {"target", "vendor", "_refs", "node_modules", ".git", "tests"}
+    crates_root = Path("crates")
+    for crate_dir in sorted(crates_root.iterdir()):
+        src_dir = crate_dir / "src"
+        if not src_dir.is_dir():
+            continue
+        for path in sorted(src_dir.rglob("*.rs")):
+            if any(p in skip_dirs for p in path.parts):
+                continue
+            text = path.read_text()
+            for m in re.finditer(r"#\[deprecated\b", text):
+                # Find balanced parens — re-use the same approach as the
+                # Rust test in crates/stealth-cli/tests/deprecated_completeness.rs.
+                start = m.start()
+                line_no = text[:start].count("\n") + 1
+                # Skip bare `#[deprecated]` form for now (the Rust test rejects it).
+                paren = text.find("(", start)
+                if paren < 0 or paren - start > 16:
+                    continue
+                depth = 1
+                i = paren + 1
+                in_string = False
+                escape = False
+                while i < len(text) and depth > 0:
+                    c = text[i]
+                    if escape:
+                        escape = False
+                    elif in_string:
+                        if c == "\\":
+                            escape = True
+                        elif c == '"':
+                            in_string = False
+                    else:
+                        if c == '"':
+                            in_string = True
+                        elif c == "(":
+                            depth += 1
+                        elif c == ")":
+                            depth -= 1
+                    i += 1
+                block = text[paren + 1:i - 1]
+                since = re.search(r'since\s*=\s*"([^"]*)"', block)
+                note = re.search(r'note\s*=\s*"((?:[^"\\]|\\.)*)"', block)
+                replace_with = None
+                if note:
+                    note_value = note.group(1)
+                    # Recognized replacement-hint syntaxes (kept aligned
+                    # with deprecated_completeness.rs::HINTS).
+                    rw = re.search(r'replace_with\s*=\s*([^\s,;]+)', note_value)
+                    if rw:
+                        replace_with = rw.group(1).strip("`\"',.")
+                    else:
+                        use = re.search(r'(?:Use|use|Prefer|prefer|replaced by)\s+`?([A-Za-z0-9_:\.]+)', note_value)
+                        if use:
+                            replace_with = use.group(1)
+                rel = path.as_posix()
+                found.append({
+                    "path": rel,
+                    "line": line_no,
+                    "since": since.group(1) if since else None,
+                    "replace_with": replace_with,
+                })
+    found.sort(key=lambda d: (d["path"], d["line"]))
+    return found
+
+
+deprecated_attrs = collect_deprecated_attrs()
 
 snapshot = {
-    "$schema_version": 2,
+    "$schema_version": 3,
     "binary_name": "rev-stealth",
     "version_string": version_line,
     "env_vars": ENV_VARS,
@@ -292,11 +527,18 @@ snapshot = {
         "names": tool_names,
         "schemas": mcp_tool_schemas,
     },
+    "error_kinds": {
+        "count": len(error_kinds),
+        "variants": error_kinds,
+    },
+    "deprecated_attrs": deprecated_attrs,
     "_notes": [
         "Generated by scripts/cli-public-api-snapshot.sh. Do not edit by hand.",
         "Drift means a public-surface change. Rebuild + commit alongside the change",
         "and apply PR label api-additive / api-breaking / mcp-schema-breaking",
         "per docs/compat.md.",
+        "Schema version 3 (R2): adds mcp_tools.schemas.*.input_enums,",
+        "mcp_tools.schemas.*.output, error_kinds, and deprecated_attrs.",
     ],
 }
 

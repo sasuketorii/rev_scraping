@@ -1,12 +1,33 @@
+# SPDX-License-Identifier: MIT
+#
+# v1.3 Lane H Slice A: the workspace member directory is still `crates/stealth-cli/`
+# (avoids churn across ~13 `workspace.dependencies` references) but the published
+# crate name is `rev-stealth`. Installation:
+#   cargo install --locked rev-stealth
+# Binary name on `PATH` after install: `rev-stealth`.
+#
+# The historical `rev-stealth-cli` publish-wrapper crate has been retired in
+# Slice A; see `docs/distribution.md` for the rationale.
+
 [package]
-name = "stealth-cli"
+name = "rev-stealth"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "rev-stealth CLI front-end (captcha / browser / vpn subcommands)"
+publish = true
+description = "Stealth scraping CLI for AI agents (rev_scraping v1.2+): captcha bypass, browser fingerprint control, VPN rotation, MCP server, content sanitization."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+documentation = "https://sasuketorii.github.io/rev_scraping/"
+readme = "README.md"
+keywords = ["scraping", "stealth", "mcp", "cdp"]
+categories = ["command-line-utilities", "web-programming::http-client"]
+
+[lib]
+name = "stealth_cli"
+path = "src/lib.rs"
 
 [[bin]]
 name = "rev-stealth"
@@ -34,6 +55,8 @@ stealth-sites = { workspace = true }
 stealth-auth = { workspace = true }
 
 clap = { workspace = true }
+clap_complete = { workspace = true }
+clap_complete_nushell = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -72,3 +95,51 @@ insta = { version = "1", features = ["yaml"] }
 
 [lints]
 workspace = true
+
+# -----------------------------------------------------------------------------
+# H.2 — cargo-deb metadata (Debian 12 / Ubuntu 22.04 + 24.04)
+# -----------------------------------------------------------------------------
+# Build with: `cargo deb -p rev-stealth --no-build`
+#   (release.yml runs `cargo build --release --bin rev-stealth` first, then
+#    `cargo deb --no-build` to avoid double-compilation across the matrix.)
+[package.metadata.deb]
+name = "rev-stealth"
+maintainer = "Sasuke Torii <sasuketorii.ai@gmail.com>"
+copyright = "2026, Sasuke Torii <sasuketorii.ai@gmail.com>"
+license-file = ["../../LICENSE", "4"]
+extended-description = """\
+rev-stealth is a stealth web scraping and Model Context Protocol (MCP) \
+command-line tool designed for AI agent developers (Claude Code, Cursor, \
+Hermes). It provides captcha bypass, browser fingerprint control, VPN \
+rotation, content sanitization, and an MCP server in a single binary."""
+section = "utils"
+priority = "optional"
+# Distribution-specific runtime deps are intentionally lean. Chromium is
+# *not* a hard dep: see Formula caveats. dpkg `Depends:` uses libc6 only;
+# the binary is otherwise statically linked via musl in CI (release.yml).
+depends = "libc6 (>= 2.31)"
+assets = [
+    # [source, target, perms]
+    ["../../target/release/rev-stealth", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/rev-stealth/README", "644"],
+    ["../../LICENSE", "usr/share/doc/rev-stealth/LICENSE", "644"],
+]
+# Shell completions + man pages are wired at release time by the
+# `cargo xtask manpages` step in release.yml (Lane G G.3 + G.8).
+
+# -----------------------------------------------------------------------------
+# H.3 — cargo-generate-rpm metadata (RHEL 9 / Fedora 41)
+# -----------------------------------------------------------------------------
+# Build with: `cargo generate-rpm -p rev-stealth`
+#   (also expects `target/release/rev-stealth` pre-built.)
+[package.metadata.generate-rpm]
+name = "rev-stealth"
+license = "MIT"
+summary = "Stealth web scraping & MCP CLI for AI agent developers"
+# Lean runtime deps; glibc only.
+requires = { glibc = ">= 2.34" }
+assets = [
+    { source = "../../target/release/rev-stealth", dest = "/usr/bin/rev-stealth", mode = "755" },
+    { source = "../../README.md", dest = "/usr/share/doc/rev-stealth/README", mode = "644", doc = true },
+    { source = "../../LICENSE", dest = "/usr/share/doc/rev-stealth/LICENSE", mode = "644", doc = true },
+]

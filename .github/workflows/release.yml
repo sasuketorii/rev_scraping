@@ -28,7 +28,7 @@ on:
       - 'Dockerfile.distroless'
       - 'Formula/rev-stealth.rb'
       - 'install.sh'
-      - 'crates/rev-stealth-cli/**'
+      - 'crates/stealth-cli/**'
       - 'release-please-config.json'
       - '.release-please-manifest.json'
   workflow_dispatch:
@@ -61,12 +61,12 @@ jobs:
         run: shellcheck -s sh install.sh
       # NOTE: workspace-wide `cargo package` fails because internal path
       # deps (e.g. mobile-fp) intentionally have no version requirement —
-      # they're `publish = false`. The wrapper crate is the only crates.io
+      # they're `publish = false`. `rev-stealth` is the only crates.io
       # publish target, so we package + dry-run-publish it explicitly.
-      - name: cargo package -p rev-stealth-cli
-        run: cargo package -p rev-stealth-cli --allow-dirty --no-verify
-      - name: cargo publish dry-run (rev-stealth-cli)
-        run: cargo publish --dry-run --allow-dirty -p rev-stealth-cli
+      - name: cargo package -p rev-stealth
+        run: cargo package -p rev-stealth --allow-dirty --no-verify
+      - name: cargo publish dry-run (rev-stealth)
+        run: cargo publish --dry-run --allow-dirty -p rev-stealth
 
   build-binaries:
     name: build (${{ matrix.target }})
@@ -204,7 +204,7 @@ jobs:
           BIN=$(find dist -type f -name rev-stealth | head -n 1)
           cp "${BIN}" target/release/rev-stealth
       - name: cargo deb --no-build
-        run: cargo deb --no-build -p rev-stealth-cli --output dist/
+        run: cargo deb --no-build -p rev-stealth --output dist/
       - uses: actions/upload-artifact@v4
         with:
           name: deb-${{ matrix.target }}
@@ -239,7 +239,7 @@ jobs:
           BIN=$(find dist -type f -name rev-stealth | head -n 1)
           cp "${BIN}" target/release/rev-stealth
       - name: cargo generate-rpm
-        run: cargo generate-rpm -p rev-stealth-cli --output dist/
+        run: cargo generate-rpm -p rev-stealth --output dist/
       - uses: actions/upload-artifact@v4
         with:
           name: rpm-${{ matrix.target }}
@@ -322,12 +322,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: cargo publish (dry-run)
         if: github.event_name != 'push'
-        run: cargo publish --dry-run --allow-dirty -p rev-stealth-cli
+        run: cargo publish --dry-run --allow-dirty -p rev-stealth
       - name: cargo publish (real)
         if: github.event_name == 'push'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --locked -p rev-stealth-cli
+        run: cargo publish --locked -p rev-stealth
 
   gh-release:
     name: draft GitHub release

@@ -313,8 +313,8 @@ jobs:
           shared-key: ubuntu-22.04-stable
           workspaces: |
             . -> target
-      - name: cargo build -p stealth-cli --bin rev-stealth
-        run: cargo build -p stealth-cli --bin rev-stealth
+      - name: cargo build -p rev-stealth --bin rev-stealth
+        run: cargo build -p rev-stealth --bin rev-stealth
       - name: config init --target=policy --non-interactive --force
         run: |
           set -euxo pipefail
@@ -464,27 +464,72 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: ubuntu-22.04-stable
           workspaces: |
             . -> target
-      - name: cargo build -p stealth-cli
-        run: cargo build -p stealth-cli
-      - name: regenerate + check snapshot
-        run: ./scripts/cli-public-api-snapshot.sh --check
+      - name: cargo build -p rev-stealth
+        run: cargo build -p rev-stealth
+      - name: regenerate + check snapshot (label-aware)
+        env:
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # R2 label-aware mode: the script itself stays drift-strict; here we
+          # add a label gate so a drift PR must declare additive vs breaking
+          # vs mcp-schema-breaking, mirroring cargo-public-api-diff.
+          #
+          # NOTE: do NOT capture `$?` after an `if ...; then ...; fi` block —
+          # bash returns 0 from the un-taken branch, masking the failing exit
+          # code. Use `|| drift_rc=$?` to capture the script's real status.
+          drift_rc=0
+          ./scripts/cli-public-api-snapshot.sh --check || drift_rc=$?
+          if [[ "$drift_rc" -eq 0 ]]; then
+            echo "[cli-public-api-snapshot] surface unchanged; label check not required."
+            exit 0
+          fi
+          if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
+            exit "$drift_rc"
+          fi
+          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+          echo "[cli-public-api-snapshot] PR labels = '${labels_csv:-<none>}'"
+          allowed=0
+          IFS=',' read -ra arr <<< "$labels_csv"
+          for l in "${arr[@]}"; do
+            case "$l" in
+              api-additive|api-breaking|mcp-schema-breaking) allowed=1 ;;
+            esac
+          done
+          if [[ "$allowed" -eq 1 ]]; then
+            echo "::warning::snapshot drift detected but an explicit compat label is set; PR may regenerate the snapshot and merge."
+            exit 0
+          fi
+          echo "::error::CLI public-API snapshot drift requires one of: api-additive, api-breaking, mcp-schema-breaking."
+          exit "$drift_rc"
 
-  # I.2: cargo-public-api Rust API diff gate. Failures here flag pub-item
-  # changes in any workspace member. Reviewer requires `api-additive` or
-  # `api-breaking` label on PRs that mutate the diff. Job is non-blocking
-  # in v1.3 (continue-on-error) — it will be hardened to a hard gate in v1.4
-  # once the baseline is stable. The diff artifact stays attached to every PR.
+  # I.2: cargo-public-api Rust API diff gate (HARD).
+  #
+  # R2 hardening (Lane I fix-up): promoted from advisory to hard gate. When the
+  # rustdoc-JSON-derived public surface of any covered crate changes against
+  # the PR base, the PR MUST carry exactly one of the labels
+  # `api-additive` (new pub items) or `api-breaking` (removed/renamed/retyped
+  # pub items). The label check runs unconditionally on PR; the diff step then
+  # fails closed if a drift exists without the corresponding label.
+  #
+  # Rationale: the v1.3 R1 advisory mode meant a reviewer could miss a silent
+  # `pub` removal. The R2 hard gate forces an explicit ack via PR label and
+  # makes the snapshot pipeline (Lane I.1) and Rust pub-API pipeline (I.2)
+  # symmetric in enforcement strength.
   cargo-public-api-diff:
-    name: cargo-public-api diff (advisory)
+    name: cargo-public-api diff (hard gate)
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    continue-on-error: true
+    # NOTE: continue-on-error intentionally OMITTED — this is now blocking.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -512,26 +557,112 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=200 origin "$BASE_REF"
-      - name: diff against base
+      - name: diff against base + enforce label
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
         run: |
           set -euo pipefail
-          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`,
-          # NOT a bare ref. We materialize the range explicitly so the gate
-          # actually runs (a syntax error here would silently no-op the diff).
+          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`.
           BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
           HEAD_SHA="$(git rev-parse HEAD)"
+
+          # cargo-public-api 0.39.0 returns rc=1 for BOTH "surface diverged
+          # under --deny=all" AND "rustdoc/build failure". To distinguish
+          # diff-vs-exec-failure we run two passes per crate:
+          #
+          #   Pass 1: `cargo public-api --package <crate> diff <range>`
+          #           — no --deny. rc != 0 ⇒ tool/build/range failure
+          #             (a real diff is allowed; the tool only emits the diff
+          #              to stdout and exits 0 without --deny).
+          #   Pass 2: `cargo public-api --package <crate> diff --deny=all <range>`
+          #           — `--deny` MUST come AFTER `diff` (0.39 clap rejects
+          #             `--deny` as a top-level option). rc != 0 ⇒ surface
+          #             diverged.
+          #
+          # If pass 1 is healthy and pass 2 is non-zero, we know it is a real
+          # diff and the label gate applies. If pass 1 fails, the gate fails
+          # closed — labels cannot waive a broken invocation.
+          diff_seen=0
+          exec_fail=0
+          tmpdir="$(mktemp -d)"
           for crate in stealth-core stealth-auth stealth-sanitize \
                        stealth-agent-contracts stealth-parse stealth-mcp; do
             echo "::group::cargo public-api diff -p $crate"
-            # Job-level `continue-on-error: true` already makes this advisory in
-            # v1.3; we deliberately do NOT mask the per-crate exit code so a
-            # genuine tool failure (missing crate, build break) surfaces.
-            cargo public-api --package "$crate" diff "$BASE_SHA..$HEAD_SHA"
+
+            # Pass 1: smoke run, no --deny. Non-zero ⇒ exec failure.
+            smoke_rc=0
+            cargo public-api --package "$crate" \
+              diff "$BASE_SHA..$HEAD_SHA" \
+              > "$tmpdir/${crate}.smoke.out" 2> "$tmpdir/${crate}.smoke.err" \
+              || smoke_rc=$?
+            cat "$tmpdir/${crate}.smoke.out"
+            cat "$tmpdir/${crate}.smoke.err" >&2
+            if [[ "$smoke_rc" -ne 0 ]]; then
+              echo "::error::cargo public-api -p $crate (pass 1, no --deny) exited rc=$smoke_rc — treating as tool/build failure, NOT a diff. Labels do not waive this."
+              exec_fail=1
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Pass 2: deny-all run. Non-zero ⇒ real surface diff.
+            deny_rc=0
+            cargo public-api --package "$crate" \
+              diff --deny=all "$BASE_SHA..$HEAD_SHA" \
+              > "$tmpdir/${crate}.deny.out" 2> "$tmpdir/${crate}.deny.err" \
+              || deny_rc=$?
+            cat "$tmpdir/${crate}.deny.out"
+            cat "$tmpdir/${crate}.deny.err" >&2
+            if [[ "$deny_rc" -ne 0 ]]; then
+              diff_seen=1
+            fi
             echo "::endgroup::"
           done
+
+          if [[ "$exec_fail" -ne 0 ]]; then
+            echo "::error::cargo-public-api hard gate cannot evaluate label compliance because at least one crate's pass-1 smoke run failed. Fix the underlying tool/build error; labels do not waive this."
+            exit 1
+          fi
+
+          if [[ "$diff_seen" -eq 0 ]]; then
+            echo "[cargo-public-api] no public-surface diff vs $BASE_REF — gate PASS."
+            exit 0
+          fi
+
+          # Step 2: surface diverged ⇒ a label is mandatory. Read labels from
+          # the PR event payload (no extra API call required); fall back to
+          # the REST API if the payload is empty (defensive).
+          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+          if [[ -z "$labels_csv" ]]; then
+            labels_csv="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/labels" --jq '[.[].name] | join(",")' || echo "")"
+          fi
+          echo "[cargo-public-api] PR labels = '${labels_csv:-<none>}'"
+
+          has_additive=0
+          has_breaking=0
+          IFS=',' read -ra arr <<< "$labels_csv"
+          for l in "${arr[@]}"; do
+            case "$l" in
+              api-additive)  has_additive=1 ;;
+              api-breaking)  has_breaking=1 ;;
+            esac
+          done
+
+          if [[ "$has_additive" -eq 0 && "$has_breaking" -eq 0 ]]; then
+            echo "::error::cargo-public-api detected a public-surface diff vs $BASE_REF but no \`api-additive\` or \`api-breaking\` PR label is set."
+            echo "::error::Decide: pure additions (new pub item, no removal/rename) ⇒ apply \`api-additive\`."
+            echo "::error::Decide: any removal, rename, signature change, or visibility narrowing ⇒ apply \`api-breaking\` AND bump per docs/compat.md."
+            exit 1
+          fi
+
+          if [[ "$has_additive" -eq 1 && "$has_breaking" -eq 1 ]]; then
+            echo "::error::Both \`api-additive\` and \`api-breaking\` labels are set; choose exactly one (a PR is either additive or breaking)."
+            exit 1
+          fi
+
+          echo "[cargo-public-api] surface diverged; one explicit label found ⇒ gate PASS (additive=$has_additive, breaking=$has_breaking)."
 
   # I.5: MCP tool-schema breaking-change detector. Mirrors mcp-schema-lint
   # but specifically asserts the canonical 16-tool list (Lane I.1 snapshot)
@@ -557,9 +688,141 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: git fetch --no-tags --depth=200 origin "$BASE_REF"
-      - name: mcp-schema-breaking diff vs base
+      - name: mcp-schema-breaking diff vs base (label-aware)
         env:
           BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
-        run: ./scripts/mcp-schema-breaking.sh --check
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # R2 label gate. The script uses a 3-valued exit-code contract:
+          #   0 — surface unchanged
+          #   2 — INTENTIONAL breaking diff (label waiver applies)
+          #   any other nonzero — script execution failure (NEVER waiveable)
+          # `$?` after `if/fi` returns 0 from the un-taken branch (bash spec);
+          # capture via `|| rc=$?` instead so the real exit code survives.
+          rc=0
+          ./scripts/mcp-schema-breaking.sh --check || rc=$?
+          if [[ "$rc" -eq 0 ]]; then
+            exit 0
+          fi
+          if [[ "$rc" -ne 2 ]]; then
+            echo "::error::mcp-schema-breaking.sh exited rc=$rc (script execution failure, not a breaking diff). Labels do not waive this. Fix the underlying error."
+            exit "$rc"
+          fi
+          if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
+            exit "$rc"
+          fi
+          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+          echo "[mcp-schema-breaking] PR labels = '${labels_csv:-<none>}'"
+          has_breaking=0
+          IFS=',' read -ra arr <<< "$labels_csv"
+          for l in "${arr[@]}"; do
+            [[ "$l" == "mcp-schema-breaking" ]] && has_breaking=1
+          done
+          if [[ "$has_breaking" -eq 1 ]]; then
+            echo "::warning::MCP schema breaking change detected and explicit \`mcp-schema-breaking\` label is set; gate PASS."
+            exit 0
+          fi
+          echo "::error::MCP tool-schema breaking change requires the \`mcp-schema-breaking\` PR label (and a 2-major bump per docs/compat.md)."
+          exit "$rc"
 
   # I.6: see crates/stealth-cli/tests/deprecated_completeness.rs (unit test).
+
+  # Lane G.3 (v1.3 Black-Belt CLI): shell-completion drift gate.
+  #
+  # Regenerates `target/completions/{bash,zsh,fish,nushell}/rev-stealth.*` via
+  # `scripts/gen_completions.sh` and fails if the committed scripts disagree
+  # with a fresh render. The script invokes the hidden
+  # `rev-stealth completions <shell>` subcommand, which reads the clap
+  # CommandFactory tree — so the gate also covers --help drift in
+  # subcommands/flags reachable from completion.
+  completion-drift:
+    name: shell-completion drift
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: assert all 4 completion files are tracked
+        # Round-1 reviewer (G.3) finding #1: `git diff --exit-code` alone
+        # ignores untracked files, so a contributor could accidentally delete
+        # the committed completions and the gate would still pass after regen.
+        # Enumerate the 4 expected files and require each to be tracked BEFORE
+        # we regenerate.
+        run: |
+          set -euo pipefail
+          missing=0
+          for f in \
+              target/completions/bash/rev-stealth.bash \
+              target/completions/zsh/rev-stealth.zsh \
+              target/completions/fish/rev-stealth.fish \
+              target/completions/nushell/rev-stealth.nu; do
+            if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+              echo "::error::expected completion file is not tracked: $f" >&2
+              missing=1
+            fi
+          done
+          if [[ "$missing" -eq 1 ]]; then
+            echo "::error::commit the missing target/completions/ files (regen via ./scripts/gen_completions.sh)." >&2
+            exit 1
+          fi
+      - name: regenerate completions
+        run: ./scripts/gen_completions.sh
+      - name: diff committed vs regenerated (modifications)
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- target/completions/; then
+            echo "::error::shell completion scripts drifted (modified content). Run \`./scripts/gen_completions.sh\` and commit the result." >&2
+            exit 1
+          fi
+      - name: diff committed vs regenerated (untracked / additions)
+        # Defensive sibling to the previous step: `git diff --exit-code` does
+        # not flag untracked files, so a regen producing a *new* file (e.g.
+        # add a future shell) would silently pass the diff above. `git status
+        # --porcelain` lists tracked-modified AND untracked entries; we fail
+        # if anything under target/completions/ is reported.
+        run: |
+          set -euo pipefail
+          drift="$(git status --porcelain -- target/completions/)"
+          if [[ -n "$drift" ]]; then
+            echo "::error::untracked / unexpected completion files detected:" >&2
+            echo "$drift" >&2
+            echo "::error::commit them via ./scripts/gen_completions.sh + git add." >&2
+            exit 1
+          fi
+
+  # I.8 (R2): fixture tests for scripts/mcp-schema-breaking.sh. Asserts the
+  # 3-valued exit-code contract (0/2/other) and the four breaking-change
+  # detectors (tool removal, required-arg tightening, input enum narrowing,
+  # output property removal / output enum narrowing) against synthetic
+  # schema_version=3 snapshot blobs. Catches regressions in the detector
+  # itself before they let a real breaking PR through.
+  mcp-schema-breaking-fixture-tests:
+    name: MCP schema breaking detector — fixture tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: run fixture tests
+        run: bash scripts/cli-public-api-snapshot.test.sh
+
+  # I.7 (R2): keep-a-changelog 1.1 structural lint for
+  # CHANGELOG.rev_scraping.md. Mirrors the release-please-config.json
+  # `changelog-path` setting and gates the `## [Unreleased]` cursor that
+  # release-please relies on to compute the next bump. A malformed file
+  # would fail release-please at release time instead of at PR time, so
+  # we shift the check left.
+  changelog-lint:
+    name: CHANGELOG keep-a-changelog lint
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: changelog structural lint
+        run: python3 scripts/changelog-keepachangelog-lint.py CHANGELOG.rev_scraping.md

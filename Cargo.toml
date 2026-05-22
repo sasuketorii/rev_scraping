@@ -23,8 +23,6 @@ members = [
     "crates/stealth-agent-contracts",
     # Lane F P13: prompt-injection defense sanitizer
     "crates/stealth-sanitize",
-    # Lane H (v1.3): crates.io publish wrapper for `cargo install rev-stealth-cli`
-    "crates/rev-stealth-cli",
 ]
 
 [workspace.package]
@@ -35,20 +33,27 @@ license = "MIT"
 authors = ["Sasuke Torii"]
 
 [workspace.dependencies]
-# Internal workspace crates (path-based so vendored `{ workspace = true }` refs resolve)
-stealth-core = { path = "crates/stealth-core" }
-mobile-fp = { path = "crates/mobile-fp" }
-vpn-rotate = { path = "crates/vpn-rotate" }
-captcha-bypass = { path = "crates/captcha-bypass" }
-stealth-cli = { path = "crates/stealth-cli" }
-obscura-bridge = { path = "crates/obscura-bridge" }
-stealth-cf = { path = "crates/stealth-cf" }
-stealth-parse = { path = "crates/stealth-parse" }
-stealth-mcp = { path = "crates/stealth-mcp" }
-stealth-sites = { path = "crates/stealth-sites" }
-stealth-auth = { path = "crates/stealth-auth" }
-stealth-agent-contracts = { path = "crates/stealth-agent-contracts" }
-stealth-sanitize = { path = "crates/stealth-sanitize" }
+# Internal workspace crates. `version` + `path` both specified so the
+# `rev-stealth` publish target satisfies cargo's "all dependencies must have
+# a version requirement specified when publishing" manifest verification.
+# Local builds still resolve via `path`; the `version` field is only used
+# in the packaged Cargo.toml uploaded to crates.io.
+stealth-core = { path = "crates/stealth-core", version = "1.2.0" }
+mobile-fp = { path = "crates/mobile-fp", version = "1.2.0" }
+vpn-rotate = { path = "crates/vpn-rotate", version = "1.2.0" }
+captcha-bypass = { path = "crates/captcha-bypass", version = "1.2.0" }
+# Lane H Slice A (v1.3): the workspace member directory stays `stealth-cli/`
+# but the published crate name is `rev-stealth`. Other workspace crates use
+# this alias for path resolution; no crate currently depends on it.
+rev-stealth = { path = "crates/stealth-cli", version = "1.2.0" }
+obscura-bridge = { path = "crates/obscura-bridge", version = "1.2.0" }
+stealth-cf = { path = "crates/stealth-cf", version = "1.2.0" }
+stealth-parse = { path = "crates/stealth-parse", version = "1.2.0" }
+stealth-mcp = { path = "crates/stealth-mcp", version = "1.2.0" }
+stealth-sites = { path = "crates/stealth-sites", version = "1.2.0" }
+stealth-auth = { path = "crates/stealth-auth", version = "1.2.0" }
+stealth-agent-contracts = { path = "crates/stealth-agent-contracts", version = "1.2.0" }
+stealth-sanitize = { path = "crates/stealth-sanitize", version = "1.2.0" }
 
 # Async runtime / utility
 tokio = { version = "1", features = ["full"] }
@@ -70,6 +75,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+clap_complete_nushell = "4"
 
 # Concurrent collections
 dashmap = "6"

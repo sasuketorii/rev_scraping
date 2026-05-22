@@ -68,7 +68,7 @@ jobs:
           fi
           # Landing page redirect for /api/
           if [ ! -f _site/api/index.html ]; then
-            echo '<meta http-equiv="refresh" content="0;url=./rev_stealth_cli/index.html">' > _site/api/index.html
+            echo '<meta http-equiv="refresh" content="0;url=./stealth_cli/index.html">' > _site/api/index.html
           fi
 
       - name: Upload Pages artifact

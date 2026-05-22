@@ -6,9 +6,10 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 # Workspace-internal Lane F crate. Marked `publish = false` so the Lane H
-# release preflight (`cargo package -p rev-stealth-cli`) reflects the
-# actual publish policy: only the `rev-stealth-cli` wrapper goes to
-# crates.io; every other workspace member is internal-only.
+# release preflight (`cargo package -p rev-stealth`) reflects the actual
+# publish policy: only the `rev-stealth` crate is published to crates.io
+# in Slice A; every other workspace member stays internal-only until Slice B
+# flips the transitive publish chain (see `docs/distribution.md`).
 publish = false
 description = "Prompt-injection defense sanitizer for RevHarness MCP surface (L2 envelope + L3 canary + L4 unicode + L5 clamp + L7 meta)."
 

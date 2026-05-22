@@ -103,7 +103,7 @@ jobs:
               cargo test --workspace -- --ignored obscura_lifecycle cdp_shim_e2e e2e_spider_fallback
               ;;
             live-spider-use-auth)
-              cargo test -p stealth-cli --test e2e_auth_flow -- --ignored e2e_spider_with_use_auth_replays_cookies
+              cargo test -p rev-stealth --test e2e_auth_flow -- --ignored e2e_spider_with_use_auth_replays_cookies
               ;;
             live-spider-use-auth-matrix)
               # P4 (B3) live matrix: 3 authorised targets (CF-protected / SPA /
@@ -137,7 +137,7 @@ jobs:
                     ;;
                 esac
                 echo "::group::live-spider-use-auth $SITE"
-                cargo test -p stealth-cli --test e2e_spider_use_auth_mock \
+                cargo test -p rev-stealth --test e2e_spider_use_auth_mock \
                   -- --ignored e2e_spider_use_auth_live_env_driven --nocapture \
                   || FAILED=$((FAILED + 1))
                 echo "::endgroup::"
@@ -160,7 +160,7 @@ jobs:
               export ENV_FILE
               bash scripts/vpn_up.sh
               trap 'bash scripts/vpn_down.sh' EXIT
-              cargo test -p stealth-cli --test e2e_vpn_proxy -- --ignored
+              cargo test -p rev-stealth --test e2e_vpn_proxy -- --ignored
               ;;
             live-captcha)
               test -n "${CAPSOLVER_API_KEY:-}"
