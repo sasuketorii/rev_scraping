@@ -118,17 +118,30 @@ At v1.3.0 tag-push (after Slice B lands):
    - Publishes to crates.io
      (`cargo publish --locked -p rev-stealth`).
    - Drafts the GitHub release with checksums + signatures attached.
-3. **Homebrew tap bootstrap** (one-time, before first v1.3.x release):
-   ```sh
-   # In a separate repo, sasuketorii/homebrew-rev-stealth:
-   mkdir Formula
-   cp /path/to/rev_scraping/Formula/rev-stealth.rb Formula/
-   git add Formula/rev-stealth.rb
-   git commit -m "feat: bootstrap rev-stealth formula at v1.3.0"
-   git push origin main
-   ```
+3. **Homebrew tap bootstrap** (one-time, before first v1.3.x release).
+
+   The tap repo (`sasuketorii/homebrew-rev-stealth`) is the public
+   `brew tap` surface. The canonical `Formula/rev-stealth.rb` lives in
+   this monorepo and is mirrored into the tap on every release; the
+   bootstrap below is the one-time step before the first mirror push.
+
+   | # | Step | Command / Action | Verification |
+   |---|------|------------------|--------------|
+   | 1 | Create the empty tap repo | `gh repo create sasuketorii/homebrew-rev-stealth --public --description "Homebrew tap for rev-stealth"` | `gh repo view sasuketorii/homebrew-rev-stealth` resolves |
+   | 2 | Clone the tap repo locally | `git clone https://github.com/sasuketorii/homebrew-rev-stealth.git && cd homebrew-rev-stealth` | `pwd` points at the tap clone |
+   | 3 | Copy the canonical formula | `mkdir -p Formula && cp ../rev_scraping/Formula/rev-stealth.rb Formula/rev-stealth.rb` | `diff Formula/rev-stealth.rb ../rev_scraping/Formula/rev-stealth.rb` is empty |
+   | 4 | Audit the formula locally before push | `brew audit --strict --online --formula ./Formula/rev-stealth.rb` | Exit 0. At bootstrap time the formula's `url` + `sha256` already point at the v1.3.0 release tarball, so `--online` resolves cleanly. The PR-time `release.yml` `brew-audit` job runs the offline variant (`brew audit --strict`) because PRs land before the tarball exists; the online check is owned by this bootstrap step and by the tap repo's own CI. |
+   | 5 | Commit + push | `git add Formula/rev-stealth.rb && git commit -m "feat: bootstrap rev-stealth formula at v1.3.0" && git push origin main` | `gh api repos/sasuketorii/homebrew-rev-stealth/contents/Formula/rev-stealth.rb` returns the committed file |
+   | 6 | Verify the tap from a clean machine | `brew tap sasuketorii/rev-stealth && brew info rev-stealth` | `brew info` prints the formula description + url |
+   | 7 | Install from tap (smoke) | `brew install rev-stealth` (or `brew install --build-from-source rev-stealth` for source build) | `rev-stealth --version` prints `rev-stealth <semver>` |
+
    After bootstrap, every release pushes an updated formula via
    release-please's `extra-files` entry on `Formula/rev-stealth.rb`.
+   The PR-time `brew-audit` job in `.github/workflows/release.yml`
+   ensures no formula change ships to the tap without passing
+   `brew audit --strict` (offline) first; the matching `--online`
+   audit runs in the tap repo's CI (and in step 4 above) where the
+   release tarball is already addressable.
 
 ## Affected files (Slice A)
 

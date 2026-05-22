@@ -32,7 +32,20 @@ on:
       - 'release-please-config.json'
       - '.release-please-manifest.json'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Execute the full release pipeline in dry-run mode (no crates.io publish, no GHCR push, no GitHub release). Artifacts and signatures stay local to the run.'
+        type: boolean
+        default: false
 
+# Top-level permissions are read-only. Jobs that need OIDC/contents-write
+# opt in per-job. After Slice B-1 round-3, OIDC authority (`id-token:
+# write` + `attestations: write`) is held ONLY by the push-only
+# `sign-binaries` and `sign-image` jobs — `build-binaries` and
+# `oci-image` are deliberately OIDC-less so PR / workflow_dispatch
+# dry-run runs cannot mint a Sigstore JWT or write GitHub attestation
+# records. `gh-release` retains `contents: write` for draft creation
+# (push-only step).
 permissions:
   contents: read
 
@@ -68,15 +81,61 @@ jobs:
       - name: cargo publish dry-run (rev-stealth)
         run: cargo publish --dry-run --allow-dirty -p rev-stealth
 
+  # Slice B-1 Delta 2: Homebrew tap audit gate.
+  #
+  # Runs `brew audit --strict` (offline) against the canonical
+  # Formula/rev-stealth.rb so the tap-repo bootstrap (documented in
+  # docs/distribution.md) never publishes a formula that fails
+  # Homebrew's strict audit. macOS runner is used because `brew` is
+  # preinstalled there; the formula targets the macOS tap user flow.
+  #
+  # `--online` is INTENTIONALLY OFF until the formula stops carrying
+  # the placeholder `v1.3.0.tar.gz` URL with the all-zero sha256 —
+  # release-please rewrites url + sha256 only AFTER a real tag has
+  # published the archive, so an online audit on PR / dry-run would
+  # 404 against the unpublished archive every time. Round-1 reviewer
+  # (Codex) flagged this as a deterministic-fail risk. The release
+  # runbook (docs/distribution.md step 4) keeps `--online` for the
+  # tap-bootstrap step where the URL is already real.
+  #
+  # Audit is gated to PR + workflow_dispatch dry_run only; on real
+  # tag push the audit runs in the tap repo's own CI against the
+  # already-published archive.
+  brew-audit:
+    name: brew audit (formula)
+    needs: preflight
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.dry_run)
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: brew --version
+        run: brew --version
+      - name: brew audit --strict (offline)
+        run: brew audit --strict --formula ./Formula/rev-stealth.rb
+      - name: brew test-bot tap-syntax (optional)
+        # `--only-tap-syntax` runs the same syntax checks the tap CI
+        # would run if Formula/rev-stealth.rb lived in
+        # sasuketorii/homebrew-rev-stealth. Treated as advisory because
+        # test-bot occasionally needs a tap repo context that doesn't
+        # exist here; the strict audit above is the hard gate.
+        continue-on-error: true
+        run: brew test-bot --only-tap-syntax ./Formula/rev-stealth.rb || true
+
   build-binaries:
     name: build (${{ matrix.target }})
     needs: preflight
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    # Slice B-1 round-2 fix (Codex round-2 high finding): this job is
+    # the build/dry-run surface. It does NOT request `id-token: write`
+    # or `attestations: write`, so a PR build or workflow_dispatch
+    # dry-run cannot mint an OIDC JWT or write GitHub attestation
+    # records even if a later edit accidentally inverted a step `if:`.
+    # All Sigstore/Rekor + provenance authority is owned by the
+    # downstream push-only `sign-binaries` job.
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -147,32 +206,120 @@ jobs:
           echo "archive=dist/${NAME}.tar.gz" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}"          >> "$GITHUB_OUTPUT"
 
-      - name: Install cosign
-        if: github.event_name == 'push'
-        uses: sigstore/cosign-installer@v3
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
 
+  # Slice B-1 round-2 fix (Codex round-2 high finding): push-only sign
+  # job. This job is the SOLE holder of `id-token: write` +
+  # `attestations: write` permission in the binary supply-chain path.
+  # build-binaries above runs OIDC-less for PR / dry-run; this job
+  # downloads the staged tarballs and performs cosign keyless sign-blob,
+  # cosign verify-blob (self-check), actions/attest-build-provenance
+  # (SLSA L3), and `gh attestation verify --bundle` (self-check) —
+  # ALL on `github.event_name == 'push'` only.
+  #
+  # NOTE on pin: actions/attest-build-provenance is pinned to @v4 (the
+  # current stable major as of round-2 review). v2 was the round-1 pin
+  # before the reviewer pointed out v4 is the recommended major.
+  sign-binaries:
+    name: sign + attest binary (${{ matrix.target }})
+    needs: build-binaries
+    if: github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: dist
+      - name: Locate archive
+        id: stage
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          ARCHIVE="$(find dist -maxdepth 2 -type f -name "rev-stealth-*-${BUILD_TARGET}.tar.gz" | head -n1)"
+          if [ -z "${ARCHIVE}" ] || [ ! -f "${ARCHIVE}" ]; then
+            echo "::error::No archive found for target ${BUILD_TARGET} under dist/"
+            ls -R dist || true
+            exit 1
+          fi
+          echo "archive=${ARCHIVE}" >> "$GITHUB_OUTPUT"
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
       - name: Cosign sign-blob (keyless OIDC)
-        if: github.event_name == 'push'
         env:
           COSIGN_YES: "true"
           ARCHIVE: ${{ steps.stage.outputs.archive }}
         run: |
+          set -euo pipefail
           cosign sign-blob \
             --yes \
             --output-signature "${ARCHIVE}.sig" \
             --output-certificate "${ARCHIVE}-keyless.pem" \
             "${ARCHIVE}"
-
+      - name: Cosign verify-blob (self-check)
+        env:
+          ARCHIVE: ${{ steps.stage.outputs.archive }}
+          # Identity is the GitHub Actions OIDC SAN for this workflow.
+          # The regexp pin keeps `cosign verify-blob` from accepting
+          # unrelated keyless signers.
+          CERT_IDENTITY_REGEXP: "^https://github\\.com/${{ github.repository }}/\\.github/workflows/release\\.yml@"
+          CERT_OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -euo pipefail
+          cosign verify-blob \
+            --certificate "${ARCHIVE}-keyless.pem" \
+            --signature "${ARCHIVE}.sig" \
+            --certificate-identity-regexp "${CERT_IDENTITY_REGEXP}" \
+            --certificate-oidc-issuer "${CERT_OIDC_ISSUER}" \
+            "${ARCHIVE}"
       - name: Attest build provenance (SLSA L3)
-        if: github.event_name == 'push'
-        uses: actions/attest-build-provenance@v1
+        id: attest
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.stage.outputs.archive }}
-
-      - name: Upload artifacts
+      - name: gh attestation verify (self-check)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARCHIVE: ${{ steps.stage.outputs.archive }}
+          ATTESTATION: ${{ steps.attest.outputs.bundle-path }}
+          REPO: ${{ github.repository }}
+          SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/release.yml
+        run: |
+          set -euo pipefail
+          if [ -z "${ATTESTATION:-}" ] || [ ! -f "${ATTESTATION}" ]; then
+            echo "::error::attest-build-provenance bundle-path is empty or missing: '${ATTESTATION:-<unset>}'"
+            exit 1
+          fi
+          gh attestation verify "${ARCHIVE}" \
+            --bundle "${ATTESTATION}" \
+            --repo "${REPO}" \
+            --signer-workflow "${SIGNER_WORKFLOW}"
+      - name: Upload signed artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bin-${{ matrix.target }}
+          name: bin-signed-${{ matrix.target }}
+          # Re-upload the entire dist/ tree so the downstream
+          # gh-release job sees the tarball alongside its .sig / .pem
+          # without depending on two artifact names for one archive.
           path: dist/*
           if-no-files-found: error
 
@@ -251,11 +398,17 @@ jobs:
     needs: preflight
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    # Slice B-1 round-2 fix (Codex round-2 high finding): OCI build job
+    # holds NO id-token/attestations authority. PR + dry-run runs that
+    # land in this job can build the image and (on tag push only)
+    # push + trivy-scan it, but they cannot mint an OIDC JWT for
+    # Sigstore signing or attestation. The downstream push-only
+    # `sign-image` job owns those permissions.
     permissions:
       contents: read
       packages: write
-      id-token: write
-      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -276,6 +429,10 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Slice B-1 Delta 7: on workflow_dispatch dry_run we still build the
+      # multi-arch image to exercise the Dockerfile + buildx path, but we
+      # never push to GHCR (no login above, no `push: true` below). On PR
+      # we keep the existing build-only behaviour.
       - name: Build (and push on tag) multi-arch image
         id: build
         uses: docker/build-push-action@v6
@@ -295,21 +452,42 @@ jobs:
         env:
           IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
         run: trivy --config trivy.yaml image "$IMAGE_REF"
+
+  # Slice B-1 round-2 fix: push-only image signing + attestation.
+  # Sole holder of `id-token: write` + `attestations: write` on the
+  # OCI side. Consumes the digest output from `oci-image` (which has
+  # already pushed the image to GHCR on tag push). attest-build-
+  # provenance is pinned to @v4 — the current stable major.
+  sign-image:
+    name: sign + attest oci image
+    needs: oci-image
+    if: github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Install cosign
-        if: github.event_name == 'push'
         uses: sigstore/cosign-installer@v3
       - name: Cosign sign image (keyless)
-        if: github.event_name == 'push'
         env:
           COSIGN_YES: "true"
-          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.oci-image.outputs.digest }}
         run: cosign sign --yes "$IMAGE_REF"
       - name: Attest image provenance (SLSA L3)
-        if: github.event_name == 'push'
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ needs.oci-image.outputs.digest }}
           push-to-registry: true
 
   cargo-publish:
@@ -331,8 +509,51 @@ jobs:
 
   gh-release:
     name: draft GitHub release
-    needs: [build-binaries, package-deb, package-rpm, oci-image, cargo-publish]
-    if: github.event_name == 'push'
+    # Slice B-1 round-3 fix (Codex round-3 high finding): on
+    # `workflow_dispatch dry_run=true`, `sign-binaries` and
+    # `sign-image` are skipped (their job-level
+    # `if: github.event_name == 'push'`). GitHub Actions default
+    # `needs:` semantics propagate skip downstream, which would skip
+    # `gh-release` too and break the dry-run inventory path. The
+    # job-level `if:` below uses `!cancelled()` to override default
+    # status-check gating and explicitly accepts `skipped` for the
+    # two sign-* dependencies while still requiring `success` for
+    # all the deterministic deps. The download-artifact step has no
+    # `name:` filter and naturally collects whichever artifacts
+    # exist (`bin-${target}` on dry-run; `bin-${target}` +
+    # `bin-signed-${target}` + deb/rpm on push).
+    needs:
+      - build-binaries
+      - sign-binaries
+      - package-deb
+      - package-rpm
+      - oci-image
+      - sign-image
+      - cargo-publish
+    # Slice B-1 Delta 7: real tag push uploads a draft release.
+    # workflow_dispatch dry_run also enters this job but stops short of
+    # creating the release — it just downloads + lists artifacts so the
+    # operator can confirm the full asset set materializes off-tag.
+    # NOTE: dry-run inventory is signing-free; cosign sign-blob and
+    # attest-build-provenance both stay gated on real tag push only
+    # (see sign-binaries / sign-image jobs) because they emit
+    # permanent Sigstore/Rekor + GitHub attestation records.
+    #
+    # `!cancelled()` overrides default status-check gating so the job
+    # is reachable even when `sign-binaries` / `sign-image` are
+    # skipped on dry-run. The explicit result checks below require
+    # success for the always-running deps and accept either
+    # success or skipped for the two push-only sign deps.
+    if: |
+      !cancelled() &&
+      needs.build-binaries.result == 'success' &&
+      needs.package-deb.result == 'success' &&
+      needs.package-rpm.result == 'success' &&
+      needs.oci-image.result == 'success' &&
+      needs.cargo-publish.result == 'success' &&
+      (needs.sign-binaries.result == 'success' || needs.sign-binaries.result == 'skipped') &&
+      (needs.sign-image.result == 'success' || needs.sign-image.result == 'skipped') &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run))
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
@@ -342,7 +563,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+      - name: List release artifacts (dry-run inventory)
+        run: |
+          set -euo pipefail
+          echo "=== release artifact inventory ==="
+          # On dry-run the .sig / -keyless.pem files will be absent
+          # because sign-blob is push-only by design. The presence /
+          # absence of those globs in the listing is itself the proof
+          # that dry-run did not produce any Sigstore side effects.
+          find dist -maxdepth 4 -type f \
+            \( -name '*.tar.gz' -o -name '*.tar.gz.sha256' \
+               -o -name '*.tar.gz.sig' -o -name '*-keyless.pem' \
+               -o -name '*.deb' -o -name '*.rpm' \) \
+            | sort
       - name: Draft release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           draft: true
