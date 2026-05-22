@@ -52,8 +52,7 @@ fn bench_sanitize_walk(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(bytes));
     group.bench_function("balanced/4kib", |b| {
         b.iter(|| {
-            let env =
-                sanitize_for_agent(black_box(payload.clone()), black_box(&policy));
+            let env = sanitize_for_agent(black_box(payload.clone()), black_box(&policy));
             black_box(env);
         });
     });
@@ -69,8 +68,7 @@ fn bench_canary_scan(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(bytes));
     group.bench_function("strict/adversarial/16kib", |b| {
         b.iter(|| {
-            let env =
-                sanitize_for_agent(black_box(payload.clone()), black_box(&policy));
+            let env = sanitize_for_agent(black_box(payload.clone()), black_box(&policy));
             black_box(env);
         });
     });

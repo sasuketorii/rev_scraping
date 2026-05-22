@@ -88,11 +88,7 @@ pub fn migrate_to(
         let step = migrations
             .iter()
             .find(|m| m.from_version == version)
-            .ok_or_else(|| {
-                format!(
-                    "no migration registered for v{version} → v{target}"
-                )
-            })?;
+            .ok_or_else(|| format!("no migration registered for v{version} → v{target}"))?;
         doc = (step.apply)(doc)?;
         version = step.to_version;
         steps += 1;
@@ -140,7 +136,10 @@ mod tests {
             migrate_to(doc_v(1), LATEST_SCHEMA_VERSION, &migs).expect("noop must succeed");
         assert_eq!(outcome, MigrationOutcome::NoOp { version: 1 });
         // Document unchanged — schema_version still 1.
-        assert_eq!(out.get("schema_version").and_then(|v| v.as_integer()), Some(1));
+        assert_eq!(
+            out.get("schema_version").and_then(|v| v.as_integer()),
+            Some(1)
+        );
     }
 
     #[test]
@@ -161,9 +160,16 @@ mod tests {
         let (out, outcome) = migrate_to(doc_v(1), 2, &migs).expect("v1→v2 must succeed");
         assert_eq!(
             outcome,
-            MigrationOutcome::Migrated { from: 1, to: 2, steps: 1 }
+            MigrationOutcome::Migrated {
+                from: 1,
+                to: 2,
+                steps: 1
+            }
         );
-        assert_eq!(out.get("schema_version").and_then(|v| v.as_integer()), Some(2));
+        assert_eq!(
+            out.get("schema_version").and_then(|v| v.as_integer()),
+            Some(2)
+        );
     }
 
     #[test]

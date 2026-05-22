@@ -1,0 +1,19 @@
+| 軸 | R3 → R4 スコア | 根拠 |
+|---|---:|---|
+| A | 8.9 → 9.1 | K.1 の branch 表現は `TRACKED-ONLY (no v1.3 gate; v1.4 nightly)` に修正済み。K.5 `sanitize_envelope_parse.rs` も `A` staged。K.7 bencher.dev と実 release artifact は残るが v1.3 外部依存として説明済み。 |
+| B | 9.2 → 9.3 | `actionlint` 6 workflow exit 0。fuzz manifest も `CARGO_HOME=/private/tmp ... cargo check --manifest-path ... --bins` PASS。CI gate / adversarial / verifiable の 3 原則は十分。 |
+| C | 8.9 → 8.9 | quality infra は強いが、branch coverage hardening と bench regression comment/label は v1.4。競合比較で「明確に勝つ」直前。 |
+| D | 9.0 → 9.1 | Lane K 特化要件の coverage / fuzz nightly / 4 matrix / SBOM-sigstore が一通り導線化。PR comment の誤読リスクが消え、AI reviewer が reject しにくい状態。 |
+| E | 8.9 → 9.1 | R3 の future-debt だった branch wording は解消。残る負債は bencher.dev・nightly branch・release artifact の昇格タイミング管理。 |
+| F | 9.0 → 9.2 | staged fuzz target + local fuzz-bin check PASS で evidence gap が縮小。proptest / fuzz / bench / actionlint の根拠はかなり強い。 |
+| G | 8.8 → 9.1 | coverage workflow と evidence note の説明が整合。K.1/K.5 の引き継ぎ時の混乱要因は解消済み。 |
+
+overall = **9.10**
+
+verdict: **PASS**
+
+gap from 9.0: **+0.10**
+
+deltas to confirmed 9.0: **none**
+
+deltas for 9.3+ strengthening: branch coverageを nightly `--branch` 実測へ昇格、bench regression の PR comment/label を実装、初回 tag/release 後に SBOM/cosign/SLSA artifact pointer を保存。

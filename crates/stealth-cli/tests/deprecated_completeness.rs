@@ -1,20 +1,38 @@
 //! Lane I.6 — `#[deprecated(...)]` lint enforced as a workspace test.
 //!
 //! Every `#[deprecated(...)]` attribute on a `pub` item in `crates/*/src/`
-//! must populate three pieces of metadata so callers can act on the warning:
+//! must populate four pieces of metadata so callers can act on the warning:
 //!
 //! 1. `since = "<version>"` — when the deprecation landed (semver string).
 //! 2. `note = "..."` — a non-empty explanation.
 //! 3. Inside `note`, a replacement hint: either `replace_with = ` (the
 //!    spelling we standardize on), or the words `Use` / `use ` / `replaced
 //!    by` so AI-assisted migration tools can extract the suggested API.
+//! 4. R2 addition: a `removal_target_version = "<semver>"` declaration so
+//!    "silent indefinite deprecation" cannot ship. The token may live in
+//!    one of two places:
+//!      a. Inside the `note` value, as the substring
+//!         `removal_target_version = "X.Y.Z"` (matches the `replace_with`
+//!         precedent — `#[deprecated]` itself does not natively accept a
+//!         `removal_target_version` key, so we encode it in `note`).
+//!      b. As a single-line comment of the form
+//!         `// removal_target_version = "X.Y.Z"` placed IMMEDIATELY above
+//!         the `#[deprecated(...)]` attribute. This escape hatch lets
+//!         contributors keep the rendered `note` short while still
+//!         declaring the removal target at the source site.
+//!    The captured target MUST be a valid semver triple
+//!    (`<major>.<minor>.<patch>`, optional `-prerelease`). Without this
+//!    field a deprecation can drift indefinitely past its intended removal
+//!    cliff (docs/compat.md guarantees 2-major-version visibility but does
+//!    not by itself force a removal target into source).
 //!
 //! Rationale: a `#[deprecated]` attribute with no `since`/`note`/replacement
-//! is invisible to anyone reading clippy output — it just says "this is
-//! deprecated, sorry." The v1.3 ExecPlan (Lane I.6) requires the attribute
-//! to be actionable, and the most portable way to enforce that across the
-//! workspace is a textual test rather than a custom clippy lint (which would
-//! require a nightly toolchain on every contributor's machine).
+//! /removal_target is invisible to anyone reading clippy output — it just
+//! says "this is deprecated, sorry." The v1.3 ExecPlan (Lane I.6) requires
+//! the attribute to be actionable, and the most portable way to enforce
+//! that across the workspace is a textual test rather than a custom clippy
+//! lint (which would require a nightly toolchain on every contributor's
+//! machine).
 //!
 //! This test runs from `cargo test -p stealth-cli` and walks every other
 //! workspace crate's `src/` tree. The walk skips `target/`, `vendor/`,
@@ -63,8 +81,138 @@ fn list_rust_sources(root: &Path) -> Vec<PathBuf> {
     out
 }
 
+/// Loose semver triple matcher: `<digits>.<digits>.<digits>` with optional
+/// `-prerelease` / `+build` suffix. Intentionally permissive enough to accept
+/// `1.0.0`, `1.0.0-alpha.1`, `2.0.0+rc1` without depending on the `semver`
+/// crate for a test.
+fn looks_like_semver(s: &str) -> bool {
+    let s = s.trim();
+    let main = s.split(['-', '+']).next().unwrap_or(s);
+    let parts: Vec<&str> = main.split('.').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+}
+
+/// Extract the value of a `<key> = "value"` pair anywhere inside a `note`
+/// string. Used to recover the R2 `removal_target_version` field, which is
+/// not a native `#[deprecated]` key. Returns `None` when the key is absent
+/// or its quoted value cannot be recovered.
+fn note_field_value(note: &str, key: &str) -> Option<String> {
+    let bytes = note.as_bytes();
+    let key_bytes = key.as_bytes();
+    let mut i = 0usize;
+    while i + key_bytes.len() <= bytes.len() {
+        if &bytes[i..i + key_bytes.len()] == key_bytes {
+            let prev_ok = i == 0
+                || !(bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
+            let next_ok = bytes
+                .get(i + key_bytes.len())
+                .is_none_or(|c| !(c.is_ascii_alphanumeric() || *c == b'_'));
+            if prev_ok && next_ok {
+                let mut j = i + key_bytes.len();
+                while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                if j >= bytes.len() || bytes[j] != b'=' {
+                    i += 1;
+                    continue;
+                }
+                j += 1;
+                while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                // The note value reaches us as the raw text between the
+                // OUTER `note = "..."` quotes; any inner `"` characters
+                // arrive escaped as `\"`. Accept either a bare `"` or
+                // a `\"` here so both `removal_target_version = "X.Y.Z"`
+                // and the source-form `removal_target_version = \"X.Y.Z\"`
+                // are recognized.
+                if j < bytes.len() && bytes[j] == b'\\' && j + 1 < bytes.len() && bytes[j + 1] == b'"' {
+                    j += 1;
+                }
+                if j >= bytes.len() || bytes[j] != b'"' {
+                    i += 1;
+                    continue;
+                }
+                j += 1;
+                let val_start = j;
+                while j < bytes.len() {
+                    if bytes[j] == b'\\' && j + 1 < bytes.len() {
+                        // Closing `\"` ends the value.
+                        if bytes[j + 1] == b'"' {
+                            break;
+                        }
+                        j += 2;
+                        continue;
+                    }
+                    if bytes[j] == b'"' {
+                        break;
+                    }
+                    j += 1;
+                }
+                return Some(String::from_utf8_lossy(&bytes[val_start..j]).into_owned());
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Extract a `removal_target_version` declaration. Two source sites are
+/// recognized:
+///   1. Inside the `note` value, as the substring
+///      `removal_target_version = "X.Y.Z"` (the canonical spelling).
+///   2. As a `// removal_target_version = "X.Y.Z"` line comment placed
+///      IMMEDIATELY above the `#[deprecated(...)]` attribute (skipping past
+///      an optional `// I6-LINT: skip` marker).
+/// Returns the captured semver string when found and parseable, else None.
+fn extract_removal_target_version(
+    note: Option<&str>,
+    lines: &[&str],
+    attr_index: usize,
+) -> Option<String> {
+    if let Some(n) = note {
+        if let Some(captured) = note_field_value(n, "removal_target_version") {
+            if looks_like_semver(&captured) {
+                return Some(captured);
+            }
+        }
+    }
+    if attr_index == 0 {
+        return None;
+    }
+    let mut idx = attr_index;
+    while idx > 0 {
+        idx -= 1;
+        let trimmed = lines[idx].trim();
+        if trimmed == "// I6-LINT: skip" {
+            continue;
+        }
+        if trimmed.starts_with("// removal_target_version") {
+            if let Some(eq) = trimmed.find('=') {
+                let rhs = trimmed[eq + 1..].trim();
+                let captured = rhs.trim_matches('"').trim_matches('\'').to_string();
+                if looks_like_semver(&captured) {
+                    return Some(captured);
+                }
+            }
+        }
+        break;
+    }
+    None
+}
+
 /// Tokens that count as a replacement hint inside `note = "..."`.
-const HINTS: &[&str] = &["replace_with", "Use ", "use ", "replaced by", "Prefer ", "prefer "];
+const HINTS: &[&str] = &[
+    "replace_with",
+    "Use ",
+    "use ",
+    "replaced by",
+    "Prefer ",
+    "prefer ",
+];
 
 #[derive(Debug)]
 struct Finding {
@@ -132,9 +280,7 @@ fn parse_deprecated_attrs(block: &str) -> (Option<String>, Option<String>) {
         }
         // Read identifier.
         let key_start = i;
-        while i < bytes.len()
-            && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_')
-        {
+        while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
             i += 1;
         }
         if key_start == i {
@@ -251,18 +397,14 @@ fn audit_file(path: &Path) -> Vec<Finding> {
             findings.push(Finding {
                 path: path.to_path_buf(),
                 line: start_line,
-                reason: format!(
-                    "#[deprecated] missing or empty `since = \"…\"` — block: {block}"
-                ),
+                reason: format!("#[deprecated] missing or empty `since = \"…\"` — block: {block}"),
             });
         }
         match note.as_deref() {
             None | Some("") => findings.push(Finding {
                 path: path.to_path_buf(),
                 line: start_line,
-                reason: format!(
-                    "#[deprecated] missing or empty `note = \"…\"` — block: {block}"
-                ),
+                reason: format!("#[deprecated] missing or empty `note = \"…\"` — block: {block}"),
             }),
             Some(note_value) => {
                 let has_hint = HINTS.iter().any(|h| note_value.contains(h));
@@ -276,6 +418,22 @@ fn audit_file(path: &Path) -> Vec<Finding> {
                     });
                 }
             }
+        }
+
+        // R2: removal_target_version requirement. Accept either an inline
+        // `removal_target_version = "X.Y.Z"` substring in the `note` value,
+        // or a `// removal_target_version = "X.Y.Z"` comment immediately
+        // above the attribute. The attribute's 0-based source index is
+        // `start_line - 1` (start_line was captured before `i` advanced).
+        let attr_index = start_line - 1;
+        if extract_removal_target_version(note.as_deref(), &lines, attr_index).is_none() {
+            findings.push(Finding {
+                path: path.to_path_buf(),
+                line: start_line,
+                reason: format!(
+                    "#[deprecated] missing `removal_target_version = \"X.Y.Z\"` (either inside `note` or as a `// removal_target_version = \"X.Y.Z\"` line comment immediately above). Silent indefinite deprecation is forbidden per docs/compat.md. block: {block}"
+                ),
+            });
         }
     }
 
@@ -307,10 +465,7 @@ fn every_deprecated_attribute_is_actionable() {
         for f in &all_findings {
             msg.push_str(&format!(
                 "  - {}:{} — {}\n",
-                f.path
-                    .strip_prefix(&root)
-                    .unwrap_or(&f.path)
-                    .display(),
+                f.path.strip_prefix(&root).unwrap_or(&f.path).display(),
                 f.line,
                 f.reason.replace('\n', " ")
             ));
@@ -360,16 +515,20 @@ fn lint_smoke_detects_missing_metadata() {
         "expected missing-since violation, got {f3:?}"
     );
 
-    // Case 4: well-formed attribute should produce zero findings.
+    // Case 4: well-formed attribute (note-encoded removal_target) should
+    // produce zero findings under the R2 contract.
     let p4 = dir.path().join("ok.rs");
     fs::write(
         &p4,
-        "#[deprecated(since = \"1.3.0\", note = \"Use rev_scraping::new_api instead\")]\n\
+        "#[deprecated(since = \"1.3.0\", note = \"Use rev_scraping::new_api instead; removal_target_version = \\\"2.0.0\\\"\")]\n\
          pub fn legacy4() {}\n",
     )
     .unwrap();
     let f4 = audit_file(&p4);
-    assert!(f4.is_empty(), "well-formed attr should not fire, got {f4:?}");
+    assert!(
+        f4.is_empty(),
+        "well-formed attr should not fire, got {f4:?}"
+    );
 
     // Case 5: regression — `since` appearing inside the note value must NOT
     // satisfy the since check. This protects against the substring-presence
@@ -385,5 +544,51 @@ fn lint_smoke_detects_missing_metadata() {
     assert!(
         f5.iter().any(|f| f.reason.contains("`since")),
         "substring 'since' inside note must NOT count as the since= attr, got {f5:?}"
+    );
+
+    // Case 6 (R2): missing removal_target_version is now a violation, even
+    // when since + note + replacement hint are all present.
+    let p6 = dir.path().join("no_removal_target.rs");
+    fs::write(
+        &p6,
+        "#[deprecated(since = \"1.3.0\", note = \"Use rev_scraping::new_api instead\")]\n\
+         pub fn legacy6() {}\n",
+    )
+    .unwrap();
+    let f6 = audit_file(&p6);
+    assert!(
+        f6.iter().any(|f| f.reason.contains("removal_target_version")),
+        "expected removal_target_version violation, got {f6:?}"
+    );
+
+    // Case 7 (R2): removal_target_version supplied via comment immediately
+    // above the attribute is accepted.
+    let p7 = dir.path().join("removal_target_via_comment.rs");
+    fs::write(
+        &p7,
+        "// removal_target_version = \"2.0.0\"\n\
+         #[deprecated(since = \"1.3.0\", note = \"Use new_api instead\")]\n\
+         pub fn legacy7() {}\n",
+    )
+    .unwrap();
+    let f7 = audit_file(&p7);
+    assert!(
+        f7.is_empty(),
+        "comment-style removal_target should satisfy the lint, got {f7:?}"
+    );
+
+    // Case 8 (R2): non-semver removal_target_version is rejected (treated
+    // as missing — the value must be a parseable triple).
+    let p8 = dir.path().join("bad_semver.rs");
+    fs::write(
+        &p8,
+        "#[deprecated(since = \"1.3.0\", note = \"Use new_api instead; removal_target_version = \\\"someday\\\"\")]\n\
+         pub fn legacy8() {}\n",
+    )
+    .unwrap();
+    let f8 = audit_file(&p8);
+    assert!(
+        f8.iter().any(|f| f.reason.contains("removal_target_version")),
+        "non-semver removal_target value must be rejected, got {f8:?}"
     );
 }

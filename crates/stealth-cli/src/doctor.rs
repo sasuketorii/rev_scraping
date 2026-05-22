@@ -733,10 +733,7 @@ fn vps_check_dir_perm(path: &str, want_mode: u32, want_owner: &str) -> DeepCheck
                 DeepCheck {
                     name,
                     status: DeepStatus::Pass,
-                    detail: format!(
-                        "{path} mode={:o} owner={}",
-                        info.mode_octal, info.owner
-                    ),
+                    detail: format!("{path} mode={:o} owner={}", info.mode_octal, info.owner),
                 }
             } else {
                 DeepCheck {
@@ -836,7 +833,16 @@ fn vps_check_docker() -> DeepCheck {
 
 fn vps_check_gluetun_image() -> DeepCheck {
     let name = "gluetun_image".to_string();
-    match run_cmd("docker", &["image", "ls", "--format", "{{.Repository}}", "qmcgaw/gluetun"]) {
+    match run_cmd(
+        "docker",
+        &[
+            "image",
+            "ls",
+            "--format",
+            "{{.Repository}}",
+            "qmcgaw/gluetun",
+        ],
+    ) {
         Some((true, out)) if out.lines().any(|l| l.trim() == "qmcgaw/gluetun") => DeepCheck {
             name,
             status: DeepStatus::Pass,
@@ -930,7 +936,9 @@ fn uid_to_name(uid: u32) -> Option<String> {
     if !ok {
         return None;
     }
-    out.lines().next().and_then(|l| l.split(':').next().map(|s| s.to_string()))
+    out.lines()
+        .next()
+        .and_then(|l| l.split(':').next().map(|s| s.to_string()))
 }
 
 fn emit_vps_report(rows: &[DeepCheck], format: DoctorFormat) -> Result<(), ExitCode> {
@@ -1254,10 +1262,8 @@ mod tests {
             // 0o755 (rust default on most umasks). Want 0o750 +
             // owner=rev-stealth → both mismatch → Fail row with the
             // observed values surfaced in `detail`.
-            let tmp = std::env::temp_dir().join(format!(
-                "rev-stealth-vps-test-{}",
-                std::process::id()
-            ));
+            let tmp =
+                std::env::temp_dir().join(format!("rev-stealth-vps-test-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&tmp);
             std::fs::create_dir(&tmp).expect("create tempdir");
             #[cfg(unix)]
@@ -1304,9 +1310,18 @@ mod tests {
                 status: s,
                 detail: "".into(),
             };
-            assert!(!super::vps_has_fail(&[mk(DeepStatus::Pass), mk(DeepStatus::Pass)]));
-            assert!(!super::vps_has_fail(&[mk(DeepStatus::Warn), mk(DeepStatus::Pass)]));
-            assert!(super::vps_has_fail(&[mk(DeepStatus::Pass), mk(DeepStatus::Fail)]));
+            assert!(!super::vps_has_fail(&[
+                mk(DeepStatus::Pass),
+                mk(DeepStatus::Pass)
+            ]));
+            assert!(!super::vps_has_fail(&[
+                mk(DeepStatus::Warn),
+                mk(DeepStatus::Pass)
+            ]));
+            assert!(super::vps_has_fail(&[
+                mk(DeepStatus::Pass),
+                mk(DeepStatus::Fail)
+            ]));
             assert!(super::vps_has_fail(&[mk(DeepStatus::Fail)]));
             assert!(!super::vps_has_fail(&[]));
         }

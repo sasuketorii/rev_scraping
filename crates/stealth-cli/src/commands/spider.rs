@@ -40,6 +40,10 @@ use vpn_rotate::leak_monitor::{LeakMonitor, LeakState};
 
 #[derive(Args, Debug)]
 pub struct SpiderArgs {
+    /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+    /// global `--format`. JSON schema: `docs/json-schemas/cli/spider.output.json`.
+    #[command(flatten)]
+    pub output_format: crate::commands::output_format::OutputFormatOverride,
     /// Target URL.
     #[arg(long)]
     pub url: String,
@@ -1785,6 +1789,7 @@ mod tests {
         // which still proves --http-only doesn't even *try* to resolve the
         // obscura binary (the obscura err would be code 3, not 1).
         let args = SpiderArgs {
+            output_format: Default::default(),
             url: "https://this-host-is-not-allowlisted.invalid/".into(),
             session_id: None,
             mobile_preset: None,
@@ -1831,6 +1836,7 @@ mod tests {
         // i-have-authorization bypass on a public host plus a deliberately
         // bogus obscura path. With --no-auto-fallback, exit MUST be 3.
         let args = SpiderArgs {
+            output_format: Default::default(),
             url: "https://example.com/".into(),
             session_id: None,
             mobile_preset: None,
@@ -1875,6 +1881,7 @@ mod tests {
         // Ensure clean slate
         let _ = std::fs::remove_file(&path);
         let args = SpiderArgs {
+            output_format: Default::default(),
             url: "https://example.com/".into(),
             session_id: None,
             mobile_preset: None,
@@ -1933,6 +1940,7 @@ mod tests {
         // dir does NOT exist yet.
         assert!(!dir.exists(), "precondition: parent dir must not exist");
         let args = SpiderArgs {
+            output_format: Default::default(),
             url: "https://example.com/".into(),
             session_id: None,
             mobile_preset: None,
@@ -1987,6 +1995,7 @@ mod tests {
         let path =
             std::env::temp_dir().join(format!("rev_stealth_obscura_dump_{}.html", Uuid::new_v4()));
         let args = SpiderArgs {
+            output_format: Default::default(),
             url: "https://example.com/".into(),
             session_id: None,
             mobile_preset: None,
@@ -2071,6 +2080,7 @@ mod tests {
         let path =
             std::env::temp_dir().join(format!("rev_stealth_wait_ms_{}.html", Uuid::new_v4()));
         let args = SpiderArgs {
+            output_format: Default::default(),
             url: "https://example.com/".into(),
             session_id: None,
             mobile_preset: None,

@@ -1,0 +1,18 @@
+METRIC: lane=G.4 round=1 verdict=NEEDS_CHANGES subcmds_with_output_format=11/11 schemas=11/11 collisions=0 issues=1
+
+1. JSON schemas do not match the actual JSON output envelopes.
+
+   Representative examples:
+   - [measure.output.json]($REPO_ROOT/docs/json-schemas/cli/measure.output.json:7) requires top-level `action`, `ok`, `url`, but [measure.rs]($REPO_ROOT/crates/stealth-cli/src/commands/measure.rs:162) emits `{"ok":true,"operation":"measure","result":{...}}`.
+   - [captcha.output.json]($REPO_ROOT/docs/json-schemas/cli/captcha.output.json:10) expects flat `action/type/ok`, but [captcha_cmd.rs]($REPO_ROOT/crates/stealth-cli/src/captcha_cmd.rs:205) emits the same `ok/operation/result` envelope.
+   - [config.output.json]($REPO_ROOT/docs/json-schemas/cli/config.output.json:18) expects an action-tagged object for `paths`, but [config_cli.rs]($REPO_ROOT/crates/stealth-cli/src/commands/config_cli.rs:753) emits a top-level array. `validate`, `diff`, and `get` also emit untagged shapes.
+   - [hermes.output.json]($REPO_ROOT/docs/json-schemas/cli/hermes.output.json:37) requires `ok` and `prefix`, but [hermes.rs]($REPO_ROOT/crates/stealth-cli/src/commands/hermes.rs:401) emits `{kind, action, status, report}` and errors emit `{kind, action, status, error}`.
+
+   Impact: Lane G.4’s schema inventory exists, but it is not a usable JSON-output contract. Downstream validation would reject valid CLI output or validate the wrong shape.
+
+   Required fix: update the schemas to describe the existing emitted envelopes, or intentionally change the emitters and add validation coverage. At minimum, cover the shared `ok/operation/result` envelope and the native `config`, `doctor`, and `hermes` shapes.
+
+Verification run:
+- `cargo test -p rev-stealth --test output_format_coverage` passed: 4/4.
+- `cargo test -p rev-stealth --lib cli_tests::` passed: 8/8.
+- `clap::CommandFactory::command().debug_assert()` passed through the coverage test.

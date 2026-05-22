@@ -11,9 +11,9 @@ Last reviewed: **v1.3.0** (Lane I.3, 2026-05-23).
 
 | Surface | Stability guarantee | Drift gate | Bumps |
 |---------|---------------------|------------|-------|
-| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` covers tool-name removals/renames and required-arg tightening (CI: `mcp-schema-breaking-detector`). The `mcp-schema-lint` CI job (`gen_reference --check`) is a freshness check — it only catches enum/output-field changes that the contributor *forgot to regenerate* in `docs/MCP_REFERENCE.md`; if the contributor regenerates the docs, an enum narrow / output rename will pass. Extending the snapshot diff to cover enums and output fields is tracked for **v1.4** (Lane I-followup). For v1.3, those narrows are policy-only and rely on the reviewer applying the `mcp-schema-breaking` label by hand. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing a value enum, or changing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
-| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`) | Any drift against the committed snapshot requires `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed). |
-| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (advisory in v1.3, hardened in v1.4) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the same `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) labels apply at the discretion of the reviewer. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
+| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` (CI: `mcp-schema-breaking-detector`) covers all four breaking shapes via base-vs-head snapshot diff at `$schema_version >= 3`: tool removal/rename, required-arg tightening, input-schema enum narrowing, and output-property removal / output enum narrowing. 3-valued exit code: 0 unchanged, 2 intentional breaking, other nonzero script failure. Fixture coverage: `scripts/cli-public-api-snapshot.test.sh` (CI: `mcp-schema-breaking-fixture-tests`). The `mcp-schema-lint` job (`gen_reference --check`) remains as a rendered-doc backstop. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing an input or output value enum, or removing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
+| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`, **HARD — drift always fails; labels classify but do not waive**) | Any drift against the committed snapshot must be regenerated and committed in the same PR (`./scripts/cli-public-api-snapshot.sh && git add .agent/v1.3/cli-public-api.snapshot.json`). The PR then carries `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed) or `mcp-schema-breaking` (MCP tool list / required-arg / enum / output change) to classify the regenerated diff. |
+| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (R2: HARD GATE, label-required) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the matching `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) PR label is mandatory and the gate fails closed without one. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
 
 ## What counts as "public surface"
 
@@ -95,12 +95,102 @@ these crates as path dependencies must pin to an exact workspace version.
 Once any crate is published independently to crates.io (Lane H.5), its own
 semver lifecycle decouples from the rev_scraping project version.
 
+## MCP schema breaking — worked examples
+
+The MCP tool catalog is a structured contract: callers depend on tool names,
+required input args, accepted input enum values, output property names, and
+output enum values. The `scripts/mcp-schema-breaking.sh` detector classifies
+each diff against the base snapshot into one of four breaking shapes plus
+two non-breaking shapes. The table below pins down how to bump on each.
+
+| Shape | Example | Breaking? | Required label | Required bump |
+|---|---|---|---|---|
+| Tool removal / rename | `cf_evaluate` removed from `mcp_tools.names` | yes | `mcp-schema-breaking` | major (cliff after 2-major visibility) |
+| Required-arg added | `spider.required` gains `timeout_ms` while `url` is kept | yes | `mcp-schema-breaking` | major |
+| Input enum narrowed | `vpn_rotate.strategy` drops the `random` value | yes | `mcp-schema-breaking` | major |
+| Output property removed | `recipe_show.output.properties` drops `endpoints` | yes | `mcp-schema-breaking` | major |
+| Output enum narrowed | `recipe_show.output.enums.status` drops `Pending` | yes | `mcp-schema-breaking` | major |
+| New tool added | new entry in `mcp_tools.names` | no | `api-additive` | minor |
+| Required-arg relaxed | a previously required arg becomes optional | no | `api-additive` | minor |
+
+### Case 1 — Enum narrowing (output): `recipe_show.status` loses `Pending`
+
+```diff
+- "enums": { "status": ["Active", "Pending", "Retired"] }
++ "enums": { "status": ["Active", "Retired"] }
+```
+
+A consumer that previously did `match status { Pending => … }` now silently
+loses the branch. This is **major-bump breaking**, not minor — even though
+the response payload still parses. Label: `mcp-schema-breaking`. The
+detector emits the line:
+
+```
+[mcp-schema-breaking] BREAKING vs <base>: output enum narrowed
+    - recipe_show.status: removed "Pending"
+```
+
+### Case 2 — Required field added (input): keep `url`, add new required `timeout_ms`
+
+```diff
+- "required": ["url"]
++ "required": ["timeout_ms", "url"]
+```
+
+Old callers that omit `timeout_ms` will be rejected by the input-schema
+validator, so this is **major-bump breaking**. Label:
+`mcp-schema-breaking`. The detector emits:
+
+```
+[mcp-schema-breaking] BREAKING vs <base>: tightened required-args
+    - spider.timeout_ms
+```
+
+If instead the new field were *optional*, the change would be additive —
+`api-additive` + minor bump.
+
+### Case 3 — Output type changed: `auth_status.status` widens from a free-form string to a closed enum
+
+```diff
+  "properties": {
+    "status": {
+-     "type": "string"
++     "type": "string",
++     "enum": ["Valid", "ExpiringSoon", "ExpiringCritical",
++              "PartiallyExpired", "AllExpired", "Missing"]
+    }
+  }
+```
+
+This is **subtle**: narrowing the *type* (from any-string to a closed enum)
+locks future server-side additions to a follow-up bump, but existing callers
+that already only emit valid values are unaffected. The R2 detector flags
+this as an **output enum narrowing** vs *no enum at all* in the base
+snapshot — but the relevant `mcp_tools.schemas.auth_status.output.enums`
+entry **did not exist** in the base snapshot, so the narrowing detector
+does not fire. To make this break the gate, the snapshot must already
+carry the prior enum literal; if it doesn't (i.e. the field was previously
+documented as a free-form string), promote this PR to
+`mcp-schema-breaking` manually and bump major. Rule of thumb: any
+*type-shape* change is a major bump even when the detector cannot prove
+it from the snapshot diff alone.
+
 ## Where to look next
 
-- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface.
+- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface
+  (`$schema_version = 3` carries enum constraints + output-schema fields).
 - `scripts/cli-public-api-snapshot.sh` — regenerator + drift checker.
-- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker.
-- `CHANGELOG.rev_scraping.md` — project-level changelog (keep-a-changelog).
+- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker with the
+  3-valued exit-code contract (0 = unchanged, 2 = breaking diff, other
+  nonzero = script execution failure).
+- `scripts/cli-public-api-snapshot.test.sh` — fixture tests covering the
+  additive / breaking / drift scenarios.
+- `scripts/changelog-keepachangelog-lint.py` — structural lint that gates
+  the `## [Unreleased]` cursor release-please depends on.
+- `CHANGELOG.rev_scraping.md` — project-level changelog (keep-a-changelog),
+  the path `release-please-config.json` targets.
 - `docs/MCP_REFERENCE.md` — current MCP tool catalog.
-- `.github/workflows/ci.yml` — `cli-public-api-snapshot`, `cargo-public-api-diff`,
-  `mcp-schema-breaking-detector` jobs.
+- `.github/workflows/ci.yml` — `cli-public-api-snapshot`,
+  `cargo-public-api-diff` (hard gate, label-aware),
+  `mcp-schema-breaking-detector` (label-aware),
+  `mcp-schema-breaking-fixture-tests`, `changelog-lint` jobs.

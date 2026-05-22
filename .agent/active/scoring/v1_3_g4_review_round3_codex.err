@@ -1,0 +1,1253 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+2026-05-22T22:40:19.204704Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e51d8-bd05-7d41-a6a5-1a296c4be047
+--------
+user
+# v1.3 Lane G.4 Reviewer (round 3)
+
+You are the **Codex reviewer** for v1.3 Lane G.4. Round 2 verdict: **NEEDS_CHANGES (1 issue)**. This is the round-3 fix submission.
+
+## Round-2 BLOCK (the issue you raised)
+
+> `docs/json-schemas/cli/auth.output.json:10` required OK auth outputs (including `auth.login` / `auth.refresh`) to be `{ok, operation, result}`.
+> Actual success path: `crates/stealth-cli/src/commands/auth.rs:406` inherits stdout from the external `rev-auth` helper, which prints a FLAT `{ok, profile, domain, cookie_count, expires_at, saved_to}` payload (`crates/stealth-auth/src/bin/rev_auth.rs:212` struct / `:382` println). No `operation`, no `result` wrapper.
+> Round-2 test coverage missed this success drift because it only covered `auth.refresh` ERR and `list/show/delete/status` OK.
+
+## Round-3 fix (now in tree)
+
+`docs/json-schemas/cli/auth.output.json` was restructured to honestly describe the **two distinct OK shapes**:
+
+1. **Envelope OK** (`auth.list` / `auth.show` / `auth.delete` / `auth.status` only) — `{ok, operation, result}` shape, `operation` enum restricted to those four.
+2. **Envelope ERR** (all six actions, including `auth.login` / `auth.refresh`) — `{ok, operation, exit_code, error}`. The CLI itself emits this on policy/AUP/VPN-guard/spawn failures BEFORE the helper is invoked.
+3. **Flat `rev_auth_success`** (`auth.login` / `auth.refresh` SUCCESS) — `{ok, profile, domain, cookie_count, expires_at?, saved_to}`. Mirror of `SuccessJson` at `crates/stealth-auth/src/bin/rev_auth.rs:212`; required fields `ok|profile|domain|cookie_count|saved_to`, optional `expires_at` (null when no cookie has an expiry). `additionalProperties: false`.
+
+The schema's top-level `oneOf` now has three branches (envelope OK, envelope ERR, flat success), and the description block at the top documents the split with file:line pointers to both the schema source-of-truth and the CLI inheritance path (`spawn_rev_auth_login` line 406).
+
+`docs/json-schemas/cli/README.md` "Envelope contracts (three flavours)" section now flags that `auth login` / `auth refresh` success falls into the no-envelope bucket alongside `doctor` and `config`, with explicit pointer to `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson`.
+
+## New test coverage
+
+`crates/stealth-cli/tests/cli_output_schema_validation.rs` (existing file, now **20 tests**, +1):
+
+- New: `auth_login_refresh_flat_success_validates` — covers the `SuccessJson` shape with and without the optional `expires_at`.
+- Updated: `auth_envelopes_validate` — adds an `auth.login` ERR sample so the pre-helper failure path is exercised, not just `auth.refresh`.
+- Unchanged: list/show/delete/status OK, refresh ERR.
+
+The integration-test contract is now: every documented branch of every schema has at least one passing-sample assertion lifted directly from a `json!({...})` or `serde::Serialize` source in the emitter.
+
+## Files touched in round 3
+
+- `docs/json-schemas/cli/auth.output.json` — top-level `oneOf` extended to 3 branches; new `$defs/rev_auth_success`; tighter `operation` enums per envelope branch.
+- `docs/json-schemas/cli/README.md` — "envelope contracts" updated to flag rev-auth's helper-owned success path.
+- `crates/stealth-cli/tests/cli_output_schema_validation.rs` — +1 test (`auth_login_refresh_flat_success_validates`), +1 sample in `auth_envelopes_validate` (login ERR).
+
+## Verification commands
+
+```
+cargo test -p rev-stealth --test cli_output_schema_validation   # 20 PASS (was 19 in round 2)
+cargo test -p rev-stealth --test output_format_coverage          # 4 PASS (unchanged)
+cargo test -p rev-stealth --lib cli_tests::                       # 8 PASS (unchanged)
+cargo test --workspace --no-fail-fast                             # 820 PASS, 0 FAIL
+```
+
+Spot-check the round-2 BLOCK alignment:
+
+```
+docs/json-schemas/cli/auth.output.json line 47   ↔   crates/stealth-auth/src/bin/rev_auth.rs line 212 (struct SuccessJson)
+docs/json-schemas/cli/auth.output.json line 47   ↔   crates/stealth-auth/src/bin/rev_auth.rs line 382 (println!)
+docs/json-schemas/cli/auth.output.json line 14   ↔   crates/stealth-cli/src/commands/auth.rs line 406 (inherits child stdout)
+```
+
+## Your verdict
+
+Emit a single METRIC line:
+
+```
+METRIC: lane=G.4 round=3 verdict=<LGTM|NEEDS_CHANGES> subcmds_with_output_format=11/11 schemas=11/11 collisions=0 issues=<N>
+```
+
+then a brief justification (≤ 8 lines). Round-2 issue is the only carry-over; if the auth-shape split + new test coverage is sufficient, return **LGTM**.
+
+You are operating in **read-only review mode**. Do NOT modify files; only emit the verdict + justification on STDOUT.
+
+2026-05-22T22:40:19.945314Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T22:40:20.020987Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T22:40:20.235976Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+I’ll use the `staff-code-reviewer` workflow and keep this to a read-only inspection of the claimed schema/test alignment.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+codex
+The primary `staff-code-reviewer` skill path is missing in this checkout, so I’m falling back to the normal review stance: verify the claimed contract against the schema, emitters, and tests without editing files.
+exec
+/bin/bash -lc 'rg -n "SuccessJson|println!|spawn_rev_auth_login|pub async fn|rev_auth_success|Envelope contracts|auth_login_refresh_flat_success_validates|auth_envelopes_validate" docs/json-schemas/cli/auth.output.json docs/json-schemas/cli/README.md crates/stealth-auth/src/bin/rev_auth.rs crates/stealth-cli/src/commands/auth.rs crates/stealth-cli/tests/cli_output_schema_validation.rs' in $REPO_ROOT
+ succeeded in 0ms:
+crates/stealth-cli/src/commands/auth.rs:253:pub async fn run(format: OutputFormat, args: AuthArgs) -> i32 {
+crates/stealth-cli/src/commands/auth.rs:298:    spawn_rev_auth_login(
+crates/stealth-cli/src/commands/auth.rs:350:    spawn_rev_auth_login(
+crates/stealth-cli/src/commands/auth.rs:364:fn spawn_rev_auth_login(
+crates/stealth-cli/src/commands/auth.rs:617:            println!(
+crates/stealth-cli/src/commands/auth.rs:623:            println!("[OK] {op}");
+crates/stealth-cli/src/commands/auth.rs:625:                println!("{s}");
+crates/stealth-cli/src/commands/auth.rs:634:            println!(
+crates/stealth-cli/src/commands/auth.rs:645:            eprintln!("[ERROR] {op}: {msg}");
+crates/stealth-cli/tests/cli_output_schema_validation.rs:315:fn auth_envelopes_validate() {
+crates/stealth-cli/tests/cli_output_schema_validation.rs:386:fn auth_login_refresh_flat_success_validates() {
+crates/stealth-cli/tests/cli_output_schema_validation.rs:389:    // helper, which prints a flat `SuccessJson` (no envelope). The schema
+crates/stealth-cli/tests/cli_output_schema_validation.rs:391:    // `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson` (line 212) and
+crates/stealth-cli/tests/cli_output_schema_validation.rs:392:    // the println at line 382, plus `auth.rs::spawn_rev_auth_login` line 406
+crates/stealth-cli/tests/cli_output_schema_validation.rs:403:    validate_ok(&s, &login_success, "auth.login flat SuccessJson");
+crates/stealth-cli/tests/cli_output_schema_validation.rs:413:    validate_ok(&s, &login_success_no_expiry, "auth.login flat SuccessJson (no expiry)");
+crates/stealth-auth/src/bin/rev_auth.rs:213:struct SuccessJson {
+crates/stealth-auth/src/bin/rev_auth.rs:255:                eprintln!("{}", error.message);
+crates/stealth-auth/src/bin/rev_auth.rs:288:        eprintln!(
+crates/stealth-auth/src/bin/rev_auth.rs:382:        let output = SuccessJson {
+crates/stealth-auth/src/bin/rev_auth.rs:401:        println!(
+crates/stealth-auth/src/bin/rev_auth.rs:427:        eprintln!("{warning}");
+crates/stealth-auth/src/bin/rev_auth.rs:901:    eprintln!("Sign in in the opened Chrome window. Press ENTER here when done.");
+docs/json-schemas/cli/auth.output.json:5:  "description": "JSON payload emitted by `rev-stealth auth {login|list|show|delete|status|refresh} --output-format json`. v1.3 Lane G.4 contract.\n\nIMPORTANT — two distinct OK shapes coexist on this surface:\n\n1. `list` / `show` / `delete` / `status` success and ALL error paths flow through `crates/stealth-cli/src/commands/auth.rs::emit_ok`/`emit_err` and use the shared `{ok, operation, result|exit_code+error}` envelope.\n\n2. `login` / `refresh` SUCCESS is emitted by the external `rev-auth` helper binary (`crates/stealth-auth/src/bin/rev_auth.rs`), whose stdout is inherited by the CLI. That helper writes a FLAT `SuccessJson` shape with no envelope: `{ok, profile, domain, cookie_count, expires_at, saved_to}`. The CLI's `auth.login` / `auth.refresh` ENVELOPE is only used for *errors* (policy-load, AUP, VPN-guard, spawn-failure) before the helper is invoked.\n\nThis split is documented honestly rather than being papered over — collapsing the two surfaces onto one envelope requires changing `rev-auth` (out of scope for G.4, which is strict-additive).\n\nCookie *values* are NEVER serialized in either shape; only sha256 prefixes (envelope path) and counts/expires_at (flat path).",
+docs/json-schemas/cli/auth.output.json:45:      "title": "rev-auth login/refresh SUCCESS (flat SuccessJson; no envelope)",
+docs/json-schemas/cli/auth.output.json:46:      "description": "Emitted by `crates/stealth-auth/src/bin/rev_auth.rs` line 212 (struct) / line 382 (println). The CLI's `auth.login` / `auth.refresh` success path inherits this stdout verbatim — see `crates/stealth-cli/src/commands/auth.rs::spawn_rev_auth_login` (line 406).",
+docs/json-schemas/cli/auth.output.json:47:      "$ref": "#/$defs/rev_auth_success"
+docs/json-schemas/cli/auth.output.json:79:      "title": "auth.show result (also: shape historically aliased for login/refresh envelope, but live login/refresh success uses rev_auth_success instead)",
+docs/json-schemas/cli/auth.output.json:115:    "rev_auth_success": {
+docs/json-schemas/cli/auth.output.json:116:      "title": "rev-auth helper SuccessJson (login / refresh success path)",
+docs/json-schemas/cli/auth.output.json:117:      "description": "Flat success shape printed by `rev-auth login` and inherited by `rev-stealth auth login` / `rev-stealth auth refresh`. Mirror of `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson` (line 212). No `operation` / no `result` wrapper.",
+docs/json-schemas/cli/README.md:52:### Envelope contracts (three flavours)
+docs/json-schemas/cli/README.md:76:   `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson`). The CLI's
+
+exec
+/bin/bash -lc 'git diff -- docs/json-schemas/cli/auth.output.json docs/json-schemas/cli/README.md crates/stealth-cli/tests/cli_output_schema_validation.rs' in $REPO_ROOT
+ succeeded in 0ms:
+exec
+/bin/bash -lc 'git status --short' in $REPO_ROOT
+ succeeded in 0ms:
+ M .agent/active/scoring/v1_3_j_convergence.md
+ M .agent/v1.3/cli-public-api.snapshot.json
+ M .github/workflows/bench.yml
+ M .github/workflows/ci.yml
+ M .github/workflows/coverage.yml
+ M .github/workflows/cross-platform-nightly.yml
+ M .github/workflows/fuzz-nightly.yml
+ M .github/workflows/security.yml
+ M .gitignore
+ M Cargo.lock
+ M crates/stealth-agent-contracts/Cargo.toml
+ M crates/stealth-auth/Cargo.toml
+ M crates/stealth-auth/src/bin/rev_auth.rs
+ M crates/stealth-cli/src/commands/auth.rs
+ M crates/stealth-cli/src/commands/cf_evaluate.rs
+ M crates/stealth-cli/src/commands/config_cli.rs
+ M crates/stealth-cli/src/commands/egress.rs
+ M crates/stealth-cli/src/commands/hermes.rs
+ M crates/stealth-cli/src/commands/measure.rs
+ M crates/stealth-cli/src/commands/mod.rs
+ M crates/stealth-cli/src/commands/relocate.rs
+ M crates/stealth-cli/src/commands/spider.rs
+ M crates/stealth-cli/src/config_io/migration.rs
+ M crates/stealth-cli/src/config_io/validate.rs
+ M crates/stealth-cli/src/config_io/writer.rs
+ M crates/stealth-cli/src/doctor.rs
+ M crates/stealth-cli/src/lib.rs
+ M crates/stealth-cli/tests/deprecated_completeness.rs
+ M crates/stealth-cli/tests/help_dictionary_quality.rs
+ M crates/stealth-mcp/Cargo.toml
+ M crates/stealth-mcp/src/bin/gen_reference.rs
+ M crates/stealth-mcp/src/server.rs
+ M crates/stealth-sanitize/benches/sanitize_hotpath.rs
+ M crates/stealth-sanitize/fuzz/Cargo.toml
+A  crates/stealth-sanitize/fuzz/fuzz_targets/sanitize_envelope_parse.rs
+ D crates/stealth-sanitize/fuzz/fuzz_targets/sanitize_full.rs
+ M crates/stealth-sites/Cargo.toml
+ M crates/vpn-rotate/Cargo.toml
+ M crates/vpn-rotate/src/credentials.rs
+ M docs/compat.md
+ M release-please-config.json
+ M scripts/mcp-schema-breaking.sh
+?? .agent/active/prompts/v1_3_g3_review.md
+?? .agent/active/prompts/v1_3_g3_review_round2.md
+?? .agent/active/prompts/v1_3_g3_review_round3.md
+?? .agent/active/prompts/v1_3_g4_review.md
+?? .agent/active/prompts/v1_3_g4_review_round2.md
+?? .agent/active/prompts/v1_3_g4_review_round3.md
+?? .agent/active/prompts/v1_3_i_fixup_review.md
+?? .agent/active/prompts/v1_3_i_fixup_review_r2_hardening.md
+?? .agent/active/prompts/v1_3_i_fixup_review_r2_hardening_round2.md
+?? .agent/active/prompts/v1_3_i_fixup_review_round2.md
+?? .agent/active/prompts/v1_3_i_fixup_review_round3.md
+?? .agent/active/prompts/v1_3_i_fixup_review_subphase_bc.md
+?? .agent/active/prompts/v1_3_i_fixup_review_subphase_bc_round2.md
+?? .agent/active/prompts/v1_3_i_fixup_review_subphase_bc_round3.md
+?? .agent/active/prompts/v1_3_k1_review.md
+?? .agent/active/prompts/v1_3_k1_review_round2.md
+?? .agent/active/prompts/v1_3_k1_review_round3.md
+?? .agent/active/prompts/v1_3_k2_review.md
+?? .agent/active/prompts/v1_3_k3_review.md
+?? .agent/active/prompts/v1_3_k3_review_round2.md
+?? .agent/active/prompts/v1_3_k4_review.md
+?? .agent/active/prompts/v1_3_k5_review.md
+?? .agent/active/prompts/v1_3_k5_review_round2.md
+?? .agent/active/prompts/v1_3_k5_review_round3.md
+?? .agent/active/prompts/v1_3_k6_review.md
+?? .agent/active/prompts/v1_3_k6_review_round2.md
+?? .agent/active/prompts/v1_3_k6_review_round3.md
+?? .agent/active/prompts/v1_3_k7_review.md
+?? .agent/active/prompts/v1_3_k8_review.md
+?? .agent/active/scoring/v1_3_g4_review_round1_codex.err
+?? .agent/active/scoring/v1_3_g4_review_round1_codex.out
+?? .agent/active/scoring/v1_3_g4_review_round2_codex.err
+?? .agent/active/scoring/v1_3_g4_review_round2_codex.out
+?? .agent/active/scoring/v1_3_g4_review_round3_codex.err
+?? .agent/active/scoring/v1_3_g4_review_round3_codex.out
+?? .agent/active/scoring/v1_3_h_convergence_r1.md
+?? .agent/active/scoring/v1_3_h_score_round1_codex.err
+?? .agent/active/scoring/v1_3_h_score_round1_codex.md
+?? .agent/active/scoring/v1_3_h_score_round1_codex.out
+?? .agent/active/scoring/v1_3_h_score_round1_opus.md
+?? .agent/active/scoring/v1_3_i_convergence.md
+?? .agent/active/scoring/v1_3_i_convergence_r1.md
+?? .agent/active/scoring/v1_3_i_convergence_r2.md
+?? .agent/active/scoring/v1_3_i_score_round1_codex.err
+?? .agent/active/scoring/v1_3_i_score_round1_codex.out
+?? .agent/active/scoring/v1_3_i_score_round1_codex_recorded.md
+?? .agent/active/scoring/v1_3_i_score_round1_opus.md
+?? .agent/active/scoring/v1_3_i_score_round2_codex.md
+?? .agent/active/scoring/v1_3_i_score_round2_codex.out
+?? .agent/active/scoring/v1_3_i_score_round2_codex_v2.md
+?? .agent/active/scoring/v1_3_i_score_round2_codex_v2.out
+?? .agent/active/scoring/v1_3_j_score_round1_opus.md
+?? .agent/active/scoring/v1_3_k_convergence.md
+?? .agent/active/scoring/v1_3_k_convergence_final.md
+?? .agent/active/scoring/v1_3_k_evidence_notes.md
+?? .agent/active/scoring/v1_3_k_score_round1_codex.md
+?? .agent/active/scoring/v1_3_k_score_round1_codex.out
+?? .agent/active/scoring/v1_3_k_score_round1_opus.md
+?? .agent/active/scoring/v1_3_k_score_round2_codex.md
+?? .agent/active/scoring/v1_3_k_score_round2_codex.out
+?? .agent/active/scoring/v1_3_k_score_round3_codex.md
+?? .agent/active/scoring/v1_3_k_score_round3_codex.out
+?? .agent/active/scoring/v1_3_k_score_round4_codex.err
+?? .agent/active/scoring/v1_3_k_score_round4_codex.out
+?? crates/stealth-agent-contracts/tests/
+?? crates/stealth-auth/benches/
+?? crates/stealth-auth/tests/proptest_envelope.rs
+?? crates/stealth-cli/src/commands/output_format.rs
+?? crates/stealth-cli/tests/cli_output_schema_validation.rs
+?? crates/stealth-cli/tests/completion_smoke.rs
+?? crates/stealth-cli/tests/output_format_coverage.rs
+?? crates/stealth-mcp/benches/
+?? crates/stealth-sites/benches/
+?? crates/vpn-rotate/tests/proptest_rotation_policy.rs
+?? docs/json-schemas/cli/
+?? scripts/changelog-keepachangelog-lint.py
+?? scripts/cli-public-api-snapshot.test.sh
+?? scripts/gen_completions.sh
+?? scripts/workspace-lib-crates.py
+?? target/
+
+codex
+I found the G.4 schema/test files are untracked in this working tree, so `git diff` cannot show the round delta. I’m reading the actual file contents and the live emitter paths directly instead.
+exec
+/bin/bash -lc "sed -n '52,90p' docs/json-schemas/cli/README.md" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,220p' docs/json-schemas/cli/auth.output.json" in $REPO_ROOT
+ succeeded in 0ms:
+### Envelope contracts (three flavours)
+
+The schemas document what each emitter *actually* writes, not an aspirational
+shape. Three envelope flavours exist in the current codebase:
+
+1. **Shared `{ok, operation, result|exit_code+error}` envelope** —
+   `captcha`, `browser`, `vpn`, `spider`, `relocate`, `cf-evaluate`, `auth`,
+   `measure`. Defined in each subcommand's local `emit_ok` / `emit_err`
+   helpers (call signature: `emit_ok(format, operation, payload)`). The
+   operation string is `"<noun>.<verb>"` for action-based commands
+   (`captcha.solve`, `vpn.rotate`) and just `"<noun>"` for single-shot
+   commands (`spider`, `measure`, `relocate`, `cf-evaluate`).
+
+2. **Hermes envelope `{kind, action, status, report|error}`** — pre-G.4
+   contract owned by `crates/stealth-cli/src/commands/hermes.rs`. `kind` is
+   always `"hermes"`, `status` is `"ok"` / `"error"`. The error envelope is
+   written to STDERR, not STDOUT.
+
+3. **No envelope at all** — `doctor` (raw `DoctorReport` / `DeepReport` /
+   `Vec<DeepCheck>` depending on flags) and `config` (each `run_*` builds
+   its own untagged shape). Additionally, `auth login` / `auth refresh`
+   *success* falls into this bucket: the CLI inherits stdout from the
+   external `rev-auth` helper, which prints a flat
+   `{ok, profile, domain, cookie_count, expires_at, saved_to}` shape (see
+   `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson`). The CLI's
+   shared envelope is only used for the `auth login`/`refresh` ERROR paths
+   (policy / AUP / VPN-guard / spawn failure before the helper runs).
+
+These mismatches predate Lane G.4. G.4 documents them honestly rather than
+forcibly normalising them — a future ExecPlan slice would be required to
+collapse all subcommands onto one envelope, and that's not a strict-additive
+change.
+
+### `anyOf` vs `oneOf` (round-2 calibration)
+
+Three schemas (`auth`, `doctor`, `config`) use `anyOf` rather than `oneOf` at
+the top level because their per-action shapes structurally overlap (e.g.
+`auth.delete`'s `{profile, deleted}` payload structurally also matches the
+looser `auth.show` payload that only requires `profile`; `config validate`'s
+
+ succeeded in 0ms:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rev-stealth.local/json-schemas/cli/auth.output.json",
+  "title": "rev-stealth auth --output-format json",
+  "description": "JSON payload emitted by `rev-stealth auth {login|list|show|delete|status|refresh} --output-format json`. v1.3 Lane G.4 contract.\n\nIMPORTANT — two distinct OK shapes coexist on this surface:\n\n1. `list` / `show` / `delete` / `status` success and ALL error paths flow through `crates/stealth-cli/src/commands/auth.rs::emit_ok`/`emit_err` and use the shared `{ok, operation, result|exit_code+error}` envelope.\n\n2. `login` / `refresh` SUCCESS is emitted by the external `rev-auth` helper binary (`crates/stealth-auth/src/bin/rev_auth.rs`), whose stdout is inherited by the CLI. That helper writes a FLAT `SuccessJson` shape with no envelope: `{ok, profile, domain, cookie_count, expires_at, saved_to}`. The CLI's `auth.login` / `auth.refresh` ENVELOPE is only used for *errors* (policy-load, AUP, VPN-guard, spawn-failure) before the helper is invoked.\n\nThis split is documented honestly rather than being papered over — collapsing the two surfaces onto one envelope requires changing `rev-auth` (out of scope for G.4, which is strict-additive).\n\nCookie *values* are NEVER serialized in either shape; only sha256 prefixes (envelope path) and counts/expires_at (flat path).",
+  "oneOf": [
+    {
+      "title": "Shared OK envelope (list / show / delete / status; never login / refresh success)",
+      "type": "object",
+      "required": ["ok", "operation", "result"],
+      "properties": {
+        "ok": { "const": true },
+        "operation": {
+          "type": "string",
+          "enum": ["auth.list", "auth.show", "auth.delete", "auth.status"]
+        },
+        "result": {
+          "description": "anyOf (not oneOf) because the payload shapes overlap structurally (e.g. delete_payload is a superset of show_or_login_payload's required fields). Live emission disambiguates via the parent `operation` enum.",
+          "anyOf": [
+            { "$ref": "#/$defs/list_payload" },
+            { "$ref": "#/$defs/show_or_login_payload" },
+            { "$ref": "#/$defs/delete_payload" },
+            { "$ref": "#/$defs/status_payload" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Shared ERR envelope (all six actions)",
+      "type": "object",
+      "required": ["ok", "operation", "exit_code", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "operation": {
+          "type": "string",
+          "enum": ["auth.login", "auth.list", "auth.show", "auth.delete", "auth.status", "auth.refresh"]
+        },
+        "exit_code": { "type": "integer", "minimum": 0, "description": "0 ok / 1 user / 3 permanent / 4 auth-expired / aborted variants per crates/stealth-cli/src/commands/auth.rs::EXIT_*." },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "rev-auth login/refresh SUCCESS (flat SuccessJson; no envelope)",
+      "description": "Emitted by `crates/stealth-auth/src/bin/rev_auth.rs` line 212 (struct) / line 382 (println). The CLI's `auth.login` / `auth.refresh` success path inherits this stdout verbatim — see `crates/stealth-cli/src/commands/auth.rs::spawn_rev_auth_login` (line 406).",
+      "$ref": "#/$defs/rev_auth_success"
+    }
+  ],
+  "$defs": {
+    "list_payload": {
+      "title": "auth.list result",
+      "type": "object",
+      "required": ["profiles"],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/profile_meta" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "profile_meta": {
+      "type": "object",
+      "required": ["profile", "created_at", "last_used", "status", "cookie_values_returned"],
+      "properties": {
+        "profile": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "last_used": { "type": "string", "format": "date-time" },
+        "cookie_count": { "type": "integer", "minimum": 0 },
+        "cookie_name_sha256_prefixes": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "cookie_values_returned": { "const": false }
+      },
+      "additionalProperties": true
+    },
+    "show_or_login_payload": {
+      "title": "auth.show result (also: shape historically aliased for login/refresh envelope, but live login/refresh success uses rev_auth_success instead)",
+      "type": "object",
+      "required": ["profile"],
+      "properties": {
+        "profile": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": ["string", "null"], "format": "date-time" },
+        "last_used": { "type": ["string", "null"], "format": "date-time" },
+        "cookie_name_sha256_prefixes": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": ["string", "null"] },
+        "cookie_values_returned": { "const": false }
+      },
+      "additionalProperties": true
+    },
+    "delete_payload": {
+      "title": "auth.delete result",
+      "type": "object",
+      "required": ["profile", "deleted"],
+      "properties": {
+        "profile": { "type": "string" },
+        "deleted": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "status_payload": {
+      "title": "auth.status result",
+      "type": "object",
+      "required": ["profile", "status", "exit_code"],
+      "properties": {
+        "profile": { "type": "string" },
+        "status": { "type": "string" },
+        "warn_level": { "type": ["string", "null"] },
+        "exit_code": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "rev_auth_success": {
+      "title": "rev-auth helper SuccessJson (login / refresh success path)",
+      "description": "Flat success shape printed by `rev-auth login` and inherited by `rev-stealth auth login` / `rev-stealth auth refresh`. Mirror of `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson` (line 212). No `operation` / no `result` wrapper.",
+      "type": "object",
+      "required": ["ok", "profile", "domain", "cookie_count", "saved_to"],
+      "properties": {
+        "ok": { "const": true },
+        "profile": { "type": "string" },
+        "domain": { "type": "string", "description": "eTLD+1 of the authorized origin." },
+        "cookie_count": { "type": "integer", "minimum": 0 },
+        "expires_at": { "type": ["string", "null"], "format": "date-time", "description": "Latest cookie expiry (RFC 3339), or null when no cookie carries an expiry." },
+        "saved_to": { "type": "string", "description": "Encrypted cookie-jar path on disk." }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+exec
+/bin/bash -lc "sed -n '315,425p' crates/stealth-cli/tests/cli_output_schema_validation.rs" in $REPO_ROOT
+ succeeded in 0ms:
+fn auth_envelopes_validate() {
+    let s = load("auth.output.json");
+    let list = json!({
+        "ok": true,
+        "operation": "auth.list",
+        "result": {
+            "profiles": [
+                {
+                    "profile": "p1",
+                    "domains": ["example.test"],
+                    "created_at": "2026-05-22T00:00:00+00:00",
+                    "last_used": "2026-05-22T00:00:00+00:00",
+                    "cookie_count": 2,
+                    "status": "valid",
+                    "cookie_values_returned": false,
+                }
+            ]
+        },
+    });
+    validate_ok(&s, &list, "auth.list");
+    let show = json!({
+        "ok": true,
+        "operation": "auth.show",
+        "result": {
+            "profile": "p1",
+            "domains": ["example.test"],
+            "created_at": "2026-05-22T00:00:00+00:00",
+            "last_used": "2026-05-22T00:00:00+00:00",
+            "cookie_name_sha256_prefixes": ["abcd"],
+            "status": "valid",
+            "cookie_values_returned": false,
+        },
+    });
+    validate_ok(&s, &show, "auth.show");
+    let delete = json!({
+        "ok": true,
+        "operation": "auth.delete",
+        "result": { "profile": "p1", "deleted": true },
+    });
+    validate_ok(&s, &delete, "auth.delete");
+    let status = json!({
+        "ok": true,
+        "operation": "auth.status",
+        "result": {
+            "profile": "p1",
+            "status": "valid",
+            "warn_level": null,
+            "exit_code": 0,
+        },
+    });
+    validate_ok(&s, &status, "auth.status");
+    let err = json!({
+        "ok": false,
+        "operation": "auth.refresh",
+        "exit_code": 4,
+        "error": "auth expired",
+    });
+    validate_ok(&s, &err, "auth.refresh ERR");
+    // Round-3 fix: cover the ERR envelope for login as well — the CLI itself
+    // emits this on policy / AUP / VPN-guard / spawn failures BEFORE handing
+    // off to rev-auth, so it must validate against the schema.
+    let login_err = json!({
+        "ok": false,
+        "operation": "auth.login",
+        "exit_code": 1,
+        "error": "AUP: domain not authorized",
+    });
+    validate_ok(&s, &login_err, "auth.login ERR");
+}
+
+#[test]
+fn auth_login_refresh_flat_success_validates() {
+    // Round-3 fix for reviewer round-2 BLOCK: `rev-stealth auth login` and
+    // `auth refresh` SUCCESS paths inherit stdout from the external rev-auth
+    // helper, which prints a flat `SuccessJson` (no envelope). The schema
+    // must accept this as a distinct top-level branch — see
+    // `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson` (line 212) and
+    // the println at line 382, plus `auth.rs::spawn_rev_auth_login` line 406
+    // which inherits the child's stdout.
+    let s = load("auth.output.json");
+    let login_success = json!({
+        "ok": true,
+        "profile": "p1",
+        "domain": "example.test",
+        "cookie_count": 4,
+        "expires_at": "2026-06-22T00:00:00+00:00",
+        "saved_to": "/home/u/.rev_scraping/auth/p1.enc",
+    });
+    validate_ok(&s, &login_success, "auth.login flat SuccessJson");
+    // expires_at can be null when no cookie carries an expiry.
+    let login_success_no_expiry = json!({
+        "ok": true,
+        "profile": "p1",
+        "domain": "example.test",
+        "cookie_count": 0,
+        "expires_at": null,
+        "saved_to": "/home/u/.rev_scraping/auth/p1.enc",
+    });
+    validate_ok(&s, &login_success_no_expiry, "auth.login flat SuccessJson (no expiry)");
+}
+
+// ---------- 3) hermes (its own envelope) ----------------------------------
+
+#[test]
+fn hermes_envelopes_validate() {
+    let s = load("hermes.output.json");
+    let ok = json!({
+        "kind": "hermes",
+        "action": "install",
+        "status": "ok",
+        "report": {
+
+exec
+/bin/bash -lc "sed -n '200,410p' crates/stealth-auth/src/bin/rev_auth.rs && sed -n '360,415p' crates/stealth-cli/src/commands/auth.rs" in $REPO_ROOT
+ succeeded in 0ms:
+        } else {
+            Self::Other
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct DisplayModeDecision {
+    mode: DisplayMode,
+    warnings: Vec<&'static str>,
+}
+
+#[derive(Serialize)]
+struct SuccessJson {
+    ok: bool,
+    profile: String,
+    domain: String,
+    cookie_count: usize,
+    expires_at: Option<String>,
+    saved_to: String,
+}
+
+trait CookieStore {
+    fn save_cookies(
+        &self,
+        profile: &str,
+        cookies: &[Cookie],
+        aad_context: &str,
+    ) -> anyhow::Result<()>;
+}
+
+impl CookieStore for AuthStore {
+    fn save_cookies(
+        &self,
+        profile: &str,
+        cookies: &[Cookie],
+        aad_context: &str,
+    ) -> anyhow::Result<()> {
+        self.save(profile, cookies, aad_context)?;
+        Ok(())
+    }
+}
+
+fn default_require_vpn() -> bool {
+    true
+}
+
+#[tokio::main]
+async fn main() {
+    install_auth_panic_hook();
+    let cli = Cli::parse();
+    let code = match cli.command {
+        Command::Login(args) => match run_login(args).await {
+            Ok(()) => 0,
+            Err(error) => {
+                eprintln!("{}", error.message);
+                error.code
+            }
+        },
+    };
+    std::process::exit(code);
+}
+
+async fn run_login(args: LoginArgs) -> Result<(), AppError> {
+    validate_login_args(&args).map_err(|error| AppError::new(EXIT_USER, error.to_string()))?;
+    let env = ProcessEnv;
+    let display_mode = resolve_login_display_mode(&args, &env, TargetOs::current());
+    let login_url = Url::parse(&args.url)
+        .map_err(|error| AppError::new(EXIT_USER, format!("invalid url: {error}")))?;
+    ObscuraBridge::validate_url(&login_url)
+        .map_err(|error| AppError::new(EXIT_USER, format!("SSRF guard: {error}")))?;
+
+    let target_etld1 = registrable_domain(&args.domain)
+        .ok_or_else(|| AppError::new(EXIT_USER, format!("invalid domain {:?}", args.domain)))?;
+    let url_host = login_url
+        .host_str()
+        .ok_or_else(|| AppError::new(EXIT_USER, "login URL must include a host"))?;
+    registrable_domain(url_host)
+        .ok_or_else(|| AppError::new(EXIT_USER, format!("invalid login URL host {url_host:?}")))?;
+
+    match auth_aup::enforce(&args.domain, &args.url) {
+        AuthAupDecision::Allowed => {}
+        AuthAupDecision::Rejected { message } => {
+            return Err(AppError::new(EXIT_USER, format!("AUP: {message}")));
+        }
+    }
+
+    if args.obscura_bin.is_some() {
+        eprintln!(
+            "warning: --obscura-bin / REV_OBSCURA_BIN are deprecated for rev-auth; \
+             use --chrome-bin / REV_AUTH_CHROME_BIN (the flag is ignored)"
+        );
+    }
+
+    let vpn = prepare_vpn_context()
+        .await
+        .map_err(|error| AppError::new(EXIT_LEAK, error.to_string()))?;
+
+    let chrome_bin = resolve_chrome_binary(args.chrome_bin.as_deref())
+        .map_err(|error| AppError::new(EXIT_CHROME_NOT_FOUND, error.to_string()))?;
+
+    let profile_dir = ProfileDir::prepare(args.user_data_dir.as_deref())
+        .map_err(|error| AppError::new(EXIT_USER, format!("profile dir: {error}")))?;
+
+    let auth_dir = default_auth_dir()
+        .map_err(|error| AppError::new(EXIT_USER, format!("auth dir: {error}")))?;
+    storage::ensure_auth_dir(&auth_dir)
+        .map_err(|error| AppError::new(EXIT_USER, format!("auth dir: {error}")))?;
+    append_auth_login_start_audit(&auth_dir, &args.profile, display_mode)
+        .map_err(|error| AppError::new(EXIT_USER, format!("audit log: {error}")))?;
+
+    let config = build_chrome_config_with_vpn(
+        &chrome_bin,
+        profile_dir.path(),
+        vpn.selection.as_ref(),
+        display_mode,
+    )
+    .map_err(|error| {
+        let code = if display_mode == DisplayMode::Xvfb {
+            EXIT_CHROME_NOT_FOUND
+        } else {
+            EXIT_USER
+        };
+        AppError::new(code, format!("chrome config: {error}"))
+    })?;
+
+    let (mut browser, mut handler) = Browser::launch(config)
+        .await
+        .map_err(|error| AppError::new(EXIT_USER, format!("chrome launch: {error}")))?;
+    let handler_task = tokio::spawn(async move {
+        while let Some(event) = handler.next().await {
+            // Drain the CDP event stream. We deliberately ignore individual
+            // events here: cookie capture happens via an explicit CDP call.
+            drop(event);
+        }
+    });
+
+    let nav_result: Result<(), AppError> = async {
+        let page = browser
+            .new_page("about:blank")
+            .await
+            .map_err(|error| AppError::new(EXIT_USER, format!("new_page: {error}")))?;
+        page.goto(login_url.as_str())
+            .await
+            .map_err(|error| AppError::new(EXIT_USER, format!("navigate: {error}")))?;
+
+        wait_for_user_or_pattern(
+            &page,
+            args.completion_pattern.as_deref(),
+            vpn.monitor.as_ref(),
+        )
+        .await?;
+
+        if let Some(monitor) = vpn.monitor.as_ref() {
+            if monitor.state_clone().read().await.leak_detected {
+                return Err(AppError::new(EXIT_LEAK, "vpn leak detected during capture"));
+            }
+        }
+
+        let mut raw_cookies = page
+            .get_cookies()
+            .await
+            .map_err(|error| AppError::new(EXIT_USER, format!("cookie capture: {error}")))?;
+        let mut cookies = filter_cdp_cookies(raw_cookies.iter_mut(), &target_etld1)
+            .map_err(|error| AppError::new(EXIT_USER, error.to_string()))?;
+        drop(raw_cookies);
+
+        if all_cookies_expired(&cookies, Utc::now()) {
+            cookies.zeroize();
+            return Err(AppError::new(
+                EXIT_AUTH_EXPIRED,
+                "captured cookies are all expired",
+            ));
+        }
+
+        // Save inside this scope so the page handle is still alive (we don't
+        // strictly need it, but it keeps cleanup ordering simple).
+        let store = open_store(&auth_dir)
+            .map_err(|error| AppError::new(EXIT_USER, format!("auth store: {error}")))?;
+        save_cookies_with_store(&store, &args.profile, &cookies, &args.aad_context)
+            .map_err(|error| AppError::new(EXIT_USER, format!("auth save: {error}")))?;
+
+        let output = SuccessJson {
+            ok: true,
+            profile: args.profile.clone(),
+            domain: target_etld1.clone(),
+            cookie_count: cookies.len(),
+            expires_at: latest_expires_at(&cookies).map(|expires| expires.to_rfc3339()),
+            saved_to: storage::enc_path(&auth_dir, &args.profile)
+                .display()
+                .to_string(),
+        };
+        cookies.zeroize();
+        drop(cookies);
+        let _ = page.close().await;
+
+        // Phase 9e: best-effort completion marker for MCP `auth_login_complete`.
+        if let Some(token) = args.mcp_session_token.as_deref() {
+            let marker = std::env::temp_dir().join(format!("rev-auth-{token}.complete"));
+            let _ = fs::write(&marker, b"done");
+        }
+        println!(
+            "{}",
+            serde_json::to_string(&output)
+                .map_err(|error| AppError::new(EXIT_USER, format!("json output: {error}")))?
+        );
+        Ok(())
+    }
+    .await;
+
+    // Always tear down Chrome regardless of outcome.
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn spawn_rev_auth_login(
+    format: OutputFormat,
+    op: &str,
+    profile: &str,
+    url: &str,
+    domain: &str,
+    completion_pattern: Option<&str>,
+    obscura_bin: Option<&std::path::Path>,
+    rev_auth_bin: Option<&std::path::Path>,
+    aad_context: &str,
+) -> i32 {
+    let helper = match rev_auth_bin
+        .map(std::path::Path::to_path_buf)
+        .or_else(|| find_in_path("rev-auth"))
+    {
+        Some(p) => p,
+        None => {
+            emit_err(
+                format,
+                op,
+                EXIT_PERMANENT,
+                "rev-auth binary not found in PATH (use --rev-auth-bin)",
+            );
+            return EXIT_PERMANENT;
+        }
+    };
+    let mut cmd = ProcessCommand::new(&helper);
+    cmd.arg("login")
+        .arg("--profile")
+        .arg(profile)
+        .arg("--url")
+        .arg(url)
+        .arg("--domain")
+        .arg(domain)
+        .arg("--aad-context")
+        .arg(aad_context);
+    if let Some(p) = completion_pattern {
+        cmd.arg("--completion-pattern").arg(p);
+    }
+    if let Some(p) = obscura_bin {
+        cmd.arg("--obscura-bin").arg(p);
+    }
+    // stdin/stdout/stderr inherited — rev-auth prints its own JSON on success.
+    match cmd.status() {
+        Ok(status) => status.code().unwrap_or(EXIT_PERMANENT),
+        Err(error) => {
+            emit_err(
+                format,
+                op,
+                EXIT_TRANSIENT,
+                &format!("rev-auth spawn failed: {error}"),
+            );
+
+codex
+The schema now has distinct branches for OK envelopes, ERR envelopes, and the helper-owned flat success shape. I’m doing one targeted validation run because it directly exercises the branch that was missing in round 2.
+exec
+/bin/bash -lc 'cargo test -p rev-stealth --test cli_output_schema_validation' in $REPO_ROOT
+ succeeded in 196ms:
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/cli_output_schema_validation.rs (target/debug/deps/cli_output_schema_validation-699b4641a02a46b0)
+
+running 20 tests
+test cf_evaluate_envelope_validates ... ok
+test config_diff_validates ... ok
+test captcha_solve_and_verify_validate ... ok
+test browser_launch_envelope_validates ... ok
+test auth_envelopes_validate ... ok
+test config_paths_array_validates ... ok
+test auth_login_refresh_flat_success_validates ... ok
+test config_validate_validates ... ok
+test spider_envelope_validates ... ok
+test doctor_report_validates ... ok
+test config_show_validates ... ok
+test doctor_vps_array_validates ... ok
+test doctor_deep_validates ... ok
+test config_outcomes_validates ... ok
+test relocate_envelope_validates ... ok
+test config_get_validates ... ok
+test hermes_envelopes_validate ... ok
+test vpn_rotate_and_status_validate ... ok
+test measure_ok_and_err_envelopes_validate ... ok
+test all_cli_output_schemas_compile_as_draft7 ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+exec
+/bin/bash -lc "sed -n '253,360p' crates/stealth-cli/src/commands/auth.rs" in $REPO_ROOT
+ succeeded in 0ms:
+pub async fn run(format: OutputFormat, args: AuthArgs) -> i32 {
+    match args.action {
+        AuthAction::Login(a) => run_login(format, a).await,
+        AuthAction::List(_) => run_list(format),
+        AuthAction::Show(a) => run_show(format, a),
+        AuthAction::Delete(a) => run_delete(format, a, &mut StdinConfirm),
+        AuthAction::Status(a) => run_status(format, a),
+        AuthAction::Refresh(a) => run_refresh(format, a).await,
+    }
+}
+
+async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
+    let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
+        Ok(d) => d,
+        Err(msg) => {
+            emit_err(format, "auth.login", EXIT_USER, &msg);
+            return EXIT_USER;
+        }
+    };
+    match auth_aup::enforce(&domain, &args.url) {
+        AuthAupDecision::Allowed => {}
+        AuthAupDecision::Rejected { message } => {
+            emit_err(format, "auth.login", EXIT_USER, &format!("AUP: {message}"));
+            return EXIT_USER;
+        }
+    }
+    let policy = match crate::policy::Policy::load() {
+        Ok(p) => p.with_env_overrides(),
+        Err(e) => {
+            emit_err(
+                format,
+                "auth.login",
+                EXIT_PERMANENT,
+                &format!("policy load: {e}"),
+            );
+            return EXIT_PERMANENT;
+        }
+    };
+    let cli_tri = crate::policy::cli_flags_to_tristate(args.require_vpn, args.allow_no_vpn);
+    let require_vpn = crate::policy::effective_require_vpn(cli_tri, &policy);
+    if let Err(e) = crate::vpn_guard::run_startup_probe(require_vpn, &policy).await {
+        let code = e.exit_code().as_i32();
+        emit_err(format, "auth.login", code, &format!("{e}"));
+        return code;
+    }
+    spawn_rev_auth_login(
+        format,
+        "auth.login",
+        &args.profile,
+        &args.url,
+        &domain,
+        args.completion_pattern.as_deref(),
+        args.obscura_bin.as_deref(),
+        args.rev_auth_bin.as_deref(),
+        &args.aad_context,
+    )
+}
+
+async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
+    let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
+        Ok(d) => d,
+        Err(msg) => {
+            emit_err(format, "auth.refresh", EXIT_USER, &msg);
+            return EXIT_USER;
+        }
+    };
+    match auth_aup::enforce(&domain, &args.url) {
+        AuthAupDecision::Allowed => {}
+        AuthAupDecision::Rejected { message } => {
+            emit_err(
+                format,
+                "auth.refresh",
+                EXIT_USER,
+                &format!("AUP: {message}"),
+            );
+            return EXIT_USER;
+        }
+    }
+    let policy = match crate::policy::Policy::load() {
+        Ok(p) => p.with_env_overrides(),
+        Err(e) => {
+            emit_err(
+                format,
+                "auth.refresh",
+                EXIT_PERMANENT,
+                &format!("policy load: {e}"),
+            );
+            return EXIT_PERMANENT;
+        }
+    };
+    let cli_tri = crate::policy::cli_flags_to_tristate(args.require_vpn, args.allow_no_vpn);
+    let require_vpn = crate::policy::effective_require_vpn(cli_tri, &policy);
+    if let Err(e) = crate::vpn_guard::run_startup_probe(require_vpn, &policy).await {
+        let code = e.exit_code().as_i32();
+        emit_err(format, "auth.refresh", code, &format!("{e}"));
+        return code;
+    }
+    spawn_rev_auth_login(
+        format,
+        "auth.refresh",
+        &args.profile,
+        &args.url,
+        &domain,
+        args.completion_pattern.as_deref(),
+        args.obscura_bin.as_deref(),
+        args.rev_auth_bin.as_deref(),
+        &args.aad_context,
+    )
+
+exec
+/bin/bash -lc "sed -n '416,660p' crates/stealth-cli/src/commands/auth.rs" in $REPO_ROOT
+ succeeded in 0ms:
+            EXIT_TRANSIENT
+        }
+    }
+}
+
+fn run_list(format: OutputFormat) -> i32 {
+    let store = match open_store(format, "auth.list") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    let profiles = match store.list_profiles() {
+        Ok(p) => p,
+        Err(error) => return emit_store_err(format, "auth.list", error),
+    };
+    let items: Vec<serde_json::Value> = profiles
+        .iter()
+        .map(|meta| {
+            let status = store.status(&meta.profile);
+            json!({
+                "profile": meta.profile,
+                "domains": meta.domains,
+                "created_at": meta.created_at.to_rfc3339(),
+                "last_used": meta.last_used.to_rfc3339(),
+                "cookie_count": meta.cookie_name_sha256_prefixes.len(),
+                "status": status_str(status),
+                "cookie_values_returned": false,
+            })
+        })
+        .collect();
+    emit_ok(format, "auth.list", json!({ "profiles": items }));
+    EXIT_OK
+}
+
+fn run_show(format: OutputFormat, args: ShowArgs) -> i32 {
+    let store = match open_store(format, "auth.show") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    let profiles = match store.list_profiles() {
+        Ok(p) => p,
+        Err(error) => return emit_store_err(format, "auth.show", error),
+    };
+    let Some(meta) = profiles.into_iter().find(|m| m.profile == args.profile) else {
+        emit_err(
+            format,
+            "auth.show",
+            EXIT_USER,
+            &format!("profile not found: {}", args.profile),
+        );
+        return EXIT_USER;
+    };
+    let status = store.status(&meta.profile);
+    emit_ok(
+        format,
+        "auth.show",
+        json!({
+            "profile": meta.profile,
+            "domains": meta.domains,
+            "created_at": meta.created_at.to_rfc3339(),
+            "last_used": meta.last_used.to_rfc3339(),
+            // sha256 prefixes only; cookie name plaintext and value never disclosed.
+            "cookie_name_sha256_prefixes": meta.cookie_name_sha256_prefixes,
+            "status": status_str(status),
+            "cookie_values_returned": false,
+        }),
+    );
+    EXIT_OK
+}
+
+fn run_delete(format: OutputFormat, args: DeleteArgs, confirm: &mut dyn Confirm) -> i32 {
+    if !args.force && !confirm.confirm(&format!("Delete auth profile {:?}? [y/N]: ", args.profile))
+    {
+        emit_err(format, "auth.delete", EXIT_ABORTED, "user declined");
+        return EXIT_ABORTED;
+    }
+    let store = match open_store(format, "auth.delete") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    match store.delete(&args.profile) {
+        Ok(()) => {
+            emit_ok(
+                format,
+                "auth.delete",
+                json!({ "profile": args.profile, "deleted": true }),
+            );
+            EXIT_OK
+        }
+        Err(error) => emit_store_err(format, "auth.delete", error),
+    }
+}
+
+fn run_status(format: OutputFormat, args: StatusArgs) -> i32 {
+    let store = match open_store(format, "auth.status") {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    let status = store.status(&args.profile);
+    let exit = match status {
+        ProfileStatus::Valid
+        | ProfileStatus::ExpiringSoon
+        | ProfileStatus::ExpiringCritical
+        | ProfileStatus::PartiallyExpired => EXIT_OK,
+        ProfileStatus::AllExpired => EXIT_AUTH_EXPIRED,
+        ProfileStatus::Missing => EXIT_USER,
+    };
+    emit_ok(
+        format,
+        "auth.status",
+        json!({
+            "profile": args.profile,
+            "status": status_str(status),
+            "warn_level": warn_level_for(status),
+            "exit_code": exit,
+        }),
+    );
+    exit
+}
+
+/// v1.1.0 (P14): map ProfileStatus → user-facing warn level for JSON output.
+fn warn_level_for(status: ProfileStatus) -> &'static str {
+    match status {
+        ProfileStatus::Valid => "ok",
+        ProfileStatus::ExpiringSoon => "soon",
+        ProfileStatus::ExpiringCritical => "critical",
+        ProfileStatus::PartiallyExpired => "soon",
+        ProfileStatus::AllExpired => "expired",
+        ProfileStatus::Missing => "expired",
+    }
+}
+
+fn open_store(format: OutputFormat, op: &str) -> Result<AuthStore, i32> {
+    let dir = auth_dir_from_env_or_default();
+    AuthStore::open(&dir).map_err(|error| emit_store_err(format, op, error))
+}
+
+fn auth_dir_from_env_or_default() -> PathBuf {
+    if let Some(path) = std::env::var_os("REV_SCRAPING_AUTH_DIR") {
+        return PathBuf::from(path);
+    }
+    default_auth_store_dir()
+}
+
+fn emit_store_err(format: OutputFormat, op: &str, error: AuthStoreError) -> i32 {
+    let (code, msg) = map_store_error(&error);
+    emit_err(format, op, code, &msg);
+    code
+}
+
+fn map_store_error(error: &AuthStoreError) -> (i32, String) {
+    match error {
+        AuthStoreError::NotFound(p) => (EXIT_AUTH_EXPIRED, format!("profile not found: {p}")),
+        AuthStoreError::BadKeyOrTamper => (EXIT_LEAK, error.to_string()),
+        AuthStoreError::ProfileHashMismatch => (EXIT_LEAK, error.to_string()),
+        AuthStoreError::KeyringUnavailable(_) => (EXIT_PERMANENT, error.to_string()),
+        AuthStoreError::Io(_) => (EXIT_PERMANENT, error.to_string()),
+        AuthStoreError::Serde(_) => (EXIT_PERMANENT, error.to_string()),
+        AuthStoreError::Crypto(_) => (EXIT_PERMANENT, error.to_string()),
+    }
+}
+
+fn status_str(status: ProfileStatus) -> &'static str {
+    match status {
+        ProfileStatus::Valid => "Valid",
+        ProfileStatus::ExpiringSoon => "ExpiringSoon",
+        ProfileStatus::ExpiringCritical => "ExpiringCritical",
+        ProfileStatus::PartiallyExpired => "PartiallyExpired",
+        ProfileStatus::AllExpired => "AllExpired",
+        ProfileStatus::Missing => "Missing",
+    }
+}
+
+fn resolve_domain(url: &str, explicit: Option<&str>) -> Result<String, String> {
+    if let Some(d) = explicit {
+        let trimmed = d.trim();
+        if trimmed.is_empty() {
+            return Err("--domain must not be empty".to_string());
+        }
+        return Ok(trimmed.to_string());
+    }
+    let parsed = url::Url::parse(url).map_err(|error| format!("invalid --url {url:?}: {error}"))?;
+    parsed
+        .host_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| format!("--url {url:?} has no host"))
+}
+
+fn find_in_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
+    match format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                json!({ "ok": true, "operation": op, "result": payload })
+            );
+        }
+        OutputFormat::Human => {
+            println!("[OK] {op}");
+            if let Ok(s) = serde_json::to_string_pretty(&payload) {
+                println!("{s}");
+            }
+        }
+    }
+}
+
+fn emit_err(format: OutputFormat, op: &str, exit: i32, msg: &str) {
+    match format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                json!({
+                    "ok": false,
+                    "operation": op,
+                    "exit_code": exit,
+                    "error": msg,
+                })
+            );
+        }
+        OutputFormat::Human => {
+            eprintln!("[ERROR] {op}: {msg}");
+        }
+    }
+}
+
+trait Confirm {
+    fn confirm(&mut self, prompt: &str) -> bool;
+}
+
+struct StdinConfirm;
+
+impl Confirm for StdinConfirm {
+    fn confirm(&mut self, prompt: &str) -> bool {
+        let stderr = io::stderr();
+        let mut handle = stderr.lock();
+        let _ = handle.write_all(prompt.as_bytes());
+
+exec
+/bin/bash -lc 'cargo test -p rev-stealth --test output_format_coverage' in $REPO_ROOT
+ succeeded in 190ms:
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/output_format_coverage.rs (target/debug/deps/output_format_coverage-dcdefecb18b6e99a)
+
+running 4 tests
+test json_schema_inventory_matches_subcommand_set ... ok
+test clap_command_tree_has_no_arg_id_collision ... ok
+test global_format_json_remains_compatible ... ok
+test every_subcommand_accepts_output_format_json ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+codex
+METRIC: lane=G.4 round=3 verdict=LGTM subcmds_with_output_format=11/11 schemas=11/11 collisions=0 issues=0
+
+Round-2 auth success drift is addressed: schema now accepts the helper-owned flat `SuccessJson` shape.
+Envelope OK is restricted to `list/show/delete/status`; ERR covers the CLI-owned pre-helper failure paths.
+The new schema validation test covers flat login/refresh success with expiry and null expiry, plus login ERR.
+Verified: `cargo test -p rev-stealth --test cli_output_schema_validation` and `output_format_coverage` both pass.
+tokens used
+41,411
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"2d3044ba-37eb-4569-a7eb-1b6e18f27373","timestamp":"2026-05-22T22:40:18Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":96108,"tokens_in":41411,"tokens_out":0,"total_tokens":41411,"dry_run":false,"specialty_status":"none"}

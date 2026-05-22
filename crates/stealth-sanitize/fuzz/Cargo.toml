@@ -2,8 +2,9 @@
 # Lane K K.5 — cargo-fuzz harness for stealth-sanitize.
 #
 # Build with:
-#   cargo +nightly fuzz run sanitize_full
-#   cargo +nightly fuzz run sanitize_l4_unicode
+#   cargo +nightly fuzz run sanitize_envelope_parse   # L2 envelope parse
+#   cargo +nightly fuzz run sanitize_l4_unicode       # L4 unicode normalize
+#   cargo +nightly fuzz run mcp_jsonrpc_frame         # MCP frame parser
 #
 # Nightly GH cron runs each target ~1h/day. Crash artifacts are pinned
 # as seed corpus under fuzz/corpus/<target>/.
@@ -25,8 +26,8 @@ stealth-sanitize = { path = ".." }
 stealth-mcp = { path = "../../stealth-mcp" }
 
 [[bin]]
-name = "sanitize_full"
-path = "fuzz_targets/sanitize_full.rs"
+name = "sanitize_envelope_parse"
+path = "fuzz_targets/sanitize_envelope_parse.rs"
 test = false
 doc = false
 bench = false

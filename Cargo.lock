@@ -580,6 +580,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0a7a9bfdb35811f9e59832f0f05975114d2251b415fb534108e6f34060fd772"
+dependencies = [
+ "clap",
+]
+
+[[package]]
+name = "clap_complete_nushell"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbb9e9715d29a754b468591be588f6b926f5b0a1eb6a8b62acabeb66ff84d897"
+dependencies = [
+ "clap",
+ "clap_complete",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2514,8 +2533,45 @@ dependencies = [
 ]
 
 [[package]]
-name = "rev-stealth-cli"
+name = "rev-stealth"
 version = "1.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "captcha-bypass",
+ "chrono",
+ "clap",
+ "clap_complete",
+ "clap_complete_nushell",
+ "dirs",
+ "insta",
+ "jsonschema",
+ "mobile-fp",
+ "obscura-bridge",
+ "regex",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "stealth-auth",
+ "stealth-cf",
+ "stealth-core",
+ "stealth-parse",
+ "stealth-sites",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "vpn-rotate",
+]
 
 [[package]]
 name = "ring"
@@ -3004,6 +3060,7 @@ name = "stealth-agent-contracts"
 version = "1.2.0"
 dependencies = [
  "dashmap",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3022,11 +3079,13 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "clap",
+ "criterion",
  "dirs",
  "futures",
  "keyring",
  "obscura-bridge",
  "parking_lot",
+ "proptest",
  "publicsuffix",
  "rand 0.8.6",
  "regex",
@@ -3064,45 +3123,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "stealth-cli"
-version = "1.2.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "captcha-bypass",
- "chrono",
- "clap",
- "dirs",
- "insta",
- "jsonschema",
- "mobile-fp",
- "obscura-bridge",
- "regex",
- "reqwest",
- "secrecy",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "stealth-auth",
- "stealth-cf",
- "stealth-core",
- "stealth-parse",
- "stealth-sites",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml",
- "tower",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "vpn-rotate",
-]
-
-[[package]]
 name = "stealth-core"
 version = "1.2.0"
 dependencies = [
@@ -3123,6 +3143,7 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "criterion",
  "dashmap",
  "dirs",
  "parking_lot",
@@ -3180,6 +3201,7 @@ name = "stealth-sites"
 version = "1.2.0"
 dependencies = [
  "anyhow",
+ "criterion",
  "pretty_assertions",
  "regex",
  "serde",
@@ -3786,6 +3808,7 @@ dependencies = [
  "async-trait",
  "bollard",
  "dashmap",
+ "proptest",
  "regex",
  "reqwest",
  "secrecy",

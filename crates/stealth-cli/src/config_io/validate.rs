@@ -151,9 +151,7 @@ pub fn validate_authorized_toml(text: &str, opts: &ValidateOptions) -> Validatio
                     ValidationIssue {
                         path: format!("targets[{index}].url_pattern"),
                         code: ValidationCode::Custom("InvalidRegex".to_string()),
-                        message: format!(
-                            "url_pattern {pattern:?} is not a valid regex: {e}"
-                        ),
+                        message: format!("url_pattern {pattern:?} is not a valid regex: {e}"),
                         hint: Some(
                             "Escape regex metacharacters (e.g. `\\.`) or wrap a literal host \
                              in `^https?://example\\.com/`."
@@ -381,8 +379,7 @@ mod tests {
                 .join("templates/policy.toml");
             let text = std::fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-            let report =
-                validate_toml_against::<Policy>(&text, &ValidateOptions::strict());
+            let report = validate_toml_against::<Policy>(&text, &ValidateOptions::strict());
             assert!(
                 report.is_ok(),
                 "templates/policy.toml must validate clean; errors={:?}",
@@ -394,10 +391,8 @@ mod tests {
     #[test]
     fn validate_policy_rejects_unknown_field() {
         with_lenient_env(None, || {
-            let report = validate_toml_against::<Policy>(
-                "requite_vpn = true\n",
-                &ValidateOptions::strict(),
-            );
+            let report =
+                validate_toml_against::<Policy>("requite_vpn = true\n", &ValidateOptions::strict());
             assert_eq!(report.errors.len(), 1);
             assert_eq!(report.errors[0].code, ValidationCode::UnknownField);
         });
@@ -406,10 +401,8 @@ mod tests {
     #[test]
     fn validate_policy_levenshtein_suggests_correction() {
         with_lenient_env(None, || {
-            let report = validate_toml_against::<Policy>(
-                "requite_vpn = true\n",
-                &ValidateOptions::strict(),
-            );
+            let report =
+                validate_toml_against::<Policy>("requite_vpn = true\n", &ValidateOptions::strict());
             assert_eq!(report.errors.len(), 1);
             assert_eq!(
                 report.errors[0].hint.as_deref(),
@@ -461,10 +454,7 @@ url_pattern = "["
                 "expected InvalidRegex error, got {:?}",
                 report.errors
             );
-            assert_eq!(
-                invalid_regex.unwrap().path,
-                "targets[0].url_pattern"
-            );
+            assert_eq!(invalid_regex.unwrap().path, "targets[0].url_pattern");
         });
     }
 

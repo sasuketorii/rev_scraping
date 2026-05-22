@@ -25,6 +25,10 @@ use stealth_auth::AuthStore;
 
 #[derive(Args, Debug)]
 pub struct CfEvaluateArgs {
+    /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+    /// global `--format`. JSON schema: `docs/json-schemas/cli/cf-evaluate.output.json`.
+    #[command(flatten)]
+    pub output_format: crate::commands::output_format::OutputFormatOverride,
     #[arg(long)]
     pub url: String,
     #[arg(long)]

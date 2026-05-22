@@ -1,0 +1,2176 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+2026-05-22T20:58:09.020837Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+2026-05-22T20:58:09.875739Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:58:10.398093Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e517b-34ef-71a1-bb81-350e099319a7
+--------
+user
+あなたは Lane H scoring 担当 (Codex gpt-5.5-xhigh)。Lane H "配布距離ゼロ" を 7 軸 rubric で 0-10 採点。
+
+## 入力
+- ExecPlan: .agent/active/v1_3_uplift_execplan_rev1.md Lane H 部
+- Quality bar: .agent/active/v1_3_quality_bar.md 7 軸 (A-G) rubric
+- Baseline: v1.2.0 (b2153aa0)
+- WIP commit: 7c700a0b
+- 参考 (Opus 独立採点): .agent/active/scoring/v1_3_h_score_round1_opus.md (overall 7.38 FAIL — D 6.5 / A 7.5 / F 6.5 が最大の減点)
+
+## Lane H 成果物
+- crates/rev-stealth-cli/ (publish=true, 0 deps stub, bin name rev-stealth-cli-stub 暫定)
+- Formula/rev-stealth.rb (Homebrew template、version 1.3.0 sha256 placeholder)
+- Dockerfile.distroless + .dockerignore + trivy.yaml + .trivyignore
+- install.sh (POSIX sh, cosign fail-closed default --no-verify オプト)
+- .github/workflows/release.yml (7 job: preflight, 4-target build, deb x2, rpm x2, OCI, cargo publish dry, gh-release)
+- .github/workflows/release-please.yml + release-please-config.json + .release-please-manifest.json
+- crates/stealth-sanitize/Cargo.toml publish=false hygiene fix
+- 外部 gate (brew install / docker pull / cosign verify / cargo publish 実 / trivy / SLSA L3) は v1.3.0 tag push 時に実走行 (Option A 設計)
+
+## 採点指示
+7 軸 (A-G) 0-10 採点、各根拠 1-3 行、overall を重み付き平均で計算。
+重み: A 2.0 / B 1.5 / C 1.5 / D 2.0 / E 1.0 / F 1.0 / G 1.0
+
+合格 ≥ 9.0 / 未達なら 9.0 到達 deltas 3-7 件。Opus に引きずられず独立採点。
+
+## 出力形式
+| 軸 | スコア | 根拠 |
+|---|---|---|
+
+overall = X.XX
+verdict: PASS | FAIL
+deltas to 9.0: ...
+
+2026-05-22T20:58:10.760807Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+`staff-code-reviewer` skill を使います。今回は実装変更ではなく、Lane H 成果物を rubric と現物に照らして採点するレビュー用途です。
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc 'git rev-parse --show-toplevel' in $REPO_ROOT
+ succeeded in 0ms:
+$REPO_ROOT
+
+exec
+/bin/bash -lc 'git status --short' in $REPO_ROOT
+ succeeded in 0ms:
+ M .agent/active/scoring/v1_3_j_convergence.md
+ M Cargo.lock
+ M crates/stealth-agent-contracts/Cargo.toml
+ M crates/stealth-auth/Cargo.toml
+?? .agent/active/scoring/v1_3_h_score_round1_codex.err
+?? .agent/active/scoring/v1_3_h_score_round1_codex.out
+?? .agent/active/scoring/v1_3_h_score_round1_opus.md
+?? .agent/active/scoring/v1_3_i_score_round1_opus.md
+?? .agent/active/scoring/v1_3_j_score_round1_opus.md
+?? crates/stealth-agent-contracts/tests/
+?? crates/stealth-auth/tests/proptest_envelope.rs
+
+codex
+手元のグローバル skill パスではなく、このプロジェクト用 runtime skill 側にあります。採点対象の未追跡/変更ファイルも混ざっているので、Lane H に関係する範囲だけを読みます。
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
+ succeeded in 0ms:
+# v1.3 Quality Bar — Dual 9/10 Convergence Protocol
+
+**Mandate (user, 2026-05-23)**: Opus 4.7-xhigh と Codex gpt-5.5-xhigh の **両方が 10 点中 9 点以上を出すまで** 各 Lane を反復する。
+
+## 評価プロトコル
+
+Lane の coder driver が LGTM (binary) で sub-phase 完走した後、**追加で graded review** を実施:
+
+1. Lane driver の完走報告を `.agent/active/reviews/v1_3_<lane>_final.md` として保存
+2. **Opus 4.7-xhigh scoring agent** を独立 dispatch — Lane 成果物を 7 軸で採点
+3. **Codex gpt-5.5-xhigh scoring** を canonical wrapper 経由で同じ rubric で採点
+4. **両方が ≥ 9.0** で合格、Lane 完了
+5. どちらか < 9.0 → 採点者の指摘を集約 → fix driver dispatch → 再採点
+6. 最大 3 ラウンドの scoring (3 回 fix で 9/10 取れなければ narrow stop で operator escalate)
+
+## Scoring rubric (7 軸 × 10 点満点)
+
+Lane 共通の評価軸。各軸 0-10 で採点、平均が overall score。
+
+### 軸 A: Acceptance criteria 充足度 (重み 2.0)
+- ExecPlan に書かれた各 sub-phase の acceptance criteria を機械的に検証
+- 全 criteria PASS → 10、半分 PASS → 5、未着手 → 0
+
+### 軸 B: 外部 verifiable / CI gate / adversarial test の 3 原則 (重み 1.5)
+- Plan A §0.2 由来。「gameable な 9/10」排除原則
+- 3 原則 ≥ 2 で 10、1 で 5、0 で 0
+
+### 軸 C: 競合比較で勝つか (重み 1.5)
+- ripgrep / fd / gh / wrangler / Crawl4AI / Browserless と並べたとき同等以上か
+- Lane G なら CLI UX、Lane H なら配布、Lane I なら semver discipline、Lane J なら docs、Lane K なら quality infra
+- 「明確に勝つ」→ 10、「同等」→ 7、「劣後」→ 3
+
+### 軸 D: AI エージェント開発者体験 (重み 2.0)
+- Claude Code / Cursor / Hermes ユーザが evaluate して reject しないか
+- JSON output / error envelope / idempotency / discoverability などが体験良く揃ってるか
+- 「最初に試すべき」レベル → 10、「使える」→ 7、「習熟前提」→ 4
+
+### 軸 E: 1 年後の負債回避 (重み 1.0)
+- 採用技術が 1 年後も maintain されているか
+- 設定ファイルや schema の breaking change リスク
+- CI / dependency が腐る速度
+- 安心 → 10、要注意点あり → 6、明確な負債 → 3
+
+### 軸 F: テスト + evidence の質 (重み 1.0)
+- 機械検証可能な test (proptest / fuzz / golden / integration) の量と質
+- 単なる happy-path test は 5、edge case + adversarial で 10
+- evidence (artifacts, logs, screenshots) の保存有無
+
+### 軸 G: ドキュメント完全性 (重み 1.0)
+- Lane 成果物が次の人 (operator / contributor / reviewer) が読んで理解可能か
+- ADR / RELEASE_NOTES 反映 / README / mdBook 整合性
+- 「次の人にハンドオフ可能」→ 10、「自分しか分からない」→ 3
+
+## 計算式
+
+```
+overall = (A*2.0 + B*1.5 + C*1.5 + D*2.0 + E*1.0 + F*1.0 + G*1.0) / 10.0
+合格: Opus overall ≥ 9.0 AND Codex overall ≥ 9.0
+```
+
+両者の score 差が 1.5 を超えた場合、disagreement reason を文書化、tie-break は operator。
+
+## Lane 別の追加軸 (rubric 上書き、上記 7 軸の D を再解釈)
+
+| Lane | D の特化 |
+|------|---------|
+| G — CLI UX 黒帯化 | 「ripgrep ファンが好む」+ 「Claude Code から `--output-format json` で安全に pipe できる」|
+| H — 配布距離ゼロ | 「`brew install rev-stealth` を 60 秒で実行できる」+「SBOM/cosign で supply-chain 監査可能」|
+| I — API stability | 「semver 違反が PR レベルで止まる」+「deprecation policy が機械可読」|
+| J — Agent-First docs | 「`docs/.../tutorial/05-claude-code.md` 通りで 5 分で動く」+「26 ErrorKind 全て個別解説」|
+| K — Quality moat | 「coverage 80%+ / fuzz nightly / cross-platform 4 matrix / SBOM/sigstore」|
+
+## Scoring agent への prompt 雛形
+
+```
+あなたは <Opus 4.7-xhigh | Codex gpt-5.5-xhigh> の v1.3 Lane <X> scoring 担当。
+
+Lane 成果物: <driver report path>
+Rubric: .agent/active/v1_3_quality_bar.md の 7 軸 (A-G)
+ExecPlan 参照: .agent/active/v1_3_uplift_execplan_rev1.md Lane <X>
+ベースライン: v1.2.0 (commit b2153aa0)
+
+各軸を 0-10 で採点、根拠を 1-3 行で記述。
+最後に overall score (重み付き平均) を出して、< 9.0 なら具体的な「9 にするための差分」を箇条書き。
+
+形式:
+| 軸 | スコア | 根拠 |
+|---|---|---|
+| A | X.X | ... |
+...
+overall = X.XX
+
+verdict: PASS (≥ 9.0) | FAIL (< 9.0)
+deltas to reach 9.0: <none | bullet list>
+```
+
+## Scoring loop ターミネーション
+
+- max 3 fix round per lane
+- 3 round で両者 9/10 未達 → narrow stop + operator escalation (v1.3.0 として ship するか、v1.3.0-rc1 で出して soak するか判断)
+- 両者 ≥ 9.0 で初回合格は理想だが現実的には 1-2 fix round 想定
+
+## Evidence 保存
+
+- Scoring prompts: `.agent/active/scoring/v1_3_<lane>_score_round{1,2,3}_<opus|codex>.md`
+- Scoring responses: `.agent/active/scoring/v1_3_<lane>_score_round{1,2,3}_<opus|codex>.out`
+- Final convergence record: `.agent/active/scoring/v1_3_<lane>_convergence.md` (両者の最終 score + delta history)
+
+## Operator visibility
+
+各 lane の Pass/Fail と差分は `.agent/active/v1_3_progress.md` (ダッシュボード markdown) に集約、operator は 1 ファイル見れば全 lane 進捗を把握可能。
+
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/scoring/v1_3_h_score_round1_opus.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Lane H Opus scoring round 1 (recorded)
+
+| 軸 | スコア | 根拠 |
+|---|---|---|
+| A | 7.5 | 7 sub-phase 足回り揃う; acceptance は外部 gate (brew install/dpkg -i/docker pull/cargo install) を要求、tag push まで PASS 確認不能 (deferred-by-design); rev-stealth-cli-stub は `rev-stealth --help` 不成立 |
+| B | 8.0 | cosign keyless OIDC + SLSA L3 + trivy HIGH/CRITICAL fail + dry-run の reproducible; cosign verify の self-check CI 未 |
+| C | 7.5 | 設計上は Crawl4AI/Browserless/Playwright を supply-chain で勝つ; 実走 0 ゆえ "設計勝ち実装 0" |
+| D | 6.5 | brew install 60 秒で動かない(placeholder version/sha256, tap repo 不在, stub binary exit 3, install path workspace publish=false) |
+| E | 8.5 | 採用技術 1 年生存; rename TODO は文書化済 |
+| F | 6.5 | install.sh unit test なし / Formula brew audit CI なし / cargo deb sanity gate なし / cosign verify self-test なし / trivy PR run なし |
+| G | 7.5 | コメントは充実だが docs/distribution.md ADR 不在 / crates/rev-stealth-cli/README が stub 動作不能を伝えていない |
+
+overall = 7.38
+verdict: FAIL (< 9.0)
+
+deltas to 9.0 (Opus):
+1. crates/stealth-cli に lib.rs + pub fn run() -> ExitCode 追加、stub bin → 1 行 forwarder + [[bin]] name = "rev-stealth" rename (最大 delta、D 6.5 → 8.5+)
+2. Homebrew tap bootstrap runbook + brew audit --strict --online CI
+3. install.sh posix unit test + cosign verify self-test (sign 直後 verify)
+4. cargo-deb / cargo-generate-rpm の dpkg/rpm sanity gate (PR で dpkg -I + rpm -qip)
+5. distroless image PR-level trivy fs scan + self-pull smoke
+6. docs/distribution.md ADR + crates.io README stub 注意書き
+7. release.yml e2e dry-run integration job (workflow_dispatch で 1 ボタン実走)
+
+exec
+/bin/bash -lc 'rg -n "Lane H|配布距離|distribution|Zero|zero" .agent/active/v1_3_uplift_execplan_rev1.md' in $REPO_ROOT
+ succeeded in 0ms:
+40:## Lane H — Distribution to zero-distance
+55:**Lane H total: 4.7 dev-day**
+162:| Solo developer 5-6 week sprint fatigue | all | Lane G+I+J can ship as v1.3.0-beta first (4 weeks), Lane H+K as v1.3.0 GA (+2 weeks) |
+181:- `.agent/active/prompts/v1_3_h[1-7]_review*.md` (Lane H)
+
+exec
+/bin/bash -lc "rg --files /Users/sasuketorii/.codex $REPO_ROOT/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
+ succeeded in 0ms:
+$REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md
+
+exec
+/bin/bash -lc "sed -n '1,220p' .agents/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ succeeded in 0ms:
+---
+name: "staff-code-reviewer"
+description: "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+source_specialty_file: "docs/roles/reviewer/specialties/staff-code-reviewer.md"
+source_manifest_hash: "eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44"
+canonical_role: "reviewer"
+generated_by: agent-core specialty project
+---
+
+# staff-code-reviewer
+
+This skill is a SELECTION HINT (lens), not a workflow owner. It is a Reviewer lens. Primary invocation is `scripts/codex-wrapper.sh --role reviewer --specialty staff-code-reviewer`. This skill auto-trigger is a discovery hint; primary invocation is the wrapper flag.
+
+## Summary
+
+Find merge-blocking bugs, release risks, regressions, and missing tests with evidence-first review.
+
+Lens type: Reviewer lens
+Canonical source: `docs/roles/reviewer/specialties/staff-code-reviewer.md`
+
+## How to invoke
+
+Reviewer wrapper flag:
+- Primary invocation: `scripts/codex-wrapper.sh --role reviewer --specialty staff-code-reviewer`.
+- The orchestrator selects this specialty before review and records `docs/roles/reviewer/specialties/staff-code-reviewer.md` as the canonical source.
+
+Specialty manifest hash: `eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44`
+
+exec
+/bin/bash -lc "sed -n '1,260p' docs/roles/reviewer/specialties/staff-code-reviewer.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Specialty: Staff Code Reviewer
+
+```json
+{
+  "schema_version": 1,
+  "slug": "staff-code-reviewer",
+  "canonical_role": "reviewer",
+  "allowed_runtime_roles": ["reviewer"],
+  "required_output_sections": ["Findings", "Block Reason", "Residual Risk", "Missing Context", "Verdict"],
+  "matrix_fields_allowed": ["task_class", "schema_profile", "change_surface", "in_scope", "out_of_scope", "required_checks", "evidence_destination", "completion_boundary", "worker_outcome", "review_request_target", "reviewer_verdict", "task_id", "slice_id", "prior_slice_id"],
+  "thin_skill_projection": {
+    "enabled": true,
+    "description_seed": "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+  },
+  "summary_oneline": "Find merge-blocking bugs, release risks, regressions, and missing tests with evidence-first review.",
+  "deprecated_aliases_forbidden": true
+}
+```
+
+## Purpose
+
+This specialty reviews submitted code or diffs for problems that should block PR progress, require pre-release fixes, or require explicit risk acceptance. It prioritizes correctness, security, performance, operational behavior, and meaningful test coverage over style preference. It is a Reviewer narrowing and cannot edit code.
+
+## Canonical Role Authority
+
+This specialty is a narrowing of the `reviewer` canonical role per `docs/roles/reviewer.md`. It does NOT redefine role boundaries or replace canonical authority.
+
+## Allowed Actions
+
+- Read code, diffs, tests, logs, requirements, existing patterns, and handoff evidence.
+- Report bugs, edge cases, regressions, security issues, performance risks, design risks, and missing tests.
+- Suggest concrete fixes and verification steps.
+- Order findings by severity with file, line, symbol, command, or artifact evidence.
+- Issue a matrix-valid verdict only when required evidence and gates are present.
+
+## Forbidden
+
+- Do not edit code.
+- Do not lead with style preferences.
+- Do not issue LGTM unless the Revharness reviewer contract is satisfied.
+- Do not convert review-comment count into `remaining issues: N`.
+- Do not downgrade fail-closed conditions into soft suggestions.
+
+## Required Output Sections
+
+The handoff envelope emitted by this specialty MUST contain these `##` headings in order:
+
+1. Findings
+2. Block Reason
+3. Residual Risk
+4. Missing Context
+5. Verdict
+
+(These names match `required_output_sections` in the manifest above.)
+
+## Findings
+
+Lead with concrete defects, ordered by severity, and include file, line, symbol, command, or artifact evidence. A finding must explain the user-visible, operational, security, or maintainability risk clearly enough for the author to fix it.
+
+## Block Reason
+
+If the verdict blocks progress, name the exact gate, invariant, missing evidence, or regression that blocks it. If nothing blocks progress, state that no blocking reason was found within the reviewed scope.
+
+## Residual Risk
+
+Record risks that remain after the reviewed diff and checks, including out-of-scope areas and assumptions that could invalidate the verdict. Do not convert risk notes into an exact remaining-issues count unless the matrix conditions for exact counts are satisfied.
+
+## Missing Context
+
+List any missing diff, test output, artifact, requirement, or lineage evidence that limits review confidence. If missing context is severe enough to make the request invalid, reflect that in the verdict instead of treating it as a soft note.
+
+## Verdict
+
+Return a matrix-valid reviewer verdict and next-status implication for the request target. `LGTM` is allowed only when the required contract, deterministic checks, and artifact traceability are current for the reviewed scope.
+
+## Common Handoff Block
+
+This specialty uses the canonical handoff envelope per `docs/manual/matrix-vocabulary.json`. Field `handoff_state` (NOT `status`) is the lifecycle field per `_policy.domain_local.handoff_state`.
+
+```yaml
+handoff:
+  role: "reviewer"
+  task_class: "..."
+  schema_profile: "..."
+  handoff_state: "ready_for_next | needs_fix | needs_more_context | blocked"
+  ...
+  specialty_id: "staff-code-reviewer"
+  canonical_role: "reviewer"
+  manifest_hash: "<sha256 from agent-core specialty lint output>"
+```
+
+(See `docs/prompts/_archive/role-operating-templates-v0.md` for the historical full common-handoff-block example.)
+
+codex
+採点は WIP commit `7c700a0b` の成果物を基準に見ます。今の worktree には別 Lane 由来らしい変更もあるため、可能な限り `git show 7c700a0b:<path>` と diff で確認します。
+exec
+/bin/bash -lc "sed -n '36,92p' .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
+ succeeded in 0ms:
+| G.8 | man page (mdoc/roff) auto-generated; `man rev-stealth` + `man rev-stealth-spider` available after `make install` | 0.5 | `man rev-stealth-spider \| col -bx \| grep -c '\.SH'` ≥ 6 (NAME/SYNOPSIS/DESCRIPTION/OPTIONS/EXAMPLES/EXIT STATUS) |
+
+**Lane G total: 5.7 dev-day**
+
+## Lane H — Distribution to zero-distance
+
+Take from Plan A axis 2 sub-phases 2.1-2.6 + 2.16; drop IaC (2.7-2.8) and observability
+(2.9-2.11) to v1.4.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| H.1 | Homebrew tap `sasuketorii/homebrew-rev-stealth` + formula | 0.5 | `brew tap sasuketorii/rev-stealth && brew install rev-stealth` works on macOS arm64 + x86_64 |
+| H.2 | `cargo-deb` setup → Debian 12 / Ubuntu 22.04+24.04 build matrix | 0.7 | `.deb` artifact on GH release; `dpkg -i` installs to /usr/local/bin |
+| H.3 | `cargo-generate-rpm` → RHEL 9 / Fedora 41 | 0.5 | `.rpm` artifact; `rpm -i` installs |
+| H.4 | Distroless multi-arch OCI image (amd64+arm64), Chromium separated | 0.9 | `docker pull ghcr.io/sasuketorii/rev-stealth:v1.3.0`; `trivy image --severity HIGH,CRITICAL --exit-code 1` PASS |
+| H.5 | `cargo install rev-stealth` via crates.io publish (workspace member publish-permission check) | 0.6 | `cargo install --locked rev-stealth` works fresh; LICENSE / README on crates.io |
+| H.6 | `curl \| sh` installer + sigstore cosign signing + SLSA L3 build provenance attestation via `actions/attest-build-provenance` | 0.7 | `cosign verify-blob --certificate-identity=...` PASS; SLSA L3 verifier passes |
+| H.7 | `release-please` automation (tag → matrix build → SBOM → cosign → GH release) | 0.8 | one-tag release: deb+rpm+brew+OCI+cargo all populated in single workflow run |
+
+**Lane H total: 4.7 dev-day**
+
+## Lane I — API stability & semver
+
+Plan A 2.14-2.15 + Lane I from my pre-pivot draft.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| I.1 | CLI public surface machine-readable snapshot (every flag, every env var, every output field) | 0.4 | `.agent/v1.3/cli-public-api.snapshot.json` committed |
+| I.2 | `cargo-public-api` PR gate (workspace member crates) | 0.4 | PR adds new pub item → CI requires label `api-additive` or `api-breaking` |
+| I.3 | `docs/compat.md` semver policy: MCP schema = 2-major guarantee / CLI flag = 1-major / internal types = no guarantee | 0.4 | document committed; linked from README |
+| I.4 | `CHANGELOG.md` keep-a-changelog format + automation hook from `release-please` | 0.3 | machine-parseable; CI verifies on every PR |
+| I.5 | MCP tool schema breaking-change detector (extend `mcp-schema-lint`) | 0.5 | schema change in `tools.rs` → fail unless `mcp-schema-breaking` label |
+| I.6 | `#[deprecated(...)]` lint customization: forces `since`, `note`, and `replace_with` populated | 0.4 | clippy custom lint denies missing fields |
+
+**Lane I total: 2.4 dev-day**
+
+## Lane J — Agent-First documentation
+
+Plan A axis 5 (subset), reframed for AI-agent-dev audience.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| J.1 | `mdbook` scaffold (`docs/book/`) + `mdbook-i18n-helpers` + GH Pages deploy on tag push | 0.5 | https://sasuketorii.github.io/rev_scraping/ live, EN+JA toggle |
+| J.2 | Quickstart 7-step tutorial (local → recipe → profile → VPN → Claude Code → Hermes → VPS) | 1.0 | `mdbook test` PASS; each step has runnable code block (stub OK for VPN/Hermes) |
+| J.3 | 16 MCP tool × cookbook: real JSON-RPC request + response + failure example per tool | 1.0 | 16 sub-pages under `docs/book/src/tools/`; each shows happy path + 1 error variant |
+| J.4 | Migration guide: Crawl4AI MCP → rev_scraping; Playwright MCP → rev_scraping | 0.6 | 2 sub-pages with side-by-side examples |
+| J.5 | `rustdoc --document-private-items` GH Pages auto-publish + `#![warn(missing_docs)]` (warning only first, gate later) | 0.5 | https://sasuketorii.github.io/rev_scraping/api/ live |
+| J.6 | 26 ErrorKind individual troubleshooting pages (reproduction code + fix + related Issues) | 0.8 | 26 sub-pages; each has 3 sections |
+| J.7 | `docs/landscape.md` competitive matrix with Q3-2026 timestamp (Playwright / Puppeteer / Crawl4AI / Browserless / Scrapling / Bright Data / obscura) — refresh quarterly | 0.4 | committed; rev_scraping has at least 1 "losing" cell per row (humble baseline) |
+
+**Lane J total: 4.8 dev-day**
+
+## Lane K — Quality moat
+
+Plan A axis 4 essentials + Plan B J essentials, no overreach.
+
+| ID | Sub-phase | dev-day | Acceptance |
+
+exec
+/bin/bash -lc 'git rev-parse HEAD' in $REPO_ROOT
+ succeeded in 0ms:
+81e2a18013b7377f0bbc79249333361fc979fecd
+
+exec
+/bin/bash -lc 'git log --oneline -5' in $REPO_ROOT
+ succeeded in 0ms:
+81e2a180 fix: remove librust_out.rlib build artifact + .gitignore entries
+7c700a0b wip(v1.3): partial Lane G/H/I/J/K — Black-Belt CLI synth checkpoint
+cff44b25 plan: v1.3 quality bar — dual Opus/Codex 9/10 convergence protocol
+6dea6f63 plan: v1.3 "Black-Belt CLI" ExecPlan rev1 (Lane G-K, AI-agent-dev focus)
+967a292d docs: add Japanese README (README.ja.md)
+
+exec
+/bin/bash -lc 'git diff --name-status b2153aa0 7c700a0b -- crates/rev-stealth-cli Formula/rev-stealth.rb Dockerfile.distroless .dockerignore trivy.yaml .trivyignore install.sh .github/workflows/release.yml .github/workflows/release-please.yml release-please-config.json .release-please-manifest.json crates/stealth-sanitize/Cargo.toml' in $REPO_ROOT
+ succeeded in 0ms:
+A	.dockerignore
+A	.github/workflows/release-please.yml
+M	.github/workflows/release.yml
+A	.release-please-manifest.json
+A	.trivyignore
+A	Dockerfile.distroless
+A	Formula/rev-stealth.rb
+A	crates/rev-stealth-cli/Cargo.toml
+A	crates/rev-stealth-cli/README.md
+A	crates/rev-stealth-cli/src/main.rs
+M	crates/stealth-sanitize/Cargo.toml
+A	install.sh
+A	release-please-config.json
+A	trivy.yaml
+
+exec
+/bin/bash -lc 'git show --stat --oneline --decorate 7c700a0b' in $REPO_ROOT
+ succeeded in 0ms:
+7c700a0b wip(v1.3): partial Lane G/H/I/J/K — Black-Belt CLI synth checkpoint
+ .agent/active/prompts/v1_3_g1_review.md            |   34 +
+ .agent/active/prompts/v1_3_g1_review_round2.md     |   43 +
+ .agent/active/prompts/v1_3_g1_review_round3.md     |   28 +
+ .agent/active/prompts/v1_3_h_plumbing_review.md    |   44 +
+ .../prompts/v1_3_h_plumbing_review_round2.md       |   45 +
+ .../prompts/v1_3_h_plumbing_review_round3.md       |   40 +
+ .agent/active/prompts/v1_3_i1_review.md            |   25 +
+ .agent/active/prompts/v1_3_i1_review_round2.md     |   27 +
+ .agent/active/prompts/v1_3_i1_review_round3.md     |   29 +
+ .agent/active/prompts/v1_3_i2_review.md            |   16 +
+ .agent/active/prompts/v1_3_i2_review_round2.md     |   30 +
+ .agent/active/prompts/v1_3_i2_review_round3.md     |   32 +
+ .agent/active/prompts/v1_3_i2_review_round4.md     |   22 +
+ .agent/active/prompts/v1_3_i3_review.md            |   19 +
+ .agent/active/prompts/v1_3_i3_review_round2.md     |   25 +
+ .agent/active/prompts/v1_3_i3_review_round3.md     |   19 +
+ .agent/active/prompts/v1_3_i4_review.md            |   16 +
+ .agent/active/prompts/v1_3_i4_review_round2.md     |   22 +
+ .agent/active/prompts/v1_3_i4_review_round3.md     |   24 +
+ .agent/active/prompts/v1_3_i5_review.md            |   16 +
+ .agent/active/prompts/v1_3_i5_review_round2.md     |   24 +
+ .agent/active/prompts/v1_3_i5_review_round3.md     |   27 +
+ .agent/active/prompts/v1_3_i6_review.md            |   27 +
+ .agent/active/prompts/v1_3_i6_review_round2.md     |   27 +
+ .agent/active/prompts/v1_3_j1_review.md            |   36 +
+ .agent/active/prompts/v1_3_j2_review.md            |   36 +
+ .agent/active/prompts/v1_3_j3_review.md            |   36 +
+ .agent/active/prompts/v1_3_j4_review.md            |   36 +
+ .agent/active/prompts/v1_3_j5_review.md            |   36 +
+ .agent/active/prompts/v1_3_j6_review.md            |   36 +
+ .agent/active/prompts/v1_3_j7_review.md            |   36 +
+ .agent/active/prompts/v1_3_j_lane_review.md        |   24 +
+ .agent/active/prompts/v1_3_j_lane_review_round2.md |   17 +
+ .agent/active/prompts/v1_3_j_lane_review_round3.md |   30 +
+ .agent/active/scoring/v1_3_j_convergence.md        |   30 +
+ .agent/active/scoring/v1_3_j_score_round1_codex.md |   23 +
+ .../active/scoring/v1_3_j_score_round1_codex.out   | 2648 +++++++++++++++++++
+ .agent/v1.3/cli-naming-lint.json                   |   41 +
+ .agent/v1.3/cli-public-api.snapshot.json           | 1586 ++++++++++++
+ .agent/v1.3/cli-surface-review.md                  |   87 +
+ .agent/v1.3/cli-surface.json                       | 2695 ++++++++++++++++++++
+ .dockerignore                                      |   55 +
+ .github/workflows/bench.yml                        |   56 +
+ .github/workflows/ci.yml                           |  115 +
+ .github/workflows/coverage.yml                     |  123 +
+ .github/workflows/cross-platform-nightly.yml       |   65 +
+ .github/workflows/docs.yml                         |   88 +
+ .github/workflows/fuzz-nightly.yml                 |   69 +
+ .github/workflows/release-please.yml               |   27 +
+ .github/workflows/release.yml                      |  335 ++-
+ .github/workflows/sbom.yml                         |  116 +
+ .github/workflows/security.yml                     |   52 +
+ .release-please-manifest.json                      |    3 +
+ .trivyignore                                       |   12 +
+ CHANGELOG.rev_scraping.md                          |   84 +
+ Cargo.lock                                         |  218 +-
+ Cargo.toml                                         |   15 +
+ Dockerfile.distroless                              |   86 +
+ Formula/rev-stealth.rb                             |   80 +
+ README.md                                          |    1 +
+ crates/rev-stealth-cli/Cargo.toml                  |  103 +
+ crates/rev-stealth-cli/README.md                   |   37 +
+ crates/rev-stealth-cli/src/main.rs                 |   30 +
+ crates/stealth-agent-contracts/src/lib.rs          |    7 +
+ crates/stealth-cf/src/lib.rs                       |    4 +-
+ .../stealth-cli/tests/deprecated_completeness.rs   |  389 +++
+ crates/stealth-parse/src/lib.rs                    |    2 +
+ crates/stealth-sanitize/Cargo.toml                 |   14 +
+ .../stealth-sanitize/benches/sanitize_hotpath.rs   |   81 +
+ crates/stealth-sanitize/fuzz/.gitignore            |    5 +
+ crates/stealth-sanitize/fuzz/Cargo.toml            |   51 +
+ .../fuzz/fuzz_targets/mcp_jsonrpc_frame.rs         |   21 +
+ .../fuzz/fuzz_targets/sanitize_full.rs             |   24 +
+ .../fuzz/fuzz_targets/sanitize_l4_unicode.rs       |   25 +
+ crates/stealth-sanitize/src/layer2_envelope.rs     |    8 +-
+ crates/stealth-sanitize/src/layer3_canary.rs       |  173 +-
+ crates/stealth-sanitize/src/layer4_unicode.rs      |   20 +-
+ crates/stealth-sanitize/src/layer5_clamp.rs        |    8 +-
+ crates/stealth-sanitize/src/lib.rs                 |   81 +-
+ crates/stealth-sanitize/tests/golden_corpus.rs     |  149 +-
+ .../stealth-sanitize/tests/proptest_invariants.rs  |  106 +
+ depr_raw                                           |  Bin 0 -> 462056 bytes
+ depr_space                                         |  Bin 0 -> 462056 bytes
+ docs/book/book.toml                                |   39 +
+ docs/book/src/SUMMARY.md                           |   78 +
+ docs/book/src/en/README.md                         |   53 +
+ docs/book/src/en/compat.md                         |   16 +
+ docs/book/src/en/errors/Aborted.md                 |   50 +
+ docs/book/src/en/errors/Aup.md                     |   49 +
+ docs/book/src/en/errors/Auth.md                    |   49 +
+ docs/book/src/en/errors/AuthSessionExpired.md      |   48 +
+ docs/book/src/en/errors/AuthSessionNotFound.md     |   48 +
+ docs/book/src/en/errors/AuthSessionPending.md      |   48 +
+ docs/book/src/en/errors/BrowserCrashed.md          |   50 +
+ docs/book/src/en/errors/BrowserNotFound.md         |   48 +
+ docs/book/src/en/errors/Captcha.md                 |   49 +
+ docs/book/src/en/errors/CdpDisconnected.md         |   49 +
+ docs/book/src/en/errors/CdpInjectionFailed.md      |   49 +
+ docs/book/src/en/errors/CdpProtocol.md             |   49 +
+ docs/book/src/en/errors/CookieDecryptFailed.md     |   49 +
+ docs/book/src/en/errors/Internal.md                |   47 +
+ docs/book/src/en/errors/Network.md                 |   50 +
+ docs/book/src/en/errors/NotFound.md                |   49 +
+ docs/book/src/en/errors/README.md                  |   47 +
+ docs/book/src/en/errors/RateLimit.md               |   50 +
+ docs/book/src/en/errors/RecipeInvalid.md           |   49 +
+ docs/book/src/en/errors/RecipeNotFound.md          |   48 +
+ docs/book/src/en/errors/Ssrf.md                    |   49 +
+ docs/book/src/en/errors/Timeout.md                 |   50 +
+ docs/book/src/en/errors/Validation.md              |   49 +
+ docs/book/src/en/errors/VpnAllInstancesFailed.md   |   49 +
+ docs/book/src/en/errors/VpnCountryMismatch.md      |   49 +
+ docs/book/src/en/errors/VpnLeak.md                 |   50 +
+ docs/book/src/en/errors/VpnNotConfigured.md        |   48 +
+ docs/book/src/en/install.md                        |   81 +
+ docs/book/src/en/landscape.md                      |   66 +
+ docs/book/src/en/migration/README.md               |   10 +
+ docs/book/src/en/migration/from-crawl4ai.md        |   84 +
+ docs/book/src/en/migration/from-playwright.md      |   68 +
+ docs/book/src/en/tools/README.md                   |   39 +
+ docs/book/src/en/tools/auth_list.md                |   75 +
+ docs/book/src/en/tools/auth_login_complete.md      |   75 +
+ docs/book/src/en/tools/auth_login_start.md         |   78 +
+ docs/book/src/en/tools/auth_status.md              |   75 +
+ docs/book/src/en/tools/cf_evaluate.md              |   76 +
+ docs/book/src/en/tools/doctor.md                   |   76 +
+ docs/book/src/en/tools/recipe_export.md            |   75 +
+ docs/book/src/en/tools/recipe_import.md            |   75 +
+ docs/book/src/en/tools/recipe_list.md              |   75 +
+ docs/book/src/en/tools/recipe_propose_endpoint.md  |   76 +
+ docs/book/src/en/tools/recipe_remove.md            |   76 +
+ docs/book/src/en/tools/recipe_show.md              |   75 +
+ docs/book/src/en/tools/relocate.md                 |   79 +
+ docs/book/src/en/tools/session_show.md             |   75 +
+ docs/book/src/en/tools/spider.md                   |   82 +
+ docs/book/src/en/tools/vpn_rotate.md               |   78 +
+ docs/book/src/en/tutorial/01-local.md              |   40 +
+ docs/book/src/en/tutorial/02-recipe.md             |   39 +
+ docs/book/src/en/tutorial/03-profile.md            |   43 +
+ docs/book/src/en/tutorial/04-vpn.md                |   43 +
+ docs/book/src/en/tutorial/05-claude-code.md        |   68 +
+ docs/book/src/en/tutorial/06-hermes.md             |   57 +
+ docs/book/src/en/tutorial/07-vps.md                |   64 +
+ docs/book/src/en/tutorial/README.md                |   18 +
+ docs/book/src/intro.md                             |   11 +
+ docs/book/src/ja/README.md                         |   33 +
+ docs/book/src/ja/errors.md                         |   33 +
+ docs/book/src/ja/install.md                        |   10 +
+ docs/book/src/ja/migration.md                      |   10 +
+ docs/book/src/ja/tools.md                          |   24 +
+ docs/book/src/ja/tutorial.md                       |   13 +
+ docs/compat.md                                     |  106 +
+ docs/landscape.md                                  |   66 +
+ install.sh                                         |  164 ++
+ librust_out.rlib                                   |  Bin 0 -> 7096 bytes
+ release-please-config.json                         |   41 +
+ scripts/cli-public-api-snapshot.sh                 |  339 +++
+ scripts/cli_surface_inventory.py                   |  377 +++
+ scripts/mcp-schema-breaking.sh                     |  174 ++
+ trivy.yaml                                         |   26 +
+ 160 files changed, 15724 insertions(+), 181 deletions(-)
+
+exec
+/bin/bash -lc 'git show 7c700a0b:crates/rev-stealth-cli/Cargo.toml' in $REPO_ROOT
+ succeeded in 0ms:
+# SPDX-License-Identifier: MIT
+#
+# `rev-stealth-cli` is the crates.io publish front for the rev-stealth CLI.
+# It exists so `cargo install rev-stealth-cli` works for end users, while the
+# internal workspace member `stealth-cli` stays `publish = false` (avoids
+# rename churn across ~13 workspace.dependencies references).
+#
+# Lane H (v1.3) plumbing-only:
+#   - This crate ships a placeholder `main.rs` so `cargo publish --dry-run`
+#     validates the manifest metadata (name, license, description, repo, etc.).
+#   - Wiring to the real CLI entrypoint (a `stealth_cli::run()` lib target on
+#     the internal crate, OR a release-time codegen step) is deferred to the
+#     v1.3.0 release cut. At that point `stealth-cli` will expose a public
+#     `run()` and this wrapper will become a one-line shim. See
+#     `.agent/active/v1_3_uplift_execplan_rev1.md` Lane H for context.
+#
+# Binary name remains `rev-stealth` (matches Homebrew formula, deb/rpm
+# install path `/usr/local/bin/rev-stealth`, and Docker `CMD`).
+
+[package]
+name = "rev-stealth-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "rev-stealth — stealth web scraping & MCP CLI for AI agent developers (Claude Code / Cursor / Hermes). Thin publish wrapper for `cargo install rev-stealth-cli`."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+documentation = "https://sasuketorii.github.io/rev_scraping/"
+readme = "README.md"
+keywords = ["scraping", "stealth", "mcp", "cli", "agent"]
+categories = ["command-line-utilities", "web-programming"]
+publish = true
+
+[[bin]]
+# Lane H plumbing-only: stub binary name is intentionally distinct from
+# the real workspace `rev-stealth` (owned by `stealth-cli`) to avoid a
+# `cargo build --workspace` output-filename collision. At the v1.3.0
+# release cut, this entry will be renamed to `rev-stealth` once
+# `stealth-cli`'s bin is moved behind a lib target.
+name = "rev-stealth-cli-stub"
+path = "src/main.rs"
+
+[dependencies]
+# Lane H plumbing-only: no internal workspace deps yet (would break
+# `cargo publish --dry-run` because `stealth-cli` is `publish = false`).
+# Real entrypoint wiring happens at v1.3.0 release cut.
+
+[lints]
+workspace = true
+
+# -----------------------------------------------------------------------------
+# H.2 — cargo-deb metadata (Debian 12 / Ubuntu 22.04 + 24.04)
+# -----------------------------------------------------------------------------
+# Build with: `cargo deb -p rev-stealth-cli --no-build`
+#   (release.yml runs `cargo build --release --bin rev-stealth` first, then
+#    `cargo deb --no-build` to avoid double-compilation across the matrix.)
+#
+# `--no-build` requires the binary at `target/release/rev-stealth`; the wrapper
+# crate's own placeholder binary is overridden at release time when this
+# wrapper is wired to the internal `stealth-cli` entrypoint.
+[package.metadata.deb]
+name = "rev-stealth"
+maintainer = "Sasuke Torii <sasuketorii.ai@gmail.com>"
+copyright = "2026, Sasuke Torii <sasuketorii.ai@gmail.com>"
+license-file = ["../../LICENSE", "4"]
+extended-description = """\
+rev-stealth is a stealth web scraping and Model Context Protocol (MCP) \
+command-line tool designed for AI agent developers (Claude Code, Cursor, \
+Hermes). It provides captcha bypass, browser fingerprint control, VPN \
+rotation, content sanitization, and an MCP server in a single binary."""
+section = "utils"
+priority = "optional"
+# Distribution-specific runtime deps are intentionally lean. Chromium is
+# *not* a hard dep: see Formula caveats. dpkg `Depends:` uses libc6 only;
+# the binary is otherwise statically linked via musl in CI (release.yml).
+depends = "libc6 (>= 2.31)"
+assets = [
+    # [source, target, perms]
+    ["../../target/release/rev-stealth", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/rev-stealth/README", "644"],
+    ["../../LICENSE", "usr/share/doc/rev-stealth/LICENSE", "644"],
+]
+# Shell completions + man pages are wired at release time by the
+# `cargo xtask manpages` step in release.yml (Lane G G.3 + G.8).
+
+# -----------------------------------------------------------------------------
+# H.3 — cargo-generate-rpm metadata (RHEL 9 / Fedora 41)
+# -----------------------------------------------------------------------------
+# Build with: `cargo generate-rpm -p rev-stealth-cli`
+#   (also expects `target/release/rev-stealth` pre-built.)
+[package.metadata.generate-rpm]
+name = "rev-stealth"
+license = "MIT"
+summary = "Stealth web scraping & MCP CLI for AI agent developers"
+# Lean runtime deps; glibc only.
+requires = { glibc = ">= 2.34" }
+assets = [
+    { source = "../../target/release/rev-stealth", dest = "/usr/bin/rev-stealth", mode = "755" },
+    { source = "../../README.md", dest = "/usr/share/doc/rev-stealth/README", mode = "644", doc = true },
+    { source = "../../LICENSE", dest = "/usr/share/doc/rev-stealth/LICENSE", mode = "644", doc = true },
+]
+
+exec
+/bin/bash -lc 'git show 7c700a0b:crates/rev-stealth-cli/src/main.rs' in $REPO_ROOT
+ succeeded in 0ms:
+// SPDX-License-Identifier: MIT
+//
+// `rev-stealth-cli` placeholder binary.
+//
+// Lane H (v1.3) plumbing-only: this stub exists so the crate's manifest
+// can be validated end-to-end via `cargo publish --dry-run -p rev-stealth-cli`.
+// At v1.3.0 release cut, this `main` becomes a one-line forwarder to the
+// real CLI entrypoint exposed by the internal `stealth-cli` workspace crate
+// (planned: `pub async fn run() -> ExitCode` on a new `lib.rs`).
+//
+// Why placeholder, not a real wiring today:
+//   `stealth-cli` is `publish = false` (workspace-internal, 13 reverse deps).
+//   Depending on it via path makes `cargo publish` reject the wrapper.
+//   The lib-target + re-export refactor is a release-time concern, not
+//   plumbing-time.
+
+#![forbid(unsafe_code)]
+
+fn main() -> std::process::ExitCode {
+    eprintln!(
+        "rev-stealth-cli {} placeholder binary.\n\
+         This is the Lane H plumbing stub. The real CLI entrypoint is wired \
+         at the v1.3.0 release cut.\n\
+         For now, build the workspace binary directly:\n  \
+         cargo install --git https://github.com/sasuketorii/rev_scraping \
+         --bin rev-stealth stealth-cli",
+        env!("CARGO_PKG_VERSION")
+    );
+    std::process::ExitCode::from(3) // permanent: not yet wired
+}
+
+exec
+/bin/bash -lc 'git show 7c700a0b:crates/rev-stealth-cli/README.md' in $REPO_ROOT
+exec
+/bin/bash -lc 'git show 7c700a0b:crates/stealth-sanitize/Cargo.toml' in $REPO_ROOT
+ succeeded in 0ms:
+# rev-stealth-cli
+
+[![crates.io](https://img.shields.io/crates/v/rev-stealth-cli.svg)](https://crates.io/crates/rev-stealth-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+`rev-stealth` is a stealth web scraping & Model Context Protocol (MCP) CLI
+designed for AI agent developers (Claude Code / Cursor / Hermes operators).
+
+This crate (`rev-stealth-cli`) is the **publish front** for `cargo install`.
+The full workspace and source live at
+[github.com/sasuketorii/rev_scraping](https://github.com/sasuketorii/rev_scraping).
+
+## Install
+
+```bash
+cargo install --locked rev-stealth-cli
+rev-stealth --help
+```
+
+Other install paths:
+
+- **Homebrew** (macOS / Linux): `brew install sasuketorii/rev-stealth/rev-stealth`
+- **Debian / Ubuntu**: `.deb` artifacts on GitHub Releases
+- **RHEL / Fedora**: `.rpm` artifacts on GitHub Releases
+- **Docker (distroless)**: `docker pull ghcr.io/sasuketorii/rev-stealth:latest`
+- **curl-pipe-sh**: `curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh`
+
+All release artifacts are cosign-signed and SLSA L3 attested.
+
+## Quickstart
+
+See the [full tutorial](https://sasuketorii.github.io/rev_scraping/) on
+GitHub Pages.
+
+## License
+
+MIT — see [LICENSE](https://github.com/sasuketorii/rev_scraping/blob/main/LICENSE).
+
+ succeeded in 0ms:
+[package]
+name = "stealth-sanitize"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+# Workspace-internal Lane F crate. Marked `publish = false` so the Lane H
+# release preflight (`cargo package -p rev-stealth-cli`) reflects the
+# actual publish policy: only the `rev-stealth-cli` wrapper goes to
+# crates.io; every other workspace member is internal-only.
+publish = false
+description = "Prompt-injection defense sanitizer for RevHarness MCP surface (L2 envelope + L3 canary + L4 unicode + L5 clamp + L7 meta)."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex = { workspace = true }
+rand = { workspace = true }
+unicode-normalization = "0.1"
+aho-corasick = "1"
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "sanitize_hotpath"
+harness = false
+
+[lints]
+workspace = true
+
+exec
+/bin/bash -lc 'git show 7c700a0b:Cargo.toml' in $REPO_ROOT
+ succeeded in 0ms:
+[workspace]
+resolver = "2"
+exclude = [
+    "_refs",
+    "vendor/obscura/.git",
+    "vendor/obscura/target",
+]
+members = [
+    # Vendored from rev_stealth @ 6fc38fd
+    "crates/stealth-core",
+    "crates/mobile-fp",
+    "crates/vpn-rotate",
+    "crates/captcha-bypass",
+    "crates/stealth-cli",
+    # New for rev_scraping v1.0.0 (Phase 1 stubs)
+    "crates/obscura-bridge",
+    "crates/stealth-cf",
+    "crates/stealth-parse",
+    "crates/stealth-mcp",
+    "crates/stealth-sites",
+    "crates/stealth-auth",
+    # Lane C P1: shared cross-crate contract types
+    "crates/stealth-agent-contracts",
+    # Lane F P13: prompt-injection defense sanitizer
+    "crates/stealth-sanitize",
+    # Lane H (v1.3): crates.io publish wrapper for `cargo install rev-stealth-cli`
+    "crates/rev-stealth-cli",
+]
+
+[workspace.package]
+version = "1.2.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT"
+authors = ["Sasuke Torii"]
+
+[workspace.dependencies]
+# Internal workspace crates (path-based so vendored `{ workspace = true }` refs resolve)
+stealth-core = { path = "crates/stealth-core" }
+mobile-fp = { path = "crates/mobile-fp" }
+vpn-rotate = { path = "crates/vpn-rotate" }
+captcha-bypass = { path = "crates/captcha-bypass" }
+stealth-cli = { path = "crates/stealth-cli" }
+obscura-bridge = { path = "crates/obscura-bridge" }
+stealth-cf = { path = "crates/stealth-cf" }
+stealth-parse = { path = "crates/stealth-parse" }
+stealth-mcp = { path = "crates/stealth-mcp" }
+stealth-sites = { path = "crates/stealth-sites" }
+stealth-auth = { path = "crates/stealth-auth" }
+stealth-agent-contracts = { path = "crates/stealth-agent-contracts" }
+stealth-sanitize = { path = "crates/stealth-sanitize" }
+
+# Async runtime / utility
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Concurrent collections
+dashmap = "6"
+
+# IDs / strings
+uuid = { version = "1", features = ["v4", "serde"] }
+strsim = "0.11"
+regex = "1"
+url = "2"
+dirs = "5"
+tempfile = "3"
+
+# Property testing (Lane K K.4). Pinned to the 1.x line which is the
+# stable API surface and shares the rusty-fork / quickcheck-free
+# implementation. PR runs default to PROPTEST_CASES=256 (set in the
+# corresponding test module); nightly cron can override to 1024 via
+# environment variable.
+proptest = "1"
+
+# Microbenchmarks (Lane K K.7). PR runs the `--bench` target on a small
+# warmup count; bencher.dev (or iai-callgrind in offline mode) consumes
+# the criterion JSON output to post a per-PR diff comment when a hot
+# path regresses by > 10%.
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
+
+# Browser / CDP
+chromiumoxide = "0.9"
+tokio-tungstenite = "0.26"
+
+# HTML / scraping
+scraper = "0.20"
+
+# HTTP / Networking
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "cookies"] }
+# NOTE: `wreq` (Phase 0 RC) is intentionally NOT declared at workspace scope
+# as of v1.1.0 (P10 security hardening). No crate depended on it on the
+# default path. If a future stealth experiment needs it, opt in behind a
+# per-crate feature gate (e.g. `wreq-stealth = ["dep:wreq"]`) so cargo-deny /
+# cargo-audit coverage does not silently inherit an RC supply-chain risk for
+# the whole workspace. See README §14 and ExecPlan §J.
+
+# Storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+chacha20poly1305 = "0.10"
+keyring = "3"
+argon2 = "0.5"
+secrecy = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+parking_lot = "0.12"
+
+# Docker (vpn-rotate)
+bollard = "0.21"
+
+# MCP (Phase 3)
+# NOTE: `rmcp` is intentionally NOT declared at workspace scope as of v1.1.0
+# (P10 security hardening). `stealth-mcp` ships a hand-rolled JSON-RPC layer
+# pinned to the 2024-11-05 schema instead — see crates/stealth-mcp/src/lib.rs.
+# Re-add as a workspace dep only when an rmcp release matches our schema and
+# passes cargo-deny / cargo-audit on its own.
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+exec
+/bin/bash -lc 'git show 7c700a0b:Formula/rev-stealth.rb' in $REPO_ROOT
+exec
+/bin/bash -lc 'git show 7c700a0b:.github/workflows/release.yml' in $REPO_ROOT
+ succeeded in 0ms:
+# typed: false
+# frozen_string_literal: true
+#
+# Homebrew formula for rev-stealth (Lane H plumbing-only template).
+#
+# Distribution path:
+#   1. User: `brew tap sasuketorii/rev-stealth`
+#      (resolves to https://github.com/sasuketorii/homebrew-rev-stealth)
+#   2. User: `brew install rev-stealth`
+#
+# This formula file lives in the main repo as the canonical source.
+# A separate `homebrew-rev-stealth` tap repository (to be created by the
+# release owner) will mirror this file at `Formula/rev-stealth.rb`.
+# `release.yml` automation can rsync this file into the tap repo on each tag.
+#
+# Audit compliance notes (Homebrew core / tap audit):
+#   - URL points at a GitHub-hosted release tarball (no curl-pipe-bash inside).
+#   - SHA256 is bumped per release by `release-please` (placeholder OK here).
+#   - `head` block supports `brew install --HEAD rev-stealth` for git tip.
+#   - No `system "curl"` / `system "wget"`; all network goes through Homebrew.
+#   - Single bin produced: `rev-stealth`.
+#
+# Cargo-driven build: Homebrew's `rust` formula provides the toolchain.
+
+class RevStealth < Formula
+  desc "Stealth web scraping & MCP CLI for AI agent developers"
+  homepage "https://github.com/sasuketorii/rev_scraping"
+  license "MIT"
+  head "https://github.com/sasuketorii/rev_scraping.git", branch: "main"
+
+  stable do
+    # Placeholder values — `release-please` rewrites url + sha256 on tag.
+    url "https://github.com/sasuketorii/rev_scraping/archive/refs/tags/v1.3.0.tar.gz"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    version "1.3.0"
+  end
+
+  depends_on "rust" => :build
+
+  # Chromium is intentionally NOT declared as a runtime dependency.
+  # `rev-stealth` works headless via system Chromium/Chrome when present,
+  # and the recommended container-mode flow uses the distroless OCI image.
+  # Surfacing this as a `caveats` block keeps Homebrew audit happy
+  # (no implicit binary dep on a 200MB+ package).
+
+  def install
+    # Build only the `rev-stealth` binary from the workspace.
+    system "cargo", "install", *std_cargo_args(path: "crates/stealth-cli")
+
+    # NOTE: shell completions + man pages are wired by Lane G G.3 / G.8.
+    # Once `rev-stealth completions <shell>` exists, swap this block in:
+    #
+    #   generate_completions_from_executable(bin/"rev-stealth", "completions",
+    #                                         shells: [:bash, :zsh, :fish])
+    #   man1.install Dir["target/release/man/*.1"] if Dir.exist?("target/release/man")
+    #
+    # Left out of v1.3 Lane H plumbing to keep `brew install rev-stealth`
+    # from failing on a missing subcommand.
+  end
+
+  def caveats
+    <<~EOS
+      `rev-stealth` browser commands need a Chromium-family browser at
+      runtime. Either install Google Chrome / Chromium yourself, or use
+      the distroless OCI image:
+
+        docker pull ghcr.io/sasuketorii/rev-stealth:#{version}
+
+      For Claude Code / Cursor / Hermes integration see:
+        https://sasuketorii.github.io/rev_scraping/
+    EOS
+  end
+
+  test do
+    # Sanity: the binary runs and reports a version.
+    assert_match(/rev-stealth \d+\.\d+\.\d+/, shell_output("#{bin}/rev-stealth --version"))
+    # Subcommand help works (covers clap wiring regression).
+    assert_match("Usage:", shell_output("#{bin}/rev-stealth --help"))
+  end
+end
+
+ succeeded in 0ms:
+name: Release
+
+# Lane H (v1.3) — one-tag release pipeline:
+#   - cargo package + publish dry-run (gates manifest correctness)
+#   - matrix build for Linux x86_64 + Linux aarch64 + macOS x86_64 + macOS arm64
+#   - deb + rpm artifacts (Linux only)
+#   - distroless multi-arch OCI image (amd64+arm64) -> ghcr.io
+#   - cosign sign-blob for every binary archive (keyless OIDC)
+#   - SLSA L3 build-provenance attestation via actions/attest-build-provenance
+#   - trivy image scan (HIGH,CRITICAL fail)
+#   - GitHub release (draft) populated with all artifacts + signatures
+#   - release-please PR automation in a separate job (pre-tag)
+#
+# Security note: every `run:` step uses only trusted scalars (runner-set env
+# like GITHUB_REF_NAME, step outputs, secrets). No user-controlled github.event
+# fields are interpolated into shell commands.
+#
+# External gates (brew install / docker pull / cosign verify / crates.io
+# publish) run on real tag push only; PR-level CI exercises dry-run paths.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'Dockerfile.distroless'
+      - 'Formula/rev-stealth.rb'
+      - 'install.sh'
+      - 'crates/rev-stealth-cli/**'
+      - 'release-please-config.json'
+      - '.release-please-manifest.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/rev-stealth
+
+jobs:
+  preflight:
+    name: preflight (lint + cargo dry-run)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: actionlint (workflow syntax)
+        uses: raven-actions/actionlint@v2
+      - name: shellcheck install.sh
+        run: shellcheck -s sh install.sh
+      # NOTE: workspace-wide `cargo package` fails because internal path
+      # deps (e.g. mobile-fp) intentionally have no version requirement —
+      # they're `publish = false`. The wrapper crate is the only crates.io
+      # publish target, so we package + dry-run-publish it explicitly.
+      - name: cargo package -p rev-stealth-cli
+        run: cargo package -p rev-stealth-cli --allow-dirty --no-verify
+      - name: cargo publish dry-run (rev-stealth-cli)
+        run: cargo publish --dry-run --allow-dirty -p rev-stealth-cli
+
+  build-binaries:
+    name: build (${{ matrix.target }})
+    needs: preflight
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-musl
+            cross: false
+          - os: ubuntu-22.04
+            target: aarch64-unknown-linux-musl
+            cross: true
+          - os: macos-14
+            target: x86_64-apple-darwin
+            cross: false
+          - os: macos-14
+            target: aarch64-apple-darwin
+            cross: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.target }}-stable
+          workspaces: |
+            . -> target
+
+      - name: Install cross toolchain (Linux aarch64)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            musl-tools gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+
+      - name: Install musl tools (Linux x86_64)
+        if: matrix.os == 'ubuntu-22.04' && !matrix.cross
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+
+      - name: cargo build --release
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          cargo build --release --target "$BUILD_TARGET" \
+            --bin rev-stealth --bin stealth-mcp --bin rev-auth
+
+      - name: Stage tarball
+        id: stage
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          VERSION="$REF_NAME"
+          if [ "$EVENT_NAME" != "push" ]; then
+            VERSION="dev-${SHORT_SHA:0:8}"
+          fi
+          NAME="rev-stealth-${VERSION}-${BUILD_TARGET}"
+          mkdir -p "dist/${NAME}"
+          cp "target/${BUILD_TARGET}/release/rev-stealth"  "dist/${NAME}/"
+          cp "target/${BUILD_TARGET}/release/stealth-mcp"  "dist/${NAME}/"
+          cp "target/${BUILD_TARGET}/release/rev-auth"     "dist/${NAME}/"
+          cp README.md LICENSE                             "dist/${NAME}/"
+          tar -czf "dist/${NAME}.tar.gz" -C dist "${NAME}"
+          (cd dist && shasum -a 256 "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256")
+          echo "archive=dist/${NAME}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}"          >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Cosign sign-blob (keyless OIDC)
+        if: github.event_name == 'push'
+        env:
+          COSIGN_YES: "true"
+          ARCHIVE: ${{ steps.stage.outputs.archive }}
+        run: |
+          cosign sign-blob \
+            --yes \
+            --output-signature "${ARCHIVE}.sig" \
+            --output-certificate "${ARCHIVE}-keyless.pem" \
+            "${ARCHIVE}"
+
+      - name: Attest build provenance (SLSA L3)
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ${{ steps.stage.outputs.archive }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  package-deb:
+    name: package .deb (${{ matrix.target }})
+    needs: build-binaries
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-deb
+        run: cargo install --locked cargo-deb
+      - name: Restore release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: dist
+      - name: Stage target/release/rev-stealth for cargo-deb
+        run: |
+          set -eu
+          mkdir -p target/release
+          ARCHIVE=$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)
+          tar -xzf "${ARCHIVE}" -C dist/
+          BIN=$(find dist -type f -name rev-stealth | head -n 1)
+          cp "${BIN}" target/release/rev-stealth
+      - name: cargo deb --no-build
+        run: cargo deb --no-build -p rev-stealth-cli --output dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.target }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  package-rpm:
+    name: package .rpm (${{ matrix.target }})
+    needs: build-binaries
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-generate-rpm
+        run: cargo install --locked cargo-generate-rpm
+      - name: Restore release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: dist
+      - name: Stage target/release/rev-stealth
+        run: |
+          set -eu
+          mkdir -p target/release
+          ARCHIVE=$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)
+          tar -xzf "${ARCHIVE}" -C dist/
+          BIN=$(find dist -type f -name rev-stealth | head -n 1)
+          cp "${BIN}" target/release/rev-stealth
+      - name: cargo generate-rpm
+        run: cargo generate-rpm -p rev-stealth-cli --output dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-${{ matrix.target }}
+          path: dist/*.rpm
+          if-no-files-found: error
+
+  oci-image:
+    name: oci image (distroless, multi-arch)
+    needs: preflight
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=ref,event=pr
+            type=sha,prefix=sha-
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (and push on tag) multi-arch image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.distroless
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+      - name: Install trivy
+        uses: aquasecurity/setup-trivy@v0.2.0
+      - name: trivy image scan (HIGH,CRITICAL)
+        if: github.event_name == 'push'
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+        run: trivy --config trivy.yaml image "$IMAGE_REF"
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v3
+      - name: Cosign sign image (keyless)
+        if: github.event_name == 'push'
+        env:
+          COSIGN_YES: "true"
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE_REF"
+      - name: Attest image provenance (SLSA L3)
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  cargo-publish:
+    name: cargo publish ${{ github.event_name == 'push' && 'real' || 'dry-run' }}
+    needs: preflight
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo publish (dry-run)
+        if: github.event_name != 'push'
+        run: cargo publish --dry-run --allow-dirty -p rev-stealth-cli
+      - name: cargo publish (real)
+        if: github.event_name == 'push'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked -p rev-stealth-cli
+
+  gh-release:
+    name: draft GitHub release
+    needs: [build-binaries, package-deb, package-rpm, oci-image, cargo-publish]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            dist/**/*.tar.gz
+            dist/**/*.tar.gz.sha256
+            dist/**/*.tar.gz.sig
+            dist/**/*-keyless.pem
+            dist/**/*.deb
+            dist/**/*.rpm
+
+# release-please runs in a separate workflow (release-please.yml) because it
+# triggers on `push: branches: [main]` rather than tag pushes, and combining
+# the two in one workflow would either dead-code the job or run it on the
+# wrong event.
+
+exec
+/bin/bash -lc 'git show 7c700a0b:trivy.yaml' in $REPO_ROOT
+exec
+/bin/bash -lc 'git show 7c700a0b:Dockerfile.distroless' in $REPO_ROOT
+ succeeded in 0ms:
+# Lane H.4 — trivy configuration for the distroless image scan.
+#
+# Used by `release.yml` job `trivy-scan`:
+#   trivy --config trivy.yaml image ghcr.io/sasuketorii/rev-stealth:${VERSION}
+
+severity:
+  - HIGH
+  - CRITICAL
+
+# Fail the CI step if any unignored finding at the listed severity exists.
+exit-code: 1
+
+# `.trivyignore` is consulted automatically; listing it here for clarity.
+ignorefile: .trivyignore
+
+# Skip dirs that don't exist in the distroless image but show up in fs scans.
+skip-dirs:
+  - vendor
+  - _refs
+  - target
+
+# Vulnerability DB cache lives in the runner cache layer.
+cache-dir: .trivy-cache
+
+# Output: SARIF for GH code-scanning + table for human review.
+format: table
+
+ succeeded in 0ms:
+# syntax=docker/dockerfile:1.7
+#
+# Lane H.4 — Distroless multi-arch image for rev-stealth.
+#
+# Build (local, single arch):
+#   docker build -f Dockerfile.distroless -t rev-stealth:dev .
+#
+# Build (release, multi-arch via buildx):
+#   docker buildx build \
+#     --platform linux/amd64,linux/arm64 \
+#     -f Dockerfile.distroless \
+#     -t ghcr.io/sasuketorii/rev-stealth:${VERSION} \
+#     --push .
+#
+# Why distroless:
+#   - Minimal attack surface (no shell, no package manager).
+#   - `trivy image --severity HIGH,CRITICAL --exit-code 1` PASS target.
+#   - Final image is ~25 MB (static musl binary + cc base).
+#
+# Chromium handling:
+#   This image does NOT bundle Chromium. The rev-stealth binary in this
+#   image is for `mcp`, `sanitize`, `auth`, `recipe`, `config`, `vpn`,
+#   `hermes`, `doctor`, and similar non-browser subcommands.
+#
+#   For `browser` / Cloudflare-bypass workflows that need a live Chrome,
+#   a separate image will be published at
+#     `ghcr.io/sasuketorii/rev-stealth-browser:${VERSION}`
+#   built from a different Dockerfile (`Dockerfile.browser`, deferred to
+#   the release cut). Splitting the images keeps the distroless target
+#   trivy-clean and avoids inheriting Chromium CVE churn for users who
+#   never touch the browser subcommands.
+
+# -----------------------------------------------------------------------------
+# Stage 1 — builder (musl static)
+# -----------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM rust:1.83-slim-bookworm AS builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETARCH
+
+# musl target per arch.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        musl-tools \
+        pkg-config \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN case "${TARGETARCH}" in \
+        amd64) RUST_TARGET=x86_64-unknown-linux-musl ;; \
+        arm64) RUST_TARGET=aarch64-unknown-linux-musl ;; \
+        *) echo "unsupported TARGETARCH: ${TARGETARCH}"; exit 1 ;; \
+    esac \
+    && rustup target add "${RUST_TARGET}" \
+    && cargo build --release --target "${RUST_TARGET}" \
+        --bin rev-stealth --bin stealth-mcp --bin rev-auth \
+    && mkdir -p /out \
+    && cp "target/${RUST_TARGET}/release/rev-stealth" /out/rev-stealth \
+    && cp "target/${RUST_TARGET}/release/stealth-mcp" /out/stealth-mcp \
+    && cp "target/${RUST_TARGET}/release/rev-auth"    /out/rev-auth
+
+# -----------------------------------------------------------------------------
+# Stage 2 — distroless runtime
+# -----------------------------------------------------------------------------
+# `cc` includes libc + ca-certs; `static-debian12` is even smaller but breaks
+# any future opt-in to dynamic-linking features. `cc` is the safe default.
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+
+LABEL org.opencontainers.image.title="rev-stealth" \
+      org.opencontainers.image.description="Stealth scraping & MCP CLI" \
+      org.opencontainers.image.source="https://github.com/sasuketorii/rev_scraping" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Sasuke Torii"
+
+COPY --from=builder --chown=nonroot:nonroot /out/rev-stealth  /usr/local/bin/rev-stealth
+COPY --from=builder --chown=nonroot:nonroot /out/stealth-mcp  /usr/local/bin/stealth-mcp
+COPY --from=builder --chown=nonroot:nonroot /out/rev-auth     /usr/local/bin/rev-auth
+
+USER nonroot:nonroot
+WORKDIR /home/nonroot
+
+ENTRYPOINT ["/usr/local/bin/rev-stealth"]
+CMD ["--help"]
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.trivyignore' in $REPO_ROOT
+ succeeded in 0ms:
+# Lane H.4 — trivy allowlist for the distroless image.
+#
+# Policy:
+#   - Default scan command is:
+#       trivy image --severity HIGH,CRITICAL --exit-code 1 \
+#         ghcr.io/sasuketorii/rev-stealth:${VERSION}
+#   - This file lists CVEs intentionally accepted (must include expiry +
+#     justification). Empty by default; entries are reviewed quarterly.
+#
+# Format: one CVE ID per line; comments allowed.
+
+# (no exceptions as of v1.3.0 plumbing)
+
+exec
+/bin/bash -lc 'git show 7c700a0b:install.sh' in $REPO_ROOT
+ succeeded in 0ms:
+#!/usr/bin/env sh
+# shellcheck shell=sh
+# SPDX-License-Identifier: MIT
+#
+# Lane H.6 — `curl | sh` installer for rev-stealth.
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --version v1.3.0
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --prefix /opt/rev-stealth/bin
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --no-verify  # skip cosign
+#
+# Security model:
+#   - Downloads the release artifact + its `*.sig` + `*-keyless.pem` from
+#     `https://github.com/sasuketorii/rev_scraping/releases/download/${VERSION}/`.
+#   - Verifies with `cosign verify-blob` using a fixed certificate-identity
+#     (GitHub Actions OIDC issuer pinned to the release workflow).
+#   - Refuses to install if cosign is unavailable AND `--no-verify` was not
+#     explicitly passed (fail-closed default).
+#   - Tries `sha256` checksum as a secondary integrity gate.
+#
+# Strict POSIX sh; no bashisms. Validated under `shellcheck -s sh`.
+
+set -eu
+
+# ---------- defaults -------------------------------------------------------
+REPO_OWNER="sasuketorii"
+REPO_NAME="rev_scraping"
+BIN_NAME="rev-stealth"
+DEFAULT_VERSION="latest"
+DEFAULT_PREFIX="/usr/local/bin"
+
+# Cosign identity pin (matches release.yml workflow file path + ref).
+# `release-please` rewrites the ref pin on each tag.
+COSIGN_IDENTITY="https://github.com/${REPO_OWNER}/${REPO_NAME}/.github/workflows/release.yml@refs/tags/v"
+COSIGN_OIDC_ISSUER="https://token.actions.githubusercontent.com"
+
+VERSION="${REV_STEALTH_VERSION:-${DEFAULT_VERSION}}"
+PREFIX="${REV_STEALTH_PREFIX:-${DEFAULT_PREFIX}}"
+VERIFY="1"
+
+# ---------- arg parse ------------------------------------------------------
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --version)   VERSION="$2"; shift 2 ;;
+        --version=*) VERSION="${1#*=}"; shift ;;
+        --prefix)    PREFIX="$2"; shift 2 ;;
+        --prefix=*)  PREFIX="${1#*=}"; shift ;;
+        --no-verify) VERIFY="0"; shift ;;
+        -h|--help)
+            sed -n '/^# Usage:/,/^# Security model:/p' "$0" | sed 's/^# //; s/^#$//'
+            exit 0
+            ;;
+        *)
+            echo "install.sh: unknown arg: $1" >&2
+            exit 64
+            ;;
+    esac
+done
+
+# ---------- helpers --------------------------------------------------------
+log()  { printf '[install.sh] %s\n' "$*"; }
+warn() { printf '[install.sh] WARN: %s\n' "$*" >&2; }
+die()  { printf '[install.sh] ERROR: %s\n' "$*" >&2; exit 1; }
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"
+}
+
+detect_target() {
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+    case "${os}-${arch}" in
+        linux-x86_64)   echo "x86_64-unknown-linux-musl" ;;
+        linux-aarch64)  echo "aarch64-unknown-linux-musl" ;;
+        linux-arm64)    echo "aarch64-unknown-linux-musl" ;;
+        darwin-x86_64)  echo "x86_64-apple-darwin" ;;
+        darwin-arm64)   echo "aarch64-apple-darwin" ;;
+        *) die "unsupported platform: ${os}-${arch}" ;;
+    esac
+}
+
+resolve_version() {
+    if [ "${VERSION}" = "latest" ]; then
+        need curl
+        VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" \
+            | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | head -n 1)
+        [ -n "${VERSION}" ] || die "could not resolve latest version"
+    fi
+    echo "${VERSION}"
+}
+
+# ---------- main -----------------------------------------------------------
+need curl
+need uname
+need tar
+
+TARGET="$(detect_target)"
+VERSION="$(resolve_version)"
+log "installing ${BIN_NAME} ${VERSION} for ${TARGET}"
+
+TMPDIR_REAL="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR_REAL}"' EXIT INT TERM
+
+BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${VERSION}"
+ARCHIVE="${BIN_NAME}-${VERSION}-${TARGET}.tar.gz"
+
+log "fetching ${BASE_URL}/${ARCHIVE}"
+curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}"     "${BASE_URL}/${ARCHIVE}"
+curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sha256" "${BASE_URL}/${ARCHIVE}.sha256" || warn "no sha256 sidecar"
+
+# sha256 check (best-effort, soft-fail if sidecar absent).
+if [ -s "${TMPDIR_REAL}/${ARCHIVE}.sha256" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        ( cd "${TMPDIR_REAL}" && sha256sum -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+    elif command -v shasum >/dev/null 2>&1; then
+        ( cd "${TMPDIR_REAL}" && shasum -a 256 -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+    else
+        warn "no sha256sum / shasum available; skipping checksum gate"
+    fi
+    log "sha256 OK"
+fi
+
+# Cosign verification (fail-closed unless --no-verify).
+if [ "${VERIFY}" = "1" ]; then
+    if command -v cosign >/dev/null 2>&1; then
+        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sig" "${BASE_URL}/${ARCHIVE}.sig"
+        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.cert" "${BASE_URL}/${ARCHIVE}-keyless.pem"
+        # Pin to the *exact* tag in the identity to prevent workflow-rename
+        # spoofing. Tag format is `v<semver>`.
+        cosign verify-blob \
+            --certificate-identity "${COSIGN_IDENTITY}${VERSION#v}" \
+            --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" \
+            --signature "${TMPDIR_REAL}/${ARCHIVE}.sig" \
+            --certificate "${TMPDIR_REAL}/${ARCHIVE}.cert" \
+            "${TMPDIR_REAL}/${ARCHIVE}" \
+            || die "cosign verify-blob FAILED — refusing to install"
+        log "cosign verification PASS"
+    else
+        die "cosign not installed; install cosign (https://docs.sigstore.dev/cosign/installation/) or rerun with --no-verify"
+    fi
+else
+    warn "cosign verification SKIPPED (--no-verify). Not recommended."
+fi
+
+# Extract + install. The release tarball is laid out as
+#   rev-stealth-${VERSION}-${TARGET}/{rev-stealth,stealth-mcp,rev-auth,README,LICENSE}
+# so we resolve the binary by find (handles dirname variations).
+tar -xzf "${TMPDIR_REAL}/${ARCHIVE}" -C "${TMPDIR_REAL}"
+EXTRACTED_BIN="$(find "${TMPDIR_REAL}" -type f -name "${BIN_NAME}" -perm -u+x -print -quit)"
+[ -n "${EXTRACTED_BIN}" ] && [ -x "${EXTRACTED_BIN}" ] \
+    || die "archive missing expected binary: ${BIN_NAME}"
+
+if [ -w "${PREFIX}" ]; then
+    install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+else
+    log "PREFIX ${PREFIX} not writable; using sudo"
+    need sudo
+    sudo install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+fi
+
+log "installed ${PREFIX}/${BIN_NAME}"
+log "next steps: ${BIN_NAME} --help"
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.github/workflows/release-please.yml' in $REPO_ROOT
+exec
+/bin/bash -lc 'git show 7c700a0b:.dockerignore' in $REPO_ROOT
+ succeeded in 0ms:
+name: release-please
+
+# Lane H.7 - release-please PR automation.
+# Runs on every push to main and opens / updates a release PR. Merging
+# that PR pushes a v* tag, which triggers release.yml to build and sign
+# artifacts.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: release-please
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+ succeeded in 0ms:
+# Lane H.4 — keep docker build context lean & private.
+# Anything not strictly required to compile + bundle docs/license should
+# be excluded so multi-arch buildx (amd64+arm64) stays fast and we never
+# leak local state into a published image.
+
+# Build outputs / caches
+/target
+**/target
+**/*.rlib
+**/*.rmeta
+
+# Local agent / harness state
+/.agent
+/.claude
+/.cursor
+/.codex
+**/node_modules
+
+# VCS
+.git
+.gitignore
+.gitattributes
+.github
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Secrets — defense in depth (CI shouldn't have these, but belt+braces).
+.env
+.env.*
+*.pem
+*.key
+secrets/
+**/credentials.json
+
+# Docs that don't need to be in the image
+/docs
+/_refs
+/vendor/obscura/.git
+/vendor/obscura/target
+
+# Test fixtures
+**/tests/fixtures/*.bin
+**/proptest-regressions
+
+# Tooling not needed in image
+Dockerfile.distroless
+.dockerignore
+Formula/
+install.sh
+
+exec
+/bin/bash -lc 'git show 7c700a0b:release-please-config.json' in $REPO_ROOT
+ succeeded in 0ms:
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "rust",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "rev_scraping",
+      "component": "rev-stealth",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "Formula/rev-stealth.rb"
+        }
+      ]
+    }
+  },
+  "plugins": [
+    {
+      "type": "cargo-workspace",
+      "merge": true
+    }
+  ],
+  "changelog-sections": [
+    { "type": "feat",     "section": "Features",                  "hidden": false },
+    { "type": "fix",      "section": "Bug Fixes",                 "hidden": false },
+    { "type": "perf",     "section": "Performance",               "hidden": false },
+    { "type": "security", "section": "Security",                  "hidden": false },
+    { "type": "deps",     "section": "Dependencies",              "hidden": false },
+    { "type": "docs",     "section": "Documentation",             "hidden": false },
+    { "type": "refactor", "section": "Refactoring",               "hidden": true  },
+    { "type": "test",     "section": "Tests",                     "hidden": true  },
+    { "type": "ci",       "section": "Continuous Integration",    "hidden": true  },
+    { "type": "build",    "section": "Build System",              "hidden": true  },
+    { "type": "chore",    "section": "Chores",                    "hidden": true  }
+  ]
+}
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.release-please-manifest.json' in $REPO_ROOT
+ succeeded in 0ms:
+{
+  ".": "1.2.0"
+}
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.agent/active/prompts/v1_3_h_plumbing_review_round3.md' in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 Lane H (plumbing-only) — round 3
+
+Round-2 BLOCK addressed:
+
+**Preflight `cargo package --workspace` failure** → narrowed to
+`cargo package -p rev-stealth-cli --allow-dirty --no-verify` in
+`.github/workflows/release.yml`. Verified locally:
+
+```
+$ cargo package -p rev-stealth-cli --allow-dirty --no-verify
+   Packaging rev-stealth-cli v1.2.0
+    Packaged 6 files, 10.5KiB (3.8KiB compressed)
+```
+
+Inline comment in the workflow explains why workspace-wide packaging
+isn't viable: internal path deps (`mobile-fp`, etc.) are `publish = false`
+and intentionally lack version requirements; the wrapper crate is the
+only crates.io publish target so it's the only thing that needs to be
+packaged.
+
+Round-1 + round-2 reviewer accepted answers retained: duplicate-bin
+collision cleared; installer find-based extract acceptable; Homebrew
+completion path removed; release-please moved to its own workflow.
+
+## Re-verified gates
+
+- `cargo check --workspace`: OK
+- `cargo package -p rev-stealth-cli --allow-dirty --no-verify`: OK
+- `cargo publish --dry-run -p rev-stealth-cli --allow-dirty`: OK
+- `cargo build --release --bin rev-stealth`: 1 artifact, no warning
+- `shellcheck -s sh install.sh`: clean
+- `actionlint release.yml release-please.yml`: clean
+- `docker buildx build --check -f Dockerfile.distroless .`: no warnings
+
+## Verify (1)
+
+Are all round-1/2 BLOCKs cleared with no new plumbing concerns introduced
+by the narrowed `cargo package` step?
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.agent/active/prompts/v1_3_h_plumbing_review.md' in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 Lane H (plumbing-only)
+
+Option A: plumbing only. External gates (brew/docker/cosign verify/crates.io
+publish real) deferred to tag push.
+
+## Files touched
+
+- `Cargo.toml` (+1 member)
+- `crates/rev-stealth-cli/{Cargo.toml,src/main.rs,README.md}` (new publish crate
+  + cargo-deb + cargo-generate-rpm metadata, placeholder main)
+- `Formula/rev-stealth.rb` (Homebrew tap template)
+- `Dockerfile.distroless` + `.dockerignore` + `.trivyignore` + `trivy.yaml`
+- `install.sh` (POSIX, cosign fail-closed default)
+- `.github/workflows/release.yml` (preflight, 4-target build, deb/rpm, OCI
+  multi-arch, cosign sign-blob, SLSA L3, release-please)
+- `release-please-config.json`, `.release-please-manifest.json`
+
+## Gates PASS (local)
+
+- `cargo check --workspace`: OK
+- `cargo test --workspace --no-run`: OK
+- `cargo publish --dry-run -p rev-stealth-cli`: OK
+- `shellcheck -s sh install.sh`: clean
+- `actionlint .github/workflows/release.yml`: clean
+- `docker buildx build --check -f Dockerfile.distroless .`: no warnings
+
+## Verify (3)
+
+1. **Wrapper strategy**: `rev-stealth-cli` is new `publish=true` crate w/
+   placeholder `main.rs` (exit 3). `stealth-cli` stays `publish=false` to
+   avoid renaming 13 workspace dep refs. Real wiring (lib target +
+   `stealth_cli::run()` forward) deferred to release cut. Acceptable as
+   plumbing-only?
+
+2. **deb/rpm asset path**: both point at `../../target/release/rev-stealth`
+   and rely on workflow to pre-stage cross-built binaries. Are the
+   `package-deb`/`package-rpm` staging steps extracting the right-arch
+   binary from `bin-<target>` artifact?
+
+3. **Workflow injection safety**: every `run:` uses env-bound scalars
+   (`GITHUB_REF_NAME`, step outputs, secrets); no raw `${{ github.event.* }}`
+   into shell. Confirm no remaining sinks.
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`
+
+exec
+/bin/bash -lc "rg --files .agent/active | rg 'v1_3_h|Lane H|h_.*(review|final|score)'" in $REPO_ROOT
+ succeeded in 0ms:
+.agent/active/prompts/v1_3_h_plumbing_review_round3.md
+.agent/active/prompts/v1_3_h_plumbing_review_round2.md
+.agent/active/prompts/v1_3_h_plumbing_review.md
+.agent/active/scoring/v1_3_h_score_round1_opus.md
+.agent/active/scoring/v1_3_h_score_round1_codex.err
+.agent/active/scoring/v1_3_h_score_round1_codex.out
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.agent/active/prompts/v1_3_h_plumbing_review_round2.md' in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 Lane H (plumbing-only) — round 2
+
+Round-1 findings addressed:
+
+1. **Duplicate `rev-stealth` bin collision** → wrapper bin renamed to
+   `rev-stealth-cli-stub`; `stealth-cli` keeps `rev-stealth`. Verified:
+   `cargo build --release --bin rev-stealth` builds one artifact with
+   no collision warning.
+
+2. **Installer tar layout** → `install.sh` resolves the binary via
+   `find ${TMPDIR_REAL} -type f -name rev-stealth -perm -u+x -print -quit`,
+   matching the real tarball layout
+   `rev-stealth-${VERSION}-${TARGET}/rev-stealth`.
+
+3. **Homebrew `completions` subcommand missing** → removed
+   `generate_completions_from_executable` from `def install`; commented
+   placeholder kept for Lane G G.3 wiring.
+
+4. **`release-please` unreachable** → moved into dedicated workflow
+   `.github/workflows/release-please.yml` on `push: branches: [main]`.
+   `release.yml` no longer contains the dead-coded job.
+
+## Re-verified gates
+
+- `cargo check --workspace`: OK
+- `cargo publish --dry-run -p rev-stealth-cli --allow-dirty`: OK
+- `cargo build --release --bin rev-stealth`: 1 artifact, no warning
+- `shellcheck -s sh install.sh`: clean
+- `actionlint release.yml release-please.yml`: clean
+- `docker buildx build --check -f Dockerfile.distroless .`: no warnings
+
+## Out of scope (release-cut, not plumbing)
+
+- Wrapper rename `rev-stealth-cli-stub` → `rev-stealth` + wiring to
+  `stealth_cli::run()` lib re-export
+- Real `cargo publish`, cosign signing, GHCR push, brew tap repo
+
+## Verify (3)
+
+1. Does duplicate-bin BLOCK clear with the unique stub name?
+2. Is `find ... -perm -u+x` acceptable, or should the installer also
+   chmod +x in case a tar lost exec bits?
+3. Any remaining plumbing concern (excluding the deferred items above)?
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`
+
+exec
+/bin/bash -lc "sed -n '1,160p' .agent/active/scoring/v1_3_h_score_round1_codex.err" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/scoring/v1_3_h_score_round1_codex.out" in $REPO_ROOT
+ succeeded in 0ms:
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+
+ succeeded in 0ms:
+codex
+Lane H は “plumbing-only” としては広く揃っていますが、ExecPlan の acceptance は実インストールと外部 gate をかなり明確に要求しています。ここからは各 H.1-H.7 が「現時点で満たすもの」と「tag push まで未証明のもの」を分けて点数化します。
+exec
+/bin/bash -lc "git show 7c700a0b:docs/book/src/en/install.md 2>/dev/null | sed -n '1,180p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Installation
+
+`rev-stealth` ships as a single static binary. Pick whichever channel matches
+your environment — they all install the same artifact, just from different
+distribution surfaces.
+
+## macOS — Homebrew (recommended)
+
+```sh
+brew tap sasuketorii/rev-stealth
+brew install rev-stealth
+rev-stealth --version
+```
+
+Apple Silicon and Intel are both bottled. The formula pulls the
+cosign-verified release tarball from the GitHub release matching the
+formula version.
+
+## Debian / Ubuntu — `.deb`
+
+```sh
+curl -fsSL https://github.com/sasuketorii/rev_scraping/releases/download/v1.3.0/rev-stealth_1.3.0_amd64.deb -o rev-stealth.deb
+sudo dpkg -i rev-stealth.deb
+```
+
+Tested on Debian 12, Ubuntu 22.04, Ubuntu 24.04. The package installs into
+`/usr/local/bin/rev-stealth` and ships an apparmor profile (optional).
+
+## RHEL / Fedora — `.rpm`
+
+```sh
+sudo rpm -i https://github.com/sasuketorii/rev_scraping/releases/download/v1.3.0/rev-stealth-1.3.0-1.x86_64.rpm
+```
+
+## Rust / `cargo install`
+
+```sh
+cargo install --locked rev-stealth
+```
+
+`--locked` honours the published `Cargo.lock`. This is the recommended
+channel for contributors and for environments where reproducibility matters
+more than convenience.
+
+## Container image (distroless multi-arch)
+
+```sh
+docker pull ghcr.io/sasuketorii/rev-stealth:v1.3.0
+docker run --rm ghcr.io/sasuketorii/rev-stealth:v1.3.0 doctor
+```
+
+Chromium runs in a separate sidecar image
+(`ghcr.io/sasuketorii/rev-stealth-chromium`). See the
+[VPS deployment chapter](./tutorial/07-vps.md) for a sample compose file.
+
+## `curl | sh` (last resort)
+
+```sh
+curl -fsSL https://get.rev-stealth.dev | sh
+```
+
+The installer verifies the cosign signature before extracting. If you do not
+trust the installer you can verify the artifact yourself:
+
+```sh
+cosign verify-blob \
+  --certificate-identity-regexp '^https://github.com/sasuketorii/rev_scraping/.*$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --signature rev-stealth.sig \
+  rev-stealth
+```
+
+## Verifying the install
+
+```sh
+rev-stealth --version
+rev-stealth doctor --output-format json | jq '.checks[] | select(.status != "ok")'
+```
+
+`doctor` is the official self-test; an empty filter means every check
+passes.
+
+codex
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 6.8 | H.1/H.5 は tap 未作成・sha placeholder・`rev-stealth-cli-stub` で acceptance 未達。H.2/H.3/H.4/H.6/H.7 は workflow/metadata はあるが、実 install/pull/verify は tag 後まで未証明。 |
+| B | 8.0 | CI dry-run、actionlint/shellcheck、cosign、attestation、Trivy 設計は揃う。だが PR 時点の adversarial/self-verify gate と実 pull/install gate が弱い。 |
+| C | 7.0 | deb/rpm/OCI/brew/cargo/curl の面は競合級。ただし現物は “配布面の設計” で、実際の 60 秒 install や crates.io install はまだ劣後。 |
+| D | 5.8 | Lane H 特化要件の `brew install rev-stealth` は tap/sha/bottle 不在で成立しない。SBOM/cosign は設計済みだが verify/self-test と実 artifact が不足。 |
+| E | 7.5 | release-please、cosign、Trivy、distroless、GitHub Actions は妥当。だが release-cut TODO、tap 同期、stub rename、formula sha 更新が将来負債として残る。 |
+| F | 6.0 | evidence は dry-run 系中心。brew audit/test、dpkg/rpm install sanity、cosign verify self-check、Trivy PR scan、installer unit が不足。 |
+| G | 6.0 | コメントは厚いが、README/docs が `cargo install rev-stealth` や bottles/app-armor 等を先取りしており現物と不一致。配布 runbook/ADR も不足。 |
+
+overall = 6.79
+
+verdict: FAIL
+
+deltas to 9.0:
+- `rev-stealth-cli-stub` を廃止し、publish crate が実 `rev-stealth` binary を出すように `stealth-cli` lib entrypoint へ接続する。
+- Homebrew tap 更新を workflow に組み込み、real sha256、`brew audit --strict --online`、`brew test-bot` 相当を CI gate 化する。
+- deb/rpm package で `--target`/arch を明示し、`dpkg -i` / `rpm -i` smoke を両 arch で検証する。
+- tag workflow 内で署名直後に `cosign verify-blob` / image verify / SLSA verifier を実行する。
+- PR-level の Docker build + Trivy fs/image scan と installer POSIX unit test を追加する。
+- docs/README を現物に合わせ、配布 runbook と外部 gate evidence 保存先を追加する。
+tokens used
+109,036
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"0fb8e442-35b3-46a1-ac67-e168fa97de6b","timestamp":"2026-05-22T20:58:08Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":182319,"tokens_in":109036,"tokens_out":0,"total_tokens":109036,"dry_run":false,"specialty_status":"none"}

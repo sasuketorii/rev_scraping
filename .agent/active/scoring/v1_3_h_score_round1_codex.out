@@ -1,0 +1,21 @@
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 6.8 | H.1/H.5 は tap 未作成・sha placeholder・`rev-stealth-cli-stub` で acceptance 未達。H.2/H.3/H.4/H.6/H.7 は workflow/metadata はあるが、実 install/pull/verify は tag 後まで未証明。 |
+| B | 8.0 | CI dry-run、actionlint/shellcheck、cosign、attestation、Trivy 設計は揃う。だが PR 時点の adversarial/self-verify gate と実 pull/install gate が弱い。 |
+| C | 7.0 | deb/rpm/OCI/brew/cargo/curl の面は競合級。ただし現物は “配布面の設計” で、実際の 60 秒 install や crates.io install はまだ劣後。 |
+| D | 5.8 | Lane H 特化要件の `brew install rev-stealth` は tap/sha/bottle 不在で成立しない。SBOM/cosign は設計済みだが verify/self-test と実 artifact が不足。 |
+| E | 7.5 | release-please、cosign、Trivy、distroless、GitHub Actions は妥当。だが release-cut TODO、tap 同期、stub rename、formula sha 更新が将来負債として残る。 |
+| F | 6.0 | evidence は dry-run 系中心。brew audit/test、dpkg/rpm install sanity、cosign verify self-check、Trivy PR scan、installer unit が不足。 |
+| G | 6.0 | コメントは厚いが、README/docs が `cargo install rev-stealth` や bottles/app-armor 等を先取りしており現物と不一致。配布 runbook/ADR も不足。 |
+
+overall = 6.79
+
+verdict: FAIL
+
+deltas to 9.0:
+- `rev-stealth-cli-stub` を廃止し、publish crate が実 `rev-stealth` binary を出すように `stealth-cli` lib entrypoint へ接続する。
+- Homebrew tap 更新を workflow に組み込み、real sha256、`brew audit --strict --online`、`brew test-bot` 相当を CI gate 化する。
+- deb/rpm package で `--target`/arch を明示し、`dpkg -i` / `rpm -i` smoke を両 arch で検証する。
+- tag workflow 内で署名直後に `cosign verify-blob` / image verify / SLSA verifier を実行する。
+- PR-level の Docker build + Trivy fs/image scan と installer POSIX unit test を追加する。
+- docs/README を現物に合わせ、配布 runbook と外部 gate evidence 保存先を追加する。

@@ -20,8 +20,8 @@ use serde::Serialize;
 use serde_json::{json, Value as JsonValue};
 
 use crate::config_io::{
-    validate_authorized_toml, validate_toml_against, ConfigWriter, FsConfigWriter,
-    ValidateOptions, ValidationReport, WriterError,
+    validate_authorized_toml, validate_toml_against, ConfigWriter, FsConfigWriter, ValidateOptions,
+    ValidationReport, WriterError,
 };
 use crate::policy::Policy;
 use crate::OutputFormat as GlobalFormat;
@@ -649,9 +649,7 @@ pub fn redact_json_tree(value: &JsonValue) -> JsonValue {
             }
             JsonValue::Object(out)
         }
-        JsonValue::Array(arr) => {
-            JsonValue::Array(arr.iter().map(redact_json_tree).collect())
-        }
+        JsonValue::Array(arr) => JsonValue::Array(arr.iter().map(redact_json_tree).collect()),
         other => other.clone(),
     }
 }
@@ -727,8 +725,16 @@ fn collect_redacted_env() -> JsonValue {
 pub fn key_looks_secret(key: &str) -> bool {
     let k = key.to_ascii_lowercase();
     const NEEDLES: &[&str] = &[
-        "password", "passwd", "secret", "token", "api_key", "apikey", "cookie",
-        "auth", "credential", "private_key",
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "api_key",
+        "apikey",
+        "cookie",
+        "auth",
+        "credential",
+        "private_key",
     ];
     NEEDLES.iter().any(|n| k.contains(n))
 }
@@ -826,8 +832,7 @@ fn run_validate(locs: &ConfigLocations, format: ConfigFormat) -> i32 {
             Err(e) => read_errors.push((locs.authorized.display().to_string(), e.to_string())),
         }
     }
-    let any_err =
-        all_reports.iter().any(|(_, r)| !r.is_ok()) || !read_errors.is_empty();
+    let any_err = all_reports.iter().any(|(_, r)| !r.is_ok()) || !read_errors.is_empty();
     if format == ConfigFormat::Text {
         for (path, r) in &all_reports {
             if r.is_ok() {
@@ -967,7 +972,10 @@ fn run_get(locs: &ConfigLocations, key: &str, format: ConfigFormat) -> i32 {
             if format == ConfigFormat::Text {
                 eprintln!("key not found: {key}");
             } else {
-                emit(&json!({ "key": key, "value": null, "error": "not_found" }), format);
+                emit(
+                    &json!({ "key": key, "value": null, "error": "not_found" }),
+                    format,
+                );
             }
             1
         }
@@ -1006,7 +1014,10 @@ fn redact_if_secret(key: &str, value: &JsonValue) -> JsonValue {
 fn emit(value: &JsonValue, format: ConfigFormat) {
     match format {
         ConfigFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(value).unwrap_or_default()
+            );
         }
         ConfigFormat::Yaml => {
             println!(
@@ -1018,7 +1029,10 @@ fn emit(value: &JsonValue, format: ConfigFormat) {
             // Text-mode for `show`/`get` falls back to pretty JSON since the
             // merged view is intrinsically nested. `paths` / `validate` /
             // `diff` already handle text mode themselves.
-            println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(value).unwrap_or_default()
+            );
         }
     }
 }
@@ -1135,9 +1149,7 @@ fn init_file(label: &'static str, path: &Path, contents: &[u8], force: bool) -> 
             path: path_str,
             status: InitStatus::Error,
             backup_path: None,
-            note: Some(
-                "path exists but is not a regular file; refusing to clobber".into(),
-            ),
+            note: Some("path exists but is not a regular file; refusing to clobber".into()),
         };
     }
     if exists && !force {
@@ -1257,10 +1269,7 @@ fn ensure_dir_0700(dir: &Path) -> std::io::Result<()> {
         if !dir.is_dir() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotADirectory,
-                format!(
-                    "path exists but is not a directory: {}",
-                    dir.display()
-                ),
+                format!("path exists but is not a directory: {}", dir.display()),
             ));
         }
         #[cfg(unix)]
@@ -1333,27 +1342,21 @@ fn strip_layer_prefix(key: &str, target: WriteTarget) -> String {
 /// Walk a `toml::Value` document along the dotted key, creating intermediate
 /// tables as needed, and replace the leaf with `value`. Returns Err if an
 /// intermediate segment exists but is not a table (refuses to clobber).
-pub fn set_dotted_toml(
-    doc: &mut toml::Value,
-    key: &str,
-    value: toml::Value,
-) -> Result<(), String> {
+pub fn set_dotted_toml(doc: &mut toml::Value, key: &str, value: toml::Value) -> Result<(), String> {
     let segs: Vec<&str> = key.split('.').filter(|s| !s.is_empty()).collect();
     if segs.is_empty() {
         return Err("empty key".into());
     }
     let mut cur = doc;
     for seg in &segs[..segs.len() - 1] {
-        let tbl = cur.as_table_mut().ok_or_else(|| {
-            format!("path segment {seg:?} is not a table")
-        })?;
+        let tbl = cur
+            .as_table_mut()
+            .ok_or_else(|| format!("path segment {seg:?} is not a table"))?;
         let entry = tbl
             .entry((*seg).to_string())
             .or_insert(toml::Value::Table(toml::value::Table::new()));
         if !entry.is_table() {
-            return Err(format!(
-                "path segment {seg:?} exists and is not a table"
-            ));
+            return Err(format!("path segment {seg:?} exists and is not a table"));
         }
         cur = entry;
     }
@@ -1445,8 +1448,8 @@ fn run_set(locs: &ConfigLocations, args: SetArgs, format: ConfigFormat) -> i32 {
         Ok(report) => {
             // Echo back only the key + redaction status — never the raw
             // value. Mirrors the redaction contract used by `config get`.
-            let secret = stripped_key.split('.').any(key_looks_secret)
-                || key_looks_secret(&args.key);
+            let secret =
+                stripped_key.split('.').any(key_looks_secret) || key_looks_secret(&args.key);
             let surfaced_value = if secret {
                 JsonValue::String(REDACTED.to_string())
             } else {
@@ -1459,15 +1462,9 @@ fn run_set(locs: &ConfigLocations, args: SetArgs, format: ConfigFormat) -> i32 {
                     .map(|p| format!(" (backup: {})", p.display()))
                     .unwrap_or_default();
                 if secret {
-                    println!(
-                        "OK   set {} = {}{}",
-                        args.key, REDACTED, backup_str
-                    );
+                    println!("OK   set {} = {}{}", args.key, REDACTED, backup_str);
                 } else {
-                    println!(
-                        "OK   set {} = {}{}",
-                        args.key, args.value, backup_str
-                    );
+                    println!("OK   set {} = {}{}", args.key, args.value, backup_str);
                 }
             } else {
                 emit(
@@ -1542,10 +1539,7 @@ fn run_edit(locs: &ConfigLocations, args: EditArgs, format: ConfigFormat) -> i32
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(
-            &tmpdir,
-            std::fs::Permissions::from_mode(0o700),
-        );
+        let _ = std::fs::set_permissions(&tmpdir, std::fs::Permissions::from_mode(0o700));
     }
     let tmp_path = tmpdir.join(
         path.file_name()
@@ -1600,9 +1594,7 @@ fn run_edit(locs: &ConfigLocations, args: EditArgs, format: ConfigFormat) -> i32
                         );
                         emit_edit_error(
                             format,
-                            &format!(
-                                "editor exited {s}; edits kept at {kept}"
-                            ),
+                            &format!("editor exited {s}; edits kept at {kept}"),
                         );
                         return 1;
                     }
@@ -1753,10 +1745,7 @@ fn persist_aborted_temp(original: &Path, tmp: &Path) -> std::io::Result<PathBuf>
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(
-            &dest,
-            std::fs::Permissions::from_mode(0o600),
-        );
+        let _ = std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o600));
     }
     Ok(dest)
 }
@@ -1809,16 +1798,9 @@ fn read_schema_version(path: &Path) -> SchemaVersionRead {
     }
 }
 
-fn run_migrate(
-    locs: &ConfigLocations,
-    args: MigrateArgs,
-    format: ConfigFormat,
-) -> i32 {
+fn run_migrate(locs: &ConfigLocations, args: MigrateArgs, format: ConfigFormat) -> i32 {
     let mut outcomes: Vec<MigrateOutcome> = Vec::new();
-    for (label, path) in [
-        ("policy", &locs.policy),
-        ("authorized", &locs.authorized),
-    ] {
+    for (label, path) in [("policy", &locs.policy), ("authorized", &locs.authorized)] {
         if !path.exists() {
             outcomes.push(MigrateOutcome {
                 target: label,
@@ -1853,11 +1835,9 @@ fn run_migrate(
                     )
                 }
             }
-            SchemaVersionRead::ReadError => (
-                0,
-                "error",
-                Some("read error (file unreadable)".to_string()),
-            ),
+            SchemaVersionRead::ReadError => {
+                (0, "error", Some("read error (file unreadable)".to_string()))
+            }
             SchemaVersionRead::ParseError => (
                 0,
                 "error",
@@ -2114,7 +2094,10 @@ fn run_rollback(locs: &ConfigLocations, args: RollbackArgs, format: ConfigFormat
                         .unwrap_or_default(),
                 );
             } else {
-                emit(&serde_json::to_value(&outcome).unwrap_or(JsonValue::Null), format);
+                emit(
+                    &serde_json::to_value(&outcome).unwrap_or(JsonValue::Null),
+                    format,
+                );
             }
             0
         }
@@ -2168,7 +2151,10 @@ fn run_gc(locs: &ConfigLocations, args: GcArgs, format: ConfigFormat) -> i32 {
                     kept,
                 );
             } else {
-                emit(&serde_json::to_value(&outcome).unwrap_or(JsonValue::Null), format);
+                emit(
+                    &serde_json::to_value(&outcome).unwrap_or(JsonValue::Null),
+                    format,
+                );
             }
             0
         }
@@ -2451,17 +2437,15 @@ fn run_profile_switch(name: &str, format: ConfigFormat) -> i32 {
         eprintln!("# rev-stealth profile switch → {name}");
         println!("{export_line}");
     } else {
-        emit(&serde_json::to_value(&hint).unwrap_or(JsonValue::Null), format);
+        emit(
+            &serde_json::to_value(&hint).unwrap_or(JsonValue::Null),
+            format,
+        );
     }
     0
 }
 
-fn run_profile_delete(
-    locs: &ConfigLocations,
-    name: &str,
-    yes: bool,
-    format: ConfigFormat,
-) -> i32 {
+fn run_profile_delete(locs: &ConfigLocations, name: &str, yes: bool, format: ConfigFormat) -> i32 {
     if let Err(msg) = validate_profile_name(name) {
         emit(
             &json!({ "error": "invalid_profile_name", "message": msg }),
@@ -2545,7 +2529,10 @@ fn run_profile_delete(
             outcome.profile, outcome.files_shredded, outcome.path
         );
     } else {
-        emit(&serde_json::to_value(&outcome).unwrap_or(JsonValue::Null), format);
+        emit(
+            &serde_json::to_value(&outcome).unwrap_or(JsonValue::Null),
+            format,
+        );
     }
     0
 }
@@ -2791,10 +2778,18 @@ mod tests {
         // "Created" branch for that target too (kept as belt-and-suspenders;
         // the policy-only assertion is what this test actually pins).
         let _ = std::fs::remove_dir_all(&locs.sites_dir);
-        let code = run_init(&locs, init_args(InitTarget::Policy, false, true), ConfigFormat::Json);
+        let code = run_init(
+            &locs,
+            init_args(InitTarget::Policy, false, true),
+            ConfigFormat::Json,
+        );
         assert_eq!(code, 0, "init must exit 0 on fresh home");
         assert!(locs.policy.exists(), "policy.toml must be created");
-        let mode = std::fs::metadata(&locs.policy).unwrap().permissions().mode() & 0o777;
+        let mode = std::fs::metadata(&locs.policy)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(
             mode, 0o600,
             "policy.toml must be 0600 AT CREATION (ConfigWriter atomic), got {mode:o}"
@@ -2812,15 +2807,30 @@ mod tests {
         let (_dir, locs) = fresh_home();
         // fresh_home pre-creates sites/ — remove it so init must mkdir.
         std::fs::remove_dir_all(&locs.sites_dir).unwrap();
-        let code = run_init(&locs, init_args(InitTarget::Sites, false, true), ConfigFormat::Json);
+        let code = run_init(
+            &locs,
+            init_args(InitTarget::Sites, false, true),
+            ConfigFormat::Json,
+        );
         assert_eq!(code, 0);
         assert!(locs.sites_dir.is_dir(), "sites/ must exist");
-        let mode = std::fs::metadata(&locs.sites_dir).unwrap().permissions().mode() & 0o777;
+        let mode = std::fs::metadata(&locs.sites_dir)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(mode, 0o700, "sites/ must be 0700, got {mode:o}");
         // Placeholder seeded with 0600 (FsConfigWriter contract).
         let placeholder = locs.sites_dir.join("example.com.toml");
-        assert!(placeholder.exists(), "placeholder example.com.toml must be seeded");
-        let pmode = std::fs::metadata(&placeholder).unwrap().permissions().mode() & 0o777;
+        assert!(
+            placeholder.exists(),
+            "placeholder example.com.toml must be seeded"
+        );
+        let pmode = std::fs::metadata(&placeholder)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(pmode, 0o600, "placeholder must be 0600, got {pmode:o}");
     }
 
@@ -2829,12 +2839,19 @@ mod tests {
         let (_dir, locs) = fresh_home();
         std::fs::write(&locs.policy, "require_vpn = true # operator-edited\n").unwrap();
         let original = std::fs::read(&locs.policy).unwrap();
-        let code = run_init(&locs, init_args(InitTarget::Policy, false, true), ConfigFormat::Json);
+        let code = run_init(
+            &locs,
+            init_args(InitTarget::Policy, false, true),
+            ConfigFormat::Json,
+        );
         // Skipped is not an error — exit 0.
         assert_eq!(code, 0);
         // Content must be byte-identical (no clobber).
         let after = std::fs::read(&locs.policy).unwrap();
-        assert_eq!(after, original, "existing policy.toml must NOT be overwritten without --force");
+        assert_eq!(
+            after, original,
+            "existing policy.toml must NOT be overwritten without --force"
+        );
     }
 
     #[cfg(unix)]
@@ -2842,7 +2859,11 @@ mod tests {
     fn config_init_with_force_creates_bak() {
         let (_dir, locs) = fresh_home();
         std::fs::write(&locs.policy, "require_vpn = false # v1\n").unwrap();
-        let code = run_init(&locs, init_args(InitTarget::Policy, true, true), ConfigFormat::Json);
+        let code = run_init(
+            &locs,
+            init_args(InitTarget::Policy, true, true),
+            ConfigFormat::Json,
+        );
         assert_eq!(code, 0);
         // The original content lives in a sibling .bak.<epoch> file written
         // by FsConfigWriter (P5.2 contract); locate it by prefix match.
@@ -2889,7 +2910,10 @@ mod tests {
             init_args(InitTarget::Policy, true, true),
             ConfigFormat::Json,
         );
-        assert_eq!(code_force, 3, "even --force must refuse to clobber a directory");
+        assert_eq!(
+            code_force, 3,
+            "even --force must refuse to clobber a directory"
+        );
         assert!(locs.policy.is_dir());
     }
 
@@ -2923,7 +2947,10 @@ mod tests {
         assert_eq!(code, 3, "stray file at sites/ path must exit 3, got {code}");
         // The path on disk must remain the operator's file (not clobbered).
         assert!(locs.sites_dir.is_file());
-        assert_eq!(std::fs::read(&locs.sites_dir).unwrap(), b"not a directory\n");
+        assert_eq!(
+            std::fs::read(&locs.sites_dir).unwrap(),
+            b"not a directory\n"
+        );
     }
 
     // ----- P6.3 `config set` / `edit` / `migrate` -----------------------
@@ -2937,11 +2964,7 @@ mod tests {
     }
 
     fn seed_valid_policy(locs: &ConfigLocations) {
-        std::fs::write(
-            &locs.policy,
-            "schema_version = 1\nrequire_vpn = false\n",
-        )
-        .unwrap();
+        std::fs::write(&locs.policy, "schema_version = 1\nrequire_vpn = false\n").unwrap();
     }
 
     #[test]
@@ -2970,7 +2993,10 @@ mod tests {
         assert_eq!(code2, 0);
         let parsed2: toml::Value =
             toml::from_str(&std::fs::read_to_string(&locs.policy).unwrap()).unwrap();
-        assert_eq!(parsed2.get("require_vpn"), Some(&toml::Value::Boolean(false)));
+        assert_eq!(
+            parsed2.get("require_vpn"),
+            Some(&toml::Value::Boolean(false))
+        );
     }
 
     #[test]
@@ -3031,11 +3057,7 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(
-                &editor_path,
-                std::fs::Permissions::from_mode(0o755),
-            )
-            .unwrap();
+            std::fs::set_permissions(&editor_path, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
 
         let code = run_edit(
@@ -3076,10 +3098,9 @@ mod tests {
                     .filter(|e| {
                         e.file_name()
                             .to_str()
-                            .map(|s| s.starts_with(&format!(
-                                "rev-stealth-edit-{}-",
-                                std::process::id()
-                            )))
+                            .map(|s| {
+                                s.starts_with(&format!("rev-stealth-edit-{}-", std::process::id()))
+                            })
                             .unwrap_or(false)
                     })
                     .count()
@@ -3096,11 +3117,7 @@ mod tests {
         let (_dir, locs) = fresh_home();
         seed_valid_policy(&locs);
         let original = std::fs::read(&locs.policy).unwrap();
-        let code = run_migrate(
-            &locs,
-            MigrateArgs { dry_run: false },
-            ConfigFormat::Json,
-        );
+        let code = run_migrate(&locs, MigrateArgs { dry_run: false }, ConfigFormat::Json);
         assert_eq!(code, 0, "v1→v1 migrate must exit 0");
         let after = std::fs::read(&locs.policy).unwrap();
         assert_eq!(
@@ -3115,22 +3132,14 @@ mod tests {
         // from_version/to_version pinned and action="noop" for v1 files.
         let (_dir, locs) = fresh_home();
         seed_valid_policy(&locs);
-        std::fs::write(
-            &locs.authorized,
-            "schema_version = 1\n",
-        )
-        .unwrap();
+        std::fs::write(&locs.authorized, "schema_version = 1\n").unwrap();
         // Build the JSON payload the same way run_migrate would so we can
         // assert on its structure (re-running with format=Json prints to
         // stdout, which we can't capture cleanly in a unit test — so we
         // reproduce the outcome generation here via the same helper).
         // Drive run_migrate end-to-end and pin the exit code; the JSON
         // schema itself is covered by serde + the `Serialize` derive.
-        let code = run_migrate(
-            &locs,
-            MigrateArgs { dry_run: true },
-            ConfigFormat::Json,
-        );
+        let code = run_migrate(&locs, MigrateArgs { dry_run: true }, ConfigFormat::Json);
         assert_eq!(code, 0);
         // Both files present → both surfaced. Direct invariant check via
         // schema_version reader.
@@ -3153,11 +3162,7 @@ mod tests {
         let (_dir, locs) = fresh_home();
         std::fs::write(&locs.policy, "schema_version = \"two\"\n").unwrap();
         std::fs::write(&locs.authorized, "this is not toml [[[ \n").unwrap();
-        let code = run_migrate(
-            &locs,
-            MigrateArgs { dry_run: false },
-            ConfigFormat::Json,
-        );
+        let code = run_migrate(&locs, MigrateArgs { dry_run: false }, ConfigFormat::Json);
         assert_eq!(code, 1, "malformed schema_version must exit 1, not 0");
         // And both files MUST remain byte-identical: we never write on
         // the error path.
@@ -3166,11 +3171,7 @@ mod tests {
         // Missing schema_version field must also error (not assume v1).
         let (_dir2, locs2) = fresh_home();
         std::fs::write(&locs2.policy, "require_vpn = true\n").unwrap();
-        let code2 = run_migrate(
-            &locs2,
-            MigrateArgs { dry_run: false },
-            ConfigFormat::Json,
-        );
+        let code2 = run_migrate(&locs2, MigrateArgs { dry_run: false }, ConfigFormat::Json);
         assert_eq!(
             code2, 1,
             "missing schema_version must exit 1 (no silent v1 default)"
@@ -3243,19 +3244,11 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(
-                &editor_path,
-                std::fs::Permissions::from_mode(0o755),
-            )
-            .unwrap();
+            std::fs::set_permissions(&editor_path, std::fs::Permissions::from_mode(0o755)).unwrap();
             // Lock down the parent so persist_aborted_temp can't write
             // its `.<orig>.edit-aborted.*` sibling.
             let parent = locs.policy.parent().unwrap();
-            std::fs::set_permissions(
-                parent,
-                std::fs::Permissions::from_mode(0o555),
-            )
-            .unwrap();
+            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o555)).unwrap();
         }
         let code = run_edit(
             &locs,
@@ -3270,10 +3263,7 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             let parent = locs.policy.parent().unwrap();
-            let _ = std::fs::set_permissions(
-                parent,
-                std::fs::Permissions::from_mode(0o755),
-            );
+            let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755));
         }
         assert_eq!(code, 1);
         // The tempdir MUST still exist somewhere under TMPDIR so the
@@ -3284,12 +3274,7 @@ mod tests {
             .filter(|e| {
                 e.file_name()
                     .to_str()
-                    .map(|s| {
-                        s.starts_with(&format!(
-                            "rev-stealth-edit-{}-",
-                            std::process::id()
-                        ))
-                    })
+                    .map(|s| s.starts_with(&format!("rev-stealth-edit-{}-", std::process::id())))
                     .unwrap_or(false)
             })
             .collect();
@@ -3324,15 +3309,26 @@ mod tests {
         // — and that it does so for a clean fresh home.
         let (_dir, locs) = fresh_home();
         let _ = std::fs::remove_dir_all(&locs.sites_dir);
-        let code = run_init(&locs, init_args(InitTarget::All, false, true), ConfigFormat::Json);
+        let code = run_init(
+            &locs,
+            init_args(InitTarget::All, false, true),
+            ConfigFormat::Json,
+        );
         assert_eq!(code, 0, "non-interactive init on fresh home must exit 0");
         assert!(locs.policy.exists());
         assert!(locs.authorized.exists());
         assert!(locs.sites_dir.is_dir());
         // And again with the flag flipped — still no prompt, still exit 0
         // (now every target hits the Skipped branch since files exist).
-        let code2 = run_init(&locs, init_args(InitTarget::All, false, false), ConfigFormat::Json);
-        assert_eq!(code2, 0, "second invocation must remain non-blocking (all skipped)");
+        let code2 = run_init(
+            &locs,
+            init_args(InitTarget::All, false, false),
+            ConfigFormat::Json,
+        );
+        assert_eq!(
+            code2, 0,
+            "second invocation must remain non-blocking (all skipped)"
+        );
     }
 
     // ---------- P6.4: history / rollback / gc ----------
@@ -3341,7 +3337,8 @@ mod tests {
     fn seed_backups(path: &Path, n: usize) {
         let w = FsConfigWriter;
         for i in 0..n {
-            w.write_with_backup(path, format!("v{i}\n").as_bytes()).unwrap();
+            w.write_with_backup(path, format!("v{i}\n").as_bytes())
+                .unwrap();
             // > 1ms gap so epoch_ms-based backup names sort deterministically
             // and so the writer's `mtime` ordering is monotonic.
             std::thread::sleep(std::time::Duration::from_millis(3));
@@ -3363,7 +3360,9 @@ mod tests {
         // Exit 0 on the public surface.
         let code = run_history(
             &locs,
-            HistoryArgs { target: WriteTarget::Policy },
+            HistoryArgs {
+                target: WriteTarget::Policy,
+            },
             ConfigFormat::Json,
         );
         assert_eq!(code, 0);
@@ -3402,7 +3401,11 @@ mod tests {
         let writer = FsConfigWriter;
         let baks_before = writer.list_backups(&locs.policy).unwrap();
         assert_eq!(baks_before.len(), 1);
-        let v0_name = baks_before[0].file_name().unwrap().to_string_lossy().to_string();
+        let v0_name = baks_before[0]
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
         // Sleep so the new .bak gets a strictly later epoch_ms suffix.
         std::thread::sleep(std::time::Duration::from_millis(5));
         let code = run_rollback(
@@ -3421,7 +3424,10 @@ mod tests {
         let v1_preserved = baks_after
             .iter()
             .any(|p| std::fs::read(p).map(|b| b == b"v1\n").unwrap_or(false));
-        assert!(v1_preserved, "rollback must preserve the displaced current as a new .bak");
+        assert!(
+            v1_preserved,
+            "rollback must preserve the displaced current as a new .bak"
+        );
     }
 
     #[test]
@@ -3523,10 +3529,7 @@ mod tests {
         // Nothing under profiles_root() should have been created.
         assert!(
             !profiles_root().exists()
-                || std::fs::read_dir(profiles_root())
-                    .unwrap()
-                    .next()
-                    .is_none()
+                || std::fs::read_dir(profiles_root()).unwrap().next().is_none()
         );
     }
 
@@ -3572,7 +3575,10 @@ mod tests {
         };
         let code = run_profile_delete(&active_locs, "alpha", true, ConfigFormat::Json);
         assert_eq!(code, 2, "active profile must not be deletable");
-        assert!(alpha_dir.is_dir(), "active profile dir must survive refused delete");
+        assert!(
+            alpha_dir.is_dir(),
+            "active profile dir must survive refused delete"
+        );
     }
 
     #[test]
@@ -3636,7 +3642,10 @@ mod tests {
         assert_eq!(writer.list_backups(&locs.policy).unwrap().len(), 5);
         let code = run_gc(
             &locs,
-            GcArgs { keep: 2, target: WriteTarget::Policy },
+            GcArgs {
+                keep: 2,
+                target: WriteTarget::Policy,
+            },
             ConfigFormat::Json,
         );
         assert_eq!(code, 0);

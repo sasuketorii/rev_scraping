@@ -53,13 +53,21 @@ impl CredentialResolver {
         if let Some(path) = env(&file_key) {
             let path = PathBuf::from(path);
             check_file_perm(&path)?;
-            let raw = std::fs::read_to_string(&path)
-                .map_err(|source| CredentialError::FileReadFailed { path: path.clone(), source })?;
-            return Ok(SecretString::new(raw.trim_end_matches(['\n', '\r']).to_owned().into()));
+            let raw = std::fs::read_to_string(&path).map_err(|source| {
+                CredentialError::FileReadFailed {
+                    path: path.clone(),
+                    source,
+                }
+            })?;
+            return Ok(SecretString::new(
+                raw.trim_end_matches(['\n', '\r']).to_owned().into(),
+            ));
         }
         match env(key) {
             Some(v) => Ok(SecretString::new(v.into())),
-            None => Err(CredentialError::EnvMissing { key: key.to_owned() }),
+            None => Err(CredentialError::EnvMissing {
+                key: key.to_owned(),
+            }),
         }
     }
 }
@@ -95,9 +103,7 @@ mod tests {
     use std::collections::HashMap;
     use std::io::Write;
 
-    fn env_from<'a>(
-        map: &'a HashMap<&'a str, String>,
-    ) -> impl Fn(&str) -> Option<String> + 'a {
+    fn env_from<'a>(map: &'a HashMap<&'a str, String>) -> impl Fn(&str) -> Option<String> + 'a {
         move |k: &str| map.get(k).cloned()
     }
 
@@ -158,7 +164,10 @@ mod tests {
         // SecretString's Debug impl must not expose the plaintext.
         let s = SecretString::new("super-sensitive".to_owned().into());
         let dbg = format!("{s:?}");
-        assert!(!dbg.contains("super-sensitive"), "Debug leaked secret: {dbg}");
+        assert!(
+            !dbg.contains("super-sensitive"),
+            "Debug leaked secret: {dbg}"
+        );
         // Sanity: ExposeSecret still works (and zeroizes on drop via Drop impl).
         assert_eq!(s.expose_secret(), "super-sensitive");
     }

@@ -86,11 +86,27 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Verify every crates/*/src/lib.rs has #![forbid(unsafe_code)]
+      - name: Verify every crate root + bin entry has #![forbid(unsafe_code)]
         run: |
           set -euo pipefail
           missing=()
+          # K.3: lib roots
           for f in crates/*/src/lib.rs; do
+            [ -f "$f" ] || continue
+            if ! grep -q '#!\[forbid(unsafe_code)\]' "$f"; then
+              missing+=("$f")
+            fi
+          done
+          # K.3: every src/main.rs (workspace bin entrypoint)
+          for f in crates/*/src/main.rs; do
+            [ -f "$f" ] || continue
+            if ! grep -q '#!\[forbid(unsafe_code)\]' "$f"; then
+              missing+=("$f")
+            fi
+          done
+          # K.3: every src/bin/*.rs (extra workspace bin entrypoints)
+          for f in crates/*/src/bin/*.rs; do
+            [ -f "$f" ] || continue
             if ! grep -q '#!\[forbid(unsafe_code)\]' "$f"; then
               missing+=("$f")
             fi
@@ -100,7 +116,39 @@ jobs:
             printf '  - %s\n' "${missing[@]}"
             exit 1
           fi
-          echo "OK: $(ls crates/*/src/lib.rs | wc -l) crate roots verified."
+          n_lib=$(find crates -maxdepth 3 -path 'crates/*/src/lib.rs' | wc -l | tr -d ' ')
+          n_main=$(find crates -maxdepth 3 -path 'crates/*/src/main.rs' | wc -l | tr -d ' ')
+          n_bin=$(find crates -maxdepth 4 -path 'crates/*/src/bin/*.rs' | wc -l | tr -d ' ')
+          echo "OK: ${n_lib} lib roots + ${n_main} main.rs + ${n_bin} bin/*.rs verified."
+
+      - name: SAFETY-doc check for every unsafe block
+        # K.3: any future `unsafe { ... }` block must be preceded by a
+        # `// SAFETY:` doc-comment line explaining why the invariants
+        # are upheld. The check ignores test modules and `unsafe impl`
+        # / `unsafe fn` (rust-clippy already handles those via
+        # undocumented_unsafe_blocks). v1.3 baseline has zero unsafe
+        # blocks, so this is a future-proofing tripwire.
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            # Find `unsafe {` not on a line that already has // SAFETY,
+            # and verify the previous non-blank line contains SAFETY:.
+            awk '
+              /^[[:space:]]*\/\/[[:space:]]*SAFETY[[:space:]]*:/ { has_safety = 1; next }
+              /unsafe[[:space:]]*\{/ {
+                if (!has_safety) { print FILENAME ":" NR }
+              }
+              /^[[:space:]]*$/ { next }
+              { has_safety = 0 }
+            ' "$f"
+          done < <(find crates -name '*.rs' -not -path '*/tests/*' -not -path '*/benches/*') \
+            | tee /tmp/safety-violations.txt
+          if [ -s /tmp/safety-violations.txt ]; then
+            echo '::error::unsafe block(s) without // SAFETY: doc:'
+            cat /tmp/safety-violations.txt
+            exit 1
+          fi
+          echo "OK: no undocumented unsafe blocks."
 
   gitleaks:
     name: gitleaks

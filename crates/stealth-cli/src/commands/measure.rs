@@ -25,6 +25,10 @@ use crate::OutputFormat;
 /// Args for `rev-stealth measure`.
 #[derive(Args, Debug, Clone)]
 pub struct MeasureArgs {
+    /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+    /// global `--format`. JSON schema: `docs/json-schemas/cli/measure.output.json`.
+    #[command(flatten)]
+    pub output_format: crate::commands::output_format::OutputFormatOverride,
     /// URL to measure against. The page is not actually fetched unless
     /// `--enable-external` is set; we only validate the URL shape here.
     #[arg(long)]

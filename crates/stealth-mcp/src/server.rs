@@ -50,10 +50,12 @@ fn envelope_response(id: Option<RpcId>, name: &str, env: &ErrorEnvelope) -> Json
     let san = sanitize_for_agent_with(
         bundle,
         &policy,
-        WrapContext { origin: "mcp-error", tool: name },
+        WrapContext {
+            origin: "mcp-error",
+            tool: name,
+        },
     );
-    let sanitize_report =
-        serde_json::to_value(&san.report).unwrap_or(Value::Null);
+    let sanitize_report = serde_json::to_value(&san.report).unwrap_or(Value::Null);
     // Raw `env.message` and `env.hint` must NEVER hit the wire if any
     // sanitize step removed/replaced them. Two cases:
     // 1. `san.report.aborted` (Strict + critical canary): payload is
@@ -94,10 +96,13 @@ fn envelope_response(id: Option<RpcId>, name: &str, env: &ErrorEnvelope) -> Json
     // Recompose envelope from the sanitized fields. Keep all original
     // structural metadata (kind / retryable / retry_after_ms) which is
     // server-generated and not attacker-influenceable.
-    let mut env_json = serde_json::to_value(env)
-        .unwrap_or_else(|_| json!({"kind": "internal", "message": ""}));
+    let mut env_json =
+        serde_json::to_value(env).unwrap_or_else(|_| json!({"kind": "internal", "message": ""}));
     if let Some(obj) = env_json.as_object_mut() {
-        obj.insert("message".to_string(), Value::String(sanitized_message.clone()));
+        obj.insert(
+            "message".to_string(),
+            Value::String(sanitized_message.clone()),
+        );
         if let Some(h) = sanitized_hint.as_ref() {
             // Preserve `hint: null` semantics when original was None.
             if env.hint.is_some() {
@@ -141,8 +146,12 @@ fn policy_for_tool(name: &str) -> SanitizePolicy {
         // Auth login flows: site-visible content, attacker-shaped pages.
         "auth_login_start" | "auth_login_complete" => SanitizePolicy::preset(Preset::Strict),
         // Recipe surfaces: external selectors / endpoint shapes.
-        "recipe_show" | "recipe_export" | "recipe_list" | "recipe_import"
-        | "recipe_propose_endpoint" | "recipe_remove" => SanitizePolicy::preset(Preset::Strict),
+        "recipe_show"
+        | "recipe_export"
+        | "recipe_list"
+        | "recipe_import"
+        | "recipe_propose_endpoint"
+        | "recipe_remove" => SanitizePolicy::preset(Preset::Strict),
         // Spider: large HTML, must remain Warn to avoid FP storms.
         "spider" => SanitizePolicy::preset(Preset::Balanced),
         // Operational tools (doctor / vpn_rotate / session_show /
@@ -179,11 +188,16 @@ enum SanitizedOutcome {
 /// payload (per reviewer round-1 finding).
 fn sanitize_structured(name: &str, value: Value) -> SanitizedOutcome {
     let policy = policy_for_tool(name);
-    let ctx = WrapContext { origin: "mcp-tool", tool: name };
+    let ctx = WrapContext {
+        origin: "mcp-tool",
+        tool: name,
+    };
     let env = sanitize_for_agent_with(value, &policy, ctx);
     let report_value = serde_json::to_value(&env.report).unwrap_or(Value::Null);
     if env.report.aborted {
-        return SanitizedOutcome::Aborted { report: report_value };
+        return SanitizedOutcome::Aborted {
+            report: report_value,
+        };
     }
     let mut payload = env.payload;
     match &mut payload {
@@ -230,8 +244,7 @@ fn aborted_response(id: Option<RpcId>, name: &str, report: Value) -> JsonRpcResp
         meta.insert("sanitize".to_string(), report);
         obj.insert("_meta".to_string(), Value::Object(meta));
     }
-    let text = serde_json::to_string(&env_json)
-        .unwrap_or_else(|_| "sanitize aborted".to_string());
+    let text = serde_json::to_string(&env_json).unwrap_or_else(|_| "sanitize aborted".to_string());
     JsonRpcResponse::ok(
         id,
         json!({
@@ -360,9 +373,7 @@ impl Server {
                             "isError": false,
                         }),
                     ),
-                    SanitizedOutcome::Aborted { report } => {
-                        aborted_response(id, name, report)
-                    }
+                    SanitizedOutcome::Aborted { report } => aborted_response(id, name, report),
                 },
                 // Missing required arguments remain a JSON-RPC protocol-level
                 // INVALID_PARAMS error so transport-aware callers can branch.
@@ -398,9 +409,7 @@ impl Server {
                             "isError": false,
                         }),
                     ),
-                    SanitizedOutcome::Aborted { report } => {
-                        aborted_response(id, name, report)
-                    }
+                    SanitizedOutcome::Aborted { report } => aborted_response(id, name, report),
                 },
                 Err(RecipeError::MissingField(f)) => JsonRpcResponse::err(
                     id,
@@ -433,9 +442,7 @@ impl Server {
                             "isError": false,
                         }),
                     ),
-                    SanitizedOutcome::Aborted { report } => {
-                        aborted_response(id, name, report)
-                    }
+                    SanitizedOutcome::Aborted { report } => aborted_response(id, name, report),
                 },
                 Err(SessionError::MissingField(f)) => JsonRpcResponse::err(
                     id,
@@ -508,8 +515,7 @@ impl Server {
                         return aborted_response(id, name, report);
                     }
                 };
-                let sanitized_text =
-                    serde_json::to_string(&sanitized_body).unwrap_or(text_body);
+                let sanitized_text = serde_json::to_string(&sanitized_body).unwrap_or(text_body);
 
                 let mut content = vec![json!({ "type": "text", "text": sanitized_text })];
                 // P13.4 reviewer fix: stderr text was previously appended
@@ -528,9 +534,9 @@ impl Server {
                         // If even the stderr trips a critical canary,
                         // we drop the stderr block entirely; the
                         // main body already carries `_meta.sanitize`.
-                        SanitizedOutcome::Aborted { .. } => String::from(
-                            "[stderr suppressed by sanitize critical canary]",
-                        ),
+                        SanitizedOutcome::Aborted { .. } => {
+                            String::from("[stderr suppressed by sanitize critical canary]")
+                        }
                     };
                     content.push(json!({
                         "type": "text",
@@ -1008,7 +1014,10 @@ mod tests {
         let result = r.result.expect("result");
         let env_json = &result["structuredContent"]["error"];
         let san = &env_json["_meta"]["sanitize"];
-        assert!(san.is_object(), "envelope _meta.sanitize missing: {env_json}");
+        assert!(
+            san.is_object(),
+            "envelope _meta.sanitize missing: {env_json}"
+        );
         assert_eq!(san["policy_name"], "strict");
         assert_eq!(san["schema_version"], 1);
     }
@@ -1120,15 +1129,11 @@ mod tests {
                 .output_schema
                 .get("properties")
                 .and_then(|p| p.get("_meta"))
-                .unwrap_or_else(|| {
-                    panic!("tool {} output_schema missing _meta property", d.name)
-                });
+                .unwrap_or_else(|| panic!("tool {} output_schema missing _meta property", d.name));
             let san = meta
                 .get("properties")
                 .and_then(|p| p.get("sanitize"))
-                .unwrap_or_else(|| {
-                    panic!("tool {} _meta missing sanitize property", d.name)
-                });
+                .unwrap_or_else(|| panic!("tool {} _meta missing sanitize property", d.name));
             assert!(
                 san.get("properties")
                     .and_then(|p| p.get("schema_version"))

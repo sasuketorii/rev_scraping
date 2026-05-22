@@ -33,6 +33,7 @@ secrecy = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+proptest = { workspace = true }
 
 [lints]
 workspace = true

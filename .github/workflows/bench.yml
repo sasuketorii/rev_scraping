@@ -24,33 +24,43 @@ env:
 
 jobs:
   criterion:
-    name: cargo bench (sanitize hotpath)
+    # K.7 5 hot paths: sanitize_walk + canary_scan, aead encrypt+decrypt,
+    # mcp dispatch (ping/initialize/tools_list), recipe_load scaling.
+    name: cargo bench (${{ matrix.bench.crate }} / ${{ matrix.bench.name }})
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        bench:
+          - { crate: stealth-sanitize, name: sanitize_hotpath }
+          - { crate: stealth-auth,     name: aead_hotpath }
+          - { crate: stealth-mcp,      name: dispatch_hotpath }
+          - { crate: stealth-sites,    name: recipe_load_hotpath }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ubuntu-22.04-stable-bench
+          shared-key: ubuntu-22.04-stable-bench-${{ matrix.bench.crate }}
           workspaces: |
             . -> target
       - name: cargo bench --no-run
-        run: cargo bench -p stealth-sanitize --bench sanitize_hotpath --no-run
+        run: cargo bench -p ${{ matrix.bench.crate }} --bench ${{ matrix.bench.name }} --no-run
       - name: cargo bench (criterion, short)
         run: |
           set -euo pipefail
-          cargo bench -p stealth-sanitize --bench sanitize_hotpath -- \
+          cargo bench -p ${{ matrix.bench.crate }} --bench ${{ matrix.bench.name }} -- \
             --warm-up-time 1 --measurement-time 3 --noplot \
             --output-format bencher \
-            | tee bench-bencher.txt
+            | tee bench-bencher-${{ matrix.bench.crate }}-${{ matrix.bench.name }}.txt
       - name: Upload criterion JSON
         uses: actions/upload-artifact@v4
         with:
-          name: criterion-${{ github.sha }}
+          name: criterion-${{ matrix.bench.crate }}-${{ matrix.bench.name }}-${{ github.sha }}
           path: |
-            bench-bencher.txt
+            bench-bencher-${{ matrix.bench.crate }}-${{ matrix.bench.name }}.txt
             target/criterion/**/estimates.json
           if-no-files-found: ignore
           retention-days: 14

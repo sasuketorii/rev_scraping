@@ -1,0 +1,2934 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A. surface-coverage completeness | 9.30 | workspace lib crateが`cargo metadata`由来で13件に拡張。CLI/MCP/ErrorKind/deprecated attrsもsnapshot v3で広い。type-shape変更は一部手動判断が残る。 |
+| B. CI enforcement strength | 9.15 | snapshot driftはHARD化、cargo-public-apiはfail-closed、MCP detectorは0/2/otherの3値で実行失敗をlabel waiver不可に分離。 |
+| C. semver lifecycle clarity | 9.25 | `docs/compat.md`の表とMCP worked examplesでminor/major/labelの判断がかなり明確。 |
+| D. PR-level intent capture | 8.65 | cargo-public-api/MCP breakingはlabel gateあり。ただし再生成済みCLI-only snapshot差分の`api-additive/api-breaking`強制はCI上まだ弱く、label正当性も人間判断。 |
+| E. forward-compatibility hygiene | 9.10 | schema v3、base-vs-head比較、pinned nightly、empty-list guardでかなり堅い。pre-v3 fallbackやtype-shape diffの限界は残る。 |
+| F. test depth | 9.20 | fixture 8件でtool removal/input enum narrowing/stale baselineを追加し、rc契約も検証済み。workflow label permutationやCLI flag/env/exit-code fixtureは未拡張。 |
+| G. doc/CI fidelity | 9.05 | docsの「drift always fails; labels classify but do not waive」とCI実装は概ね一致。CLI-only label強制だけ文書要求よりCIが弱い。 |
+
+overall = 9.10 PASS
+
+Residual risk: 最大の残りは、再生成済みのCLI-only public-surface差分に対してPR labelを機械的に強制するbase-vs-head snapshot classifierがまだ無い点です。9.5超えには、CLI flag/env/exit-code/default/subcommand差分をadditive/breaking分類するCI gate、label permutation fixture、snapshot extractorのtype-shape差分検出を追加するのが必要です。ローカルではfixture 8/0、workspace lib crate 13件、YAML parse、changelog lintを確認しました。
+2026-05-22T22:06:38.405872Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e51b9-e746-7cc0-8382-50910bd43a3f
+--------
+user
+# Lane I R2 dual scoring — Codex prompt (after post-scoring hardening)
+
+Role: strict scorer (Codex gpt-5.5 xhigh). You scored R2 v1 at 8.77 FAIL. The fix-up driver addressed all three concerns. Re-score the same 7-axis rubric.
+
+R1 = 7.79 FAIL.
+R2-v1 = 8.77 FAIL (your previous score).
+Target: ≥ 9.0 PASS.
+
+## Concerns you raised → fixes delivered
+
+1. **"snapshot drift waiveable by label → stale-snapshot bypass risk"**
+   → Step rewritten as `./scripts/cli-public-api-snapshot.sh --check` only. Drift always fails. Labels classify the *regenerated* diff at the cargo-public-api / mcp-schema-breaking gates only. `.github/workflows/ci.yml::cli-public-api-snapshot::regenerate + check snapshot (HARD — drift always fails)`.
+
+2. **"cargo-public-api coverage = 6 hand-listed crates, not workspace"**
+   → Auto-discovered via `cargo metadata --no-deps` → `scripts/workspace-lib-crates.py` (new helper). 13 lib crates covered (was 6). Three-stage explicit error checking on metadata invocation, helper invocation, and empty-list guard — process-substitution race fixed (Codex round-1 finding on this very hardening).
+
+3. **"fixture coverage gaps: tool removal, input enum narrowing, stale-snapshot bypass"**
+   → Three new cases in `scripts/cli-public-api-snapshot.test.sh`:
+     - Case 2d input enum narrowing (spider.mobile_preset drops pixel) → rc=2 PASS
+     - Case 2e tool removal (recipe_show vanishes) → rc=2 PASS
+     - Case 2f stale-snapshot baseline (identical base==live) → rc=0 PASS with inline comment documenting the intended division of labor (the snapshot-drift workflow step catches stale-snapshot bypass; the detector is intentionally blind so the test asserts the no-false-positive baseline).
+   → 8 fixture cases total (was 5), 0 failed, rc=0 deterministic.
+
+`docs/compat.md` CLI row updated to read "**HARD — drift always fails; labels classify but do not waive**".
+
+## Workspace impact
+
+* `cargo test --workspace --no-fail-fast`: 800 / 0 fail (was 791 R1 baseline → 796 R2-v1 → 800 R2-v2).
+* `bash scripts/cli-public-api-snapshot.test.sh`: 8 passed, 0 failed, rc=0.
+* YAML parses; changelog lint OK; cargo metadata → workspace-lib-crates discovers 13 crates.
+
+## Files touched in the post-R2-scoring round
+
+* `.github/workflows/ci.yml` (cli-public-api-snapshot HARD; cargo-public-api auto-discovery + 3-stage error checking)
+* `scripts/workspace-lib-crates.py` (new helper)
+* `scripts/cli-public-api-snapshot.test.sh` (3 new fixture cases)
+* `docs/compat.md` (CLI row)
+
+## Scoring rubric (same 7 axes)
+
+A. surface-coverage completeness
+B. CI enforcement strength
+C. semver lifecycle clarity
+D. PR-level intent capture
+E. forward-compatibility hygiene
+F. test depth
+G. doc/CI fidelity
+
+Compute overall as arithmetic mean. PASS ≥ 9.0.
+
+Return:
+
+```
+| 軸 | スコア | 根拠 |
+|---|---|---|
+...
+overall = X.XX PASS/FAIL
+```
+
+Then one paragraph on residual risk (if any) and what is needed to push above 9.5.
+
+2026-05-22T22:06:39.178656Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T22:06:39.221024Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T22:06:39.414536Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+staff-code-reviewer skillを使って、提出された修正内容を採点者目線で確認します。まず該当ファイルと検証ルールを読み、ユーザー提示の結果と実際のCI/テスト実装が噛み合っているかを見ます。
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,220p' docs/manual/verification-truth-matrix.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Verification / Truth Matrix
+
+vocabulary-rev: 39ab54db69ded2c81d79789b9b616be86cce54aeeac8df11245cf88158b3f9b4
+Machine-readable vocabulary mirror and consumer policy: docs/manual/matrix-vocabulary.json (`_policy.vocabulary_consumer_contract`).
+
+## Must Read
+
+この文書は、verification / truth placement / reviewer LGTM validity の現行正本である。
+計画分解、Coder着手、Reviewer判定、最終受け入れの前に必ず読むこと。
+他文書の例や古い手順と衝突する場合は、本書と `.agent_rules/RULES.md` を優先する。
+
+## Task Class Profiles
+
+`light / standard / heavy` の task class は、slice contract より先に判定する。heavy 用の完全 Canonical Schema を全タスクへ機械的に適用してはならない。
+
+Canonical classifier entrypoint は `scripts/rev-harness-task-classifier.sh classify --intent <intent> --files <path>... --json` とする。分類結果の `task_class / gate_tier / schema_profile / review_required / final_reviewer_gate_required` が、その task の acceptance envelope を決める。
+
+| task class | gate tier | schema profile | review / final gate | 用途 |
+|------------|-----------|----------------|----------------------|------|
+| `light` | `quick` | `light-change-record` | reviewer 不要、Final Reviewer gate 不要 | typo、reference cleanup、admin、prompt wording など、runtime / policy / acceptance / security に触れない小変更 |
+| `standard` | `local` | `standard-slice-contract` | scoped reviewer signoff 必須、Final Reviewer gate 不要 | 通常の実装、テスト、docs 更新。release / security / acceptance 正本をまたがない変更 |
+| `heavy` | `full` | `heavy-canonical-final-packet` | reviewer 必須、Final Reviewer gate 必須 | release、security、live orchestration、wrapper、role / acceptance matrix、release gate、semantic authority など高リスク変更 |
+
+## Classifier Specialty Selection
+
+| Surface | Truth source | Acceptance evidence | Hint surface | Note |
+|---------|--------------|---------------------|--------------|------|
+| classifier specialty selection | `scripts/rev-harness-task-classifier.sh` + `docs/manual/matrix-vocabulary.json` | `bash test/unit/test-classifier-specialty-surface.sh` (7 tests) + `scripts/check-matrix-vocabulary-sync.sh` | generated `.claude/skills/<slug>/SKILL.md` + `.agents/skills/<slug>/SKILL.md` | SKILL projection auto-trigger is a discovery hint only. Primary invocation is `scripts/codex-wrapper.sh --role <coder|high-coder|reviewer> --specialty <slug>` for coder / reviewer specialties, or direct `Read` of `docs/roles/orchestrator/specialties/<slug>.md` for orchestrator-canonical specialties. |
+
+`light-change-record` の必須 field:
+
+- `task class: light`
+- `intent`
+- `changed files`
+- `why light is valid`
+- `required quick checks`
+- `check results`
+- `completion boundary`
+
+`standard-slice-contract` の必須 field:
+
+- `task class: standard`
+- `task id / slice id`
+- `change surface / in-scope / out-of-scope`
+- `required local checks`
+- `evidence destination`
+- `completion boundary`
+- `worker outcome`
+- `scope delta since last review`
+- defect / root-cause / same-class fix の場合だけ class-closure fields
+
+`heavy-canonical-final-packet` は下記 `Canonical Schema` の全 field を使う。`light` と `standard` に heavy-only field を要求して、reviewer loop、lineage ledger、Final Reviewer gate、full release gate を常時強制してはならない。
+
+## Slice Contract
+
+広いタスクは slice に分解してから扱う。`standard` / `heavy` の各 slice は着手前に slice contract を記録する。`light` は `light-change-record` で足りる。`slice record` は plan / SOW / handoff に永続化された slice contract の copy を指す。task lineage の authoritative registry は常に `.agent/active/sow/task-lineage-ledger.md` であり、plan / SOW / handoff は registry 自体の代替ではなく `task lineage ledger entry` を参照して使う。
+
+### Canonical Schema
+
+以下を `heavy-canonical-final-packet` の canonical schema とする。対応する概念は必ずこの名前で記録すること。
+
+| 項目 | 必須内容 |
+|------|----------|
+| task id | task-level aggregate ceiling を数える単位 |
+| task lineage ledger entry | authoritative registry `.agent/active/sow/task-lineage-ledger.md` 内の対応 entry ref。例: `.agent/active/sow/task-lineage-ledger.md :: task-20260418-remediation` |
+| prior task id | 初回 lineage は `none`。同じ bug class / materially same change surface を新しい task id で再開する場合は直前 lineage の task id を指す |
+| slice id | slice を一意に識別する ID |
+| prior slice id | 初回は `none`。mandatory re-slice 時は直前 slice を指す |
+| review request target | `INTERMEDIATE` または `FINAL` |
+| discovery owner | `coder | orchestrator`。same-class sink の初期発見責務を持つ owner |
+| bug class candidate | `n/a` または concrete な bug-class summary。class-closure 要否を判定する canonical field |
+| change surface | この slice で変更してよいファイル、レイヤ、責務 |
+| in-scope | この slice が変更・検証するファイル、サーフェス、責務 |
+| out-of-scope | 今回触らないファイル、責務、保護対象 |
+| required checks | 受け入れ前に実行する deterministic checks の正確な一覧 |
+| evidence destination | command result、artifact pointer、review report の保存先。slice 固有の volatile truth を置く場所 |
+| completion boundary | この slice を完了と呼べる境界。旧 `checkpoint boundary` は deprecated / non-canonical |
+| scope delta since last review | 前回 review request 以降の scope 差分。初回は `none` |
+| class closure sheet | `path | n/a`。`bug class candidate != n/a` または relevant / unclear な slice では `n/a` 不可 |
+| sheet status | `OPEN | CLOSED | RESET | n/a`。`class closure sheet=n/a` の場合だけ `n/a` 可 |
+| owned sink universe | `n/a | ...`。same-class slice の completeness を判定する canonical field。class-closure 非適用 slice のみ `n/a` 可 |
+| closed universe status | `YES | NO | n/a`。`n/a` は class-closure 非適用 slice のみ。`YES` は all owned sink statuses known のときだけ有効 |
+| closed universe basis | `closed universe status=YES` を主張する場合の再現可能な根拠。該当しない場合は `n/a` |
+| fix-review loops used | 現 slice で消費した reviewer request 数。`INTERMEDIATE` / `FINAL` の両方を含む |
+| closure resets used | 現 slice で実施した class closure reset 数 |
+| reviewer-found same-class finding count | coding / handoff 開始後に reviewer iteration で見つかった同一 class sink 数 |
+| re-slice count for task | task 全体で消費した mandatory re-slice 数。初回 slice は数えない |
+| cumulative reviewer requests for task | task 全体で送った reviewer request 数。`INTERMEDIATE` / `FINAL` を合算する |
+| cumulative late same-class findings for task | task 全体で発生した late same-class finding の累積数。re-slice / session / handoff をまたいで持ち越す |
+| cumulative closure resets for task | task 全体で実施した class closure reset の累積数。re-slice / session / handoff をまたいで持ち越す |
+| task-level stall-or-wall-time budget | `stall<=<minutes>m; wall<=<minutes>m; basis=<task-lineage-opened-at|user-approved-reopen-at>; start=<RFC3339Z>; last-progress=<RFC3339Z>` 形式の mandatory field |
+| task-level stall-or-wall-time budget status | `within-budget | exhausted`。`not-defined` / `unknown` / 空欄は deprecated / non-canonical であり fail-closed で `BLOCK` |
+
+補助 provenance として、以下は該当時に必須である。
+
+- `re-slice delta type`: `none | narrowed change surface | redefined owned sink universe | user decision | blocker resolution`
+- `re-slice delta summary`: prior slice から何が変わったか。初回は `none`
+- `delta evidence`: blocker ticket、user decision、探索ログなど。初回は `none`
+
+class-closure 関連 field の canonical non-applicable sentinel は `n/a` のみとする。`bug class candidate / class closure sheet / sheet status / owned sink universe / closed universe status / closed universe basis` で `not required`、空欄、省略を使ってはならない。
+`bug class candidate=n/a` は、その slice が defect / regression / root-cause / same-class fix と無関係だと evidence-backed に示せる場合に限り有効である。relevant か不明な slice は concrete な `bug class candidate` を持ち、`class closure sheet` を required にしなければならない。
+`re-slice delta type=none / re-slice delta summary=none / delta evidence=none` は `prior slice id=none` の初回 slice にだけ有効である。`prior slice id != none` で `none` を使った re-slice は fail-closed で `BLOCK` とする。
+`worker outcome` は post-execution の worker report / review request / acceptance gate でのみ使う canonical field であり、pre-flight の slice contract には置かない。
+deprecated live field alias の `checkpoint boundary`、`truth destination`、`artifact truth destination` は historical label としてしか扱わない。slice contract / worker report / review request / review report では active schema key として使ってはならず、intake は canonical `completion boundary` / `evidence destination` による再提出を要求する。
+
+canonical counter semantics:
+
+1. `fix-review loops used` / `closure resets used` / `reviewer-found same-class finding count` は per-slice counter であり、新しい valid slice を開いたときだけ reset してよい。
+2. `re-slice count for task` / `cumulative reviewer requests for task` / `cumulative late same-class findings for task` / `cumulative closure resets for task` / `task-level stall-or-wall-time budget` / `task-level stall-or-wall-time budget status` は task-level ledger であり、re-slice・session・handoff・task id をまたぐ reopen を跨いでも必ず carry-forward する。ceiling 判定ではこの task-level ledger を authoritative とする。
+3. `task-level stall-or-wall-time budget` は mandatory である。budget subfield は `basis / start / last-progress` のみを使う。budget が未定義、`basis / start / last-progress` のいずれかが無い、または `task-level stall-or-wall-time budget status` を示せない場合は fail-closed で `BLOCK` とする。
+4. default budget は `stall<=30m; wall<=240m; basis=task-lineage-opened-at; start=<task-opened RFC3339Z>; last-progress=<same or newer RFC3339Z>` とする。auto-loop で許容できる最大 ceiling は `stall<=60m; wall<=480m` であり、これより soft な budget は invalid で `BLOCK` とする。
+5. counter field は `<actual>/<non-blocking ceiling>` で記録する。ceiling 超過の terminal state でも値を丸めず、`fix-review loops used=3/2` や `reviewer-found same-class finding count=2/1` のように actual overflow をそのまま残したうえで `BLOCK` とする。
+
+### Scope Delta Since Last Review
+
+`scope delta since last review` は reviewer が最後に読んだ baseline と current request の差分を表す canonical field である。
+
+1. 初回 review request だけが `none` を使える。以後は同一 lineage の最新 reviewer-reviewed baseline と比較して記録する。
+2. 次の request を作る owner（通常は coder）が refresh 責務を持つ。`change surface`、`in-scope`、`out-of-scope`、`required checks`、`evidence destination`、`completion boundary`、Class Closure Sheet / owned sink universe、changed files、または reviewer が再確認すべき verification evidence が変わった場合は concrete な delta を書かなければならない。
+3. verification artifact のみを再生成し、reviewer-visible scope が変わらない場合に限り `none` を維持できる。ただし verification record、worker outcome payload、`task-level stall-or-wall-time budget status` は fresh に更新しなければならない。
+4. reviewer は `scope delta since last review` を diff / evidence / request target と照合して validate する。欠落、stale、または現 diff / evidence と矛盾する delta は fail-closed で `BLOCK` とする。
+5. `scope delta since last review != none` が発生した時点で、既存の residual count、ready for final reviewer LGTM claim、`review request target=FINAL` は失効する。次 request で refresh されるまで再利用してはならない。
+
+## Canonical Status / Verdict State Machine
+
+canonical non-completion statuses は `in progress` / `pending review` / `pending verification` / `pending final review` / `pending acceptance` / `blocked` とする。status field を持つ template / handoff / report はこの exact enum を使う。
+reviewer-intake-valid な `Review Request` status は `pending review` / `pending final review` のみである。`pending verification` は reviewer verdict `Needs verification` を受けた後の internal holding state であり、そのまま reviewer に再提出してはならない。
+
+1. `pending final review` は gated status であり、`Final Reviewer Request Gate` を満たした request にだけ使える。conditions-not-met の generic fallback として使ってはならない。
+2. `in progress` は slice contract を作成済みだが、まだ review request や required verification が揃っていない状態。
+3. `pending review` は reviewer へ渡せるが、`Final Reviewer Request Gate` は未充足の状態。`INTERMEDIATE` request と、`FINAL` request が `Request Changes` で invalidated された後の戻り先はここに統一する。
+4. `pending verification` は required checks または reviewer-request 前の追加 verification が未完了の internal holding state である。reviewer-intake-valid ではなく、fail-closed な不足をこの status に downgrade してはならない。
+5. `pending acceptance` は reviewer が valid な `LGTM` を返した後、orchestrator acceptance が完了するまでの holding status である。reviewer は `completed` を直接返してはならない。
+6. `blocked` は fail-closed、ceiling 超過、provenance 不足、または human/user unblock を要する状態。
+7. `completed` は orchestrator 専用 completion status であり、`pending acceptance` から task class profile acceptance gate を再確認した後にだけ使える。fresh な `task-level stall-or-wall-time budget status=within-budget` recheck は `standard` / `heavy` で必須、`light` では不要。
+
+reviewer verdict mapping:
+
+1. `LGTM` は task class profile に応じて有効性を判定する。`standard` では `standard-slice-contract` と required local checks が current evidence で満たされた scoped reviewer signoff として有効であり、release readiness や final closeout を意味しない。`heavy` では `review request target=FINAL` かつ `Final Reviewer Request Gate` 充足時にのみ有効であり、next status は `pending acceptance` とする。`completed` は orchestrator だけが返せる。
+2. `BLOCK` は fail-closed verdict であり、next status は `blocked`。
+3. `Request Changes` は non-fail-closed だが actionable な issue がある verdict である。current request が `FINAL` の場合、その request は即時に `INTERMEDIATE` へ automatic downgrade され、next status は `pending review` に戻る。`pending final review` は gate 再充足まで再利用不可。
+4. `Needs verification` は non-blocking な追加 verification を要求する verdict であり、next status は `pending verification`。required checks failure や provenance 欠落を隠す用途には使えない。`FINAL` request または `ready for final reviewer LGTM` claim から `Needs verification` へ戻った場合、`pending final review` へ再昇格する前に full `Final Reviewer Request Gate` と fresh budget recheck を再充足しなければならない。
+5. `Needs Discussion` は human / user decision が必要な verdict であり、next status は `blocked`。
+
+### Return Path From `pending verification`
+
+1. `pending verification` に入った後の追加 verification は、次の worker request を作る owner（通常は coder。reviewer は実行 owner にならない）が行う。
+2. `pending verification` は internal holding state であり、reviewer へ再提出する review request の `incoming request status` にそのまま使ってはならない。verification 完了後は fresh な review request を再発行し、status を `pending review` または `pending final review` に正規化するか、return-path 条件を満たせなければ `blocked` に倒す。
+3. return 前に refresh 必須なのは、requested verification の `command / result / covered scope / artifact pointer or no-artifact reason / artifact integrity`、`scope delta since last review`、current `worker outcome` payload、fresh な `task-level stall-or-wall-time budget status`、および verification で invalidated された Class Closure Sheet / adversarial pre-closure pass / residual count である。
+4. `pending review` に正規化して戻るのは、verification 作業で reviewer-visible diff または scope delta が発生した、`review request target` が `INTERMEDIATE` のまま、または full `Final Reviewer Request Gate` を fresh に再充足できていない場合である。
+5. `pending final review` に正規化して戻れるのは、直前 verdict が `Needs verification`、request target が引き続き `FINAL`、`scope delta since last review=none`、新しい diff / late same-class finding / blocker が無く、full `Final Reviewer Request Gate` と fresh budget recheck を current evidence で再充足した場合に限る。
+6. requested verification を実行できない、evidence がなお weak / contradictory / missing、lineage や budget refresh を完了できない、または verification が fail-closed issue を露呈した場合は `blocked` に移す。
+
+## Task Lineage / Reopen Guard
+
+task-level ledger は cosmetic な task id ではなく、bug class と materially same な change surface を共有する lineage に紐づく。authoritative lineage registry は `.agent/active/sow/task-lineage-ledger.md` とし、lineage の正本は常にここだけに置く。
+
+1. 同じ bug class / materially same change surface を新しい task id で reopen / relabel する場合、slice contract / handoff / worker report には `task lineage ledger entry` と `prior task id` を必ず残し、`scope delta since last review` と evidence record で reopen 理由を明示する。
+2. `.agent/active/sow/task-lineage-ledger.md` には `task id / prior task id / bug class candidate / materially same change surface summary / reopen delta summary / delta evidence / carried task-level counters / timestamp` を記録し、plan / SOW / handoff は registry の代わりにその ledger entry を参照して一致しなければならない。
+3. `prior task id != none` の場合、`re-slice count for task` / `cumulative reviewer requests for task` / `cumulative late same-class findings for task` / `cumulative closure resets for task` / `task-level stall-or-wall-time budget` / `task-level stall-or-wall-time budget status` は reset せず carry-forward する。
+4. `task lineage ledger entry` が無い、`prior task id` が無い、reopen delta / evidence が無い、ledger entry が無い、または counters を reset した relabel task は invalid であり、fail-closed で `BLOCK` とする。
+5. materially same な bug class / change surface に対して `prior task id=none` の新 task id を立てることも invalid であり、fail-closed で `BLOCK` とする。
+
+slice contract 自体の記録先は `.agent/active/plan_*.md`、`.agent/active/sow/*.md`、または明示的な handoff prompt のいずれかとする。ただし task lineage の authoritative registry は常に `.agent/active/sow/task-lineage-ledger.md` であり、他の面は `task lineage ledger entry` を参照するだけに留める。
+未分解の broad task をそのまま Coder / Reviewer に渡してはならない。
+
+### Reopen Path From `blocked`
+
+1. `blocked` の解除 owner は、直近の block report に記録された `reroute owner` に従う。restart authority のような別 authority field は持たず、reopen authority は `reroute owner` と block report に記録された `reopen condition summary / unblock evidence required / unblock evidence / reroute evidence` の組合せで判定する。user / orchestrator approval が必要な blocker では、その approval が block report の required evidence として揃うまで coder / reviewer は self-unblock してはならない。
+2. unblock 前に、`.agent/active/sow/task-lineage-ledger.md` の対応 entry を refresh し、`prior task id`、unblock reason、unblock evidence、reroute evidence、carried task-level counters、current budget を記録する。explicit approval を伴う reopen では budget basis を `user-approved-reopen-at` に更新する。
+3. blocker 解消で slice 境界が変わる場合は mandatory re-slice を行い、`prior slice id` と `re-slice delta type / summary / evidence` を必ず残す。identical relabel-and-restart は無効であり、同じ bug class / change surface に `prior task id=none` を新設してはならない。
+4. reopened task は同一 lineage 上で `in progress` に戻る。`blocked` から `pending review` / `pending verification` / `pending final review` へ直接飛ぶことはできず、fresh な worker request を再作成してから進める。
+
+## Universe Adequacy Before Coding
+
+root-cause fix / same-class fix では、coding 前に owned sink universe の妥当性を検証する。
+
+最低条件:
+
+1. owned sink universe が列挙可能で、探索方法が exact command で書かれている
+2. closed universe basis を主張する場合、その根拠が再現可能である
+3. out-of-scope sink には owner または target owner が付いている
+4. target scope、required checks、evidence destination、completion boundary が同じ slice contract に結び付いている
+
+`similar places`、`likely all`、owner 未確定、探索方法不明のような weak universe definition は fail-closed で `BLOCK` または mandatory re-slice とする。
+`bug class candidate` が `n/a` のままでも relevant か不明な slice は weak classification とみなし、fail-closed で `BLOCK` とする。
+
+## Mandatory Re-Slice Gate
+
+mandatory re-slice は escape hatch ではない。許可条件は次のとおり。
+
+1. `prior slice id` が埋まっている
+2. `re-slice delta type / re-slice delta summary / delta evidence` が埋まっている
+3. 少なくとも `change surface の縮小または再定義`、`owned sink universe または closed universe basis の再定義`、`user decision`、`blocker resolution` のいずれかの explicit delta がある
+
+legacy `re-slice delta type=other` は deprecated / non-canonical であり無効とする。分類不能なら user escalation + evidence を要求し、そのままの自動継続は fail-closed で `BLOCK` とする。
+`prior slice id != none` なのに `re-slice delta type / re-slice delta summary / delta evidence` のいずれかが `none` の re-slice も fail-closed で `BLOCK` とする。
+prior slice と実質同一の slice をラベルだけ変えて再投入することは無効であり、fail-closed で `BLOCK` とする。
+
+## Class Closure / Sink Universe
+
+defect / regression / root-cause fix / same-class fix を完了扱いにする前に、Class Closure Sheet を作成し、少なくとも以下を埋める。
+
+1. bug class の定義
+2. owned sink universe と closed universe の根拠
+3. sink を列挙した inventory
+4. 各 sink の status (`fixed` / `not-present` / `out-of-scope` / `unknown` など)
+5. late same-class finding があった場合の reset 状態と再探索結果
+
+closed universe が無い、または `unknown` sink が 1 件でも残る場合、`remaining issues: N`、`root cause fixed`、`class closed`、final reviewer LGTM request は fail-closed で禁止する。
+`late same-class finding` は coding / handoff 開始後に同じ owned surface / bug class に対して reviewer が見つけた新規 sink を指し、`INTERMEDIATE` / `FINAL` を問わず timing-independent に扱う。
+late same-class finding が出た場合、旧 closeout claim は失効し、sink expansion / verification / final review request をやり直す。
+
+late same-class finding の責務分界:
+
+1. reviewer は finding を review report に concrete な sink / evidence 付きで記録し、verdict で class-closure claim を失効させる。reviewer は authoritative ledger を代理更新しない。
+2. 次の request を作る owner（通常は coder、task reopen / re-slice を跨ぐ場合は orchestrator）が、Class Closure Sheet、`scope delta since last review`、per-slice counters、`.agent/active/sow/task-lineage-ledger.md` の task-level counters を refresh してから次 request を出す。
+3. reviewer は次 request で authoritative ledger / counters の carry-forward が refresh 済みかを validate し、未更新なら fail-closed で `BLOCK` とする。
+
+## Loop / Stall Rules
+
+exec
+/bin/bash -lc 'git status --short' in $REPO_ROOT
+ succeeded in 0ms:
+ M .agent/active/scoring/v1_3_j_convergence.md
+ M .agent/v1.3/cli-public-api.snapshot.json
+ M .github/workflows/bench.yml
+ M .github/workflows/ci.yml
+ M .github/workflows/coverage.yml
+ M .github/workflows/cross-platform-nightly.yml
+ M .github/workflows/fuzz-nightly.yml
+ M .github/workflows/security.yml
+ M .gitignore
+ M Cargo.lock
+ M crates/stealth-agent-contracts/Cargo.toml
+ M crates/stealth-auth/Cargo.toml
+ M crates/stealth-auth/src/bin/rev_auth.rs
+ M crates/stealth-cli/src/commands/auth.rs
+ M crates/stealth-cli/src/commands/cf_evaluate.rs
+ M crates/stealth-cli/src/commands/config_cli.rs
+ M crates/stealth-cli/src/commands/egress.rs
+ M crates/stealth-cli/src/commands/hermes.rs
+ M crates/stealth-cli/src/commands/measure.rs
+ M crates/stealth-cli/src/commands/mod.rs
+ M crates/stealth-cli/src/commands/relocate.rs
+ M crates/stealth-cli/src/commands/spider.rs
+ M crates/stealth-cli/src/config_io/migration.rs
+ M crates/stealth-cli/src/config_io/validate.rs
+ M crates/stealth-cli/src/config_io/writer.rs
+ M crates/stealth-cli/src/doctor.rs
+ M crates/stealth-cli/src/lib.rs
+ M crates/stealth-cli/tests/deprecated_completeness.rs
+ M crates/stealth-cli/tests/help_dictionary_quality.rs
+ M crates/stealth-mcp/Cargo.toml
+ M crates/stealth-mcp/src/bin/gen_reference.rs
+ M crates/stealth-mcp/src/server.rs
+ M crates/stealth-sanitize/benches/sanitize_hotpath.rs
+ M crates/stealth-sanitize/fuzz/Cargo.toml
+ D crates/stealth-sanitize/fuzz/fuzz_targets/sanitize_full.rs
+ M crates/stealth-sites/Cargo.toml
+ M crates/vpn-rotate/Cargo.toml
+ M crates/vpn-rotate/src/credentials.rs
+ M docs/compat.md
+ M release-please-config.json
+ M scripts/mcp-schema-breaking.sh
+?? .agent/active/prompts/v1_3_g3_review.md
+?? .agent/active/prompts/v1_3_g3_review_round2.md
+?? .agent/active/prompts/v1_3_g3_review_round3.md
+?? .agent/active/prompts/v1_3_g4_review.md
+?? .agent/active/prompts/v1_3_i_fixup_review.md
+?? .agent/active/prompts/v1_3_i_fixup_review_r2_hardening.md
+?? .agent/active/prompts/v1_3_i_fixup_review_r2_hardening_round2.md
+?? .agent/active/prompts/v1_3_i_fixup_review_round2.md
+?? .agent/active/prompts/v1_3_i_fixup_review_round3.md
+?? .agent/active/prompts/v1_3_i_fixup_review_subphase_bc.md
+?? .agent/active/prompts/v1_3_i_fixup_review_subphase_bc_round2.md
+?? .agent/active/prompts/v1_3_i_fixup_review_subphase_bc_round3.md
+?? .agent/active/prompts/v1_3_k1_review.md
+?? .agent/active/prompts/v1_3_k1_review_round2.md
+?? .agent/active/prompts/v1_3_k1_review_round3.md
+?? .agent/active/prompts/v1_3_k2_review.md
+?? .agent/active/prompts/v1_3_k3_review.md
+?? .agent/active/prompts/v1_3_k3_review_round2.md
+?? .agent/active/prompts/v1_3_k4_review.md
+?? .agent/active/prompts/v1_3_k5_review.md
+?? .agent/active/prompts/v1_3_k5_review_round2.md
+?? .agent/active/prompts/v1_3_k5_review_round3.md
+?? .agent/active/prompts/v1_3_k6_review.md
+?? .agent/active/prompts/v1_3_k6_review_round2.md
+?? .agent/active/prompts/v1_3_k6_review_round3.md
+?? .agent/active/prompts/v1_3_k7_review.md
+?? .agent/active/prompts/v1_3_k8_review.md
+?? .agent/active/scoring/v1_3_g4_review_round1_codex.err
+?? .agent/active/scoring/v1_3_g4_review_round1_codex.out
+?? .agent/active/scoring/v1_3_h_convergence_r1.md
+?? .agent/active/scoring/v1_3_h_score_round1_codex.err
+?? .agent/active/scoring/v1_3_h_score_round1_codex.md
+?? .agent/active/scoring/v1_3_h_score_round1_codex.out
+?? .agent/active/scoring/v1_3_h_score_round1_opus.md
+?? .agent/active/scoring/v1_3_i_convergence_r1.md
+?? .agent/active/scoring/v1_3_i_score_round1_codex.err
+?? .agent/active/scoring/v1_3_i_score_round1_codex.out
+?? .agent/active/scoring/v1_3_i_score_round1_codex_recorded.md
+?? .agent/active/scoring/v1_3_i_score_round1_opus.md
+?? .agent/active/scoring/v1_3_i_score_round2_codex.md
+?? .agent/active/scoring/v1_3_i_score_round2_codex.out
+?? .agent/active/scoring/v1_3_i_score_round2_codex_v2.md
+?? .agent/active/scoring/v1_3_i_score_round2_codex_v2.out
+?? .agent/active/scoring/v1_3_j_score_round1_opus.md
+?? .agent/active/scoring/v1_3_k_convergence.md
+?? .agent/active/scoring/v1_3_k_evidence_notes.md
+?? .agent/active/scoring/v1_3_k_score_round1_codex.md
+?? .agent/active/scoring/v1_3_k_score_round1_codex.out
+?? .agent/active/scoring/v1_3_k_score_round2_codex.md
+?? .agent/active/scoring/v1_3_k_score_round2_codex.out
+?? .agent/active/scoring/v1_3_k_score_round3_codex.md
+?? .agent/active/scoring/v1_3_k_score_round3_codex.out
+?? crates/stealth-agent-contracts/tests/
+?? crates/stealth-auth/benches/
+?? crates/stealth-auth/tests/proptest_envelope.rs
+?? crates/stealth-cli/src/commands/output_format.rs
+?? crates/stealth-cli/tests/completion_smoke.rs
+?? crates/stealth-cli/tests/output_format_coverage.rs
+?? crates/stealth-mcp/benches/
+?? crates/stealth-sanitize/fuzz/fuzz_targets/sanitize_envelope_parse.rs
+?? crates/stealth-sites/benches/
+?? crates/vpn-rotate/tests/proptest_rotation_policy.rs
+?? docs/json-schemas/cli/
+?? scripts/changelog-keepachangelog-lint.py
+?? scripts/cli-public-api-snapshot.test.sh
+?? scripts/gen_completions.sh
+?? scripts/workspace-lib-crates.py
+?? target/
+
+exec
+/bin/bash -lc "sed -n '1,220p' $REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ succeeded in 0ms:
+---
+name: "staff-code-reviewer"
+description: "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+source_specialty_file: "docs/roles/reviewer/specialties/staff-code-reviewer.md"
+source_manifest_hash: "eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44"
+canonical_role: "reviewer"
+generated_by: agent-core specialty project
+---
+
+# staff-code-reviewer
+
+This skill is a SELECTION HINT (lens), not a workflow owner. It is a Reviewer lens. Primary invocation is `scripts/codex-wrapper.sh --role reviewer --specialty staff-code-reviewer`. This skill auto-trigger is a discovery hint; primary invocation is the wrapper flag.
+
+## Summary
+
+Find merge-blocking bugs, release risks, regressions, and missing tests with evidence-first review.
+
+Lens type: Reviewer lens
+Canonical source: `docs/roles/reviewer/specialties/staff-code-reviewer.md`
+
+## How to invoke
+
+Reviewer wrapper flag:
+- Primary invocation: `scripts/codex-wrapper.sh --role reviewer --specialty staff-code-reviewer`.
+- The orchestrator selects this specialty before review and records `docs/roles/reviewer/specialties/staff-code-reviewer.md` as the canonical source.
+
+Specialty manifest hash: `eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44`
+
+exec
+/bin/bash -lc 'git diff -- .github/workflows/ci.yml scripts/workspace-lib-crates.py scripts/cli-public-api-snapshot.test.sh docs/compat.md' in $REPO_ROOT
+ succeeded in 0ms:
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 721934c8..f5cad20e 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -474,43 +474,25 @@ jobs:
+             . -> target
+       - name: cargo build -p rev-stealth
+         run: cargo build -p rev-stealth
+-      - name: regenerate + check snapshot (label-aware)
+-        env:
+-          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++      - name: regenerate + check snapshot (HARD — drift always fails)
+         run: |
+           set -euo pipefail
+-          # R2 label-aware mode: the script itself stays drift-strict; here we
+-          # add a label gate so a drift PR must declare additive vs breaking
+-          # vs mcp-schema-breaking, mirroring cargo-public-api-diff.
++          # R2 hardening (Codex R2 scoring finding): a contributor MUST commit
++          # the regenerated snapshot in the same PR as the change that mutated
++          # the public surface — labels NEVER waive this. Why: if the snapshot
++          # gate could be waived with `api-additive`, the BASE-vs-HEAD
++          # mcp-schema-breaking detector would diff a stale base snapshot
++          # against the same stale live snapshot, miss the real breaking
++          # change, and let the PR merge with the wrong label.
+           #
+-          # NOTE: do NOT capture `$?` after an `if ...; then ...; fi` block —
+-          # bash returns 0 from the un-taken branch, masking the failing exit
+-          # code. Use `|| drift_rc=$?` to capture the script's real status.
+-          drift_rc=0
+-          ./scripts/cli-public-api-snapshot.sh --check || drift_rc=$?
+-          if [[ "$drift_rc" -eq 0 ]]; then
+-            echo "[cli-public-api-snapshot] surface unchanged; label check not required."
+-            exit 0
+-          fi
+-          if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
+-            exit "$drift_rc"
+-          fi
+-          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+-          echo "[cli-public-api-snapshot] PR labels = '${labels_csv:-<none>}'"
+-          allowed=0
+-          IFS=',' read -ra arr <<< "$labels_csv"
+-          for l in "${arr[@]}"; do
+-            case "$l" in
+-              api-additive|api-breaking|mcp-schema-breaking) allowed=1 ;;
+-            esac
+-          done
+-          if [[ "$allowed" -eq 1 ]]; then
+-            echo "::warning::snapshot drift detected but an explicit compat label is set; PR may regenerate the snapshot and merge."
+-            exit 0
+-          fi
+-          echo "::error::CLI public-API snapshot drift requires one of: api-additive, api-breaking, mcp-schema-breaking."
+-          exit "$drift_rc"
++          # Acceptable PR flow:
++          #   1. mutate CLI / MCP source
++          #   2. `./scripts/cli-public-api-snapshot.sh` to regenerate
++          #   3. commit the snapshot diff in the same PR
++          #   4. add `api-additive` / `api-breaking` / `mcp-schema-breaking`
++          #      based on the regenerated diff (label classifies; it does
++          #      not waive the regeneration requirement).
++          ./scripts/cli-public-api-snapshot.sh --check
+ 
+   # I.2: cargo-public-api Rust API diff gate (HARD).
+   #
+@@ -585,11 +567,35 @@ jobs:
+           # If pass 1 is healthy and pass 2 is non-zero, we know it is a real
+           # diff and the label gate applies. If pass 1 fails, the gate fails
+           # closed — labels cannot waive a broken invocation.
++          #
++          # Workspace coverage (Codex R2 scoring finding): enumerate ALL
++          # workspace members that have library targets via cargo metadata
++          # instead of hand-listing six. binary-only crates (no [lib]) are
++          # silently dropped by cargo-public-api, so we filter to lib targets.
+           diff_seen=0
+           exec_fail=0
+           tmpdir="$(mktemp -d)"
+-          for crate in stealth-core stealth-auth stealth-sanitize \
+-                       stealth-agent-contracts stealth-parse stealth-mcp; do
++          # Process-substitution pipelines do NOT propagate exit status under
++          # `set -euo pipefail` (Codex R2 hardening finding). Materialize the
++          # crate list to a temp file with explicit exit-code checks at each
++          # stage so a metadata/helper failure cannot pretend "no diff".
++          metadata_json="$tmpdir/cargo-metadata.json"
++          if ! cargo metadata --no-deps --format-version=1 > "$metadata_json"; then
++            echo "::error::cargo metadata --no-deps failed; cannot enumerate workspace lib crates."
++            exit 1
++          fi
++          crate_list="$tmpdir/workspace-libs.txt"
++          if ! python3 scripts/workspace-lib-crates.py < "$metadata_json" > "$crate_list"; then
++            echo "::error::scripts/workspace-lib-crates.py failed; cannot enumerate workspace lib crates."
++            exit 1
++          fi
++          mapfile -t WORKSPACE_LIBS < "$crate_list"
++          if [[ "${#WORKSPACE_LIBS[@]}" -eq 0 ]]; then
++            echo "::error::workspace lib crate list is empty — refusing to fall through with zero coverage. Inspect $crate_list."
++            exit 1
++          fi
++          echo "[cargo-public-api] workspace lib crates (${#WORKSPACE_LIBS[@]}): ${WORKSPACE_LIBS[*]}"
++          for crate in "${WORKSPACE_LIBS[@]}"; do
+             echo "::group::cargo public-api diff -p $crate"
+ 
+             # Pass 1: smoke run, no --deny. Non-zero ⇒ exec failure.
+diff --git a/docs/compat.md b/docs/compat.md
+index b7139541..0acf28ca 100644
+--- a/docs/compat.md
++++ b/docs/compat.md
+@@ -11,9 +11,9 @@ Last reviewed: **v1.3.0** (Lane I.3, 2026-05-23).
+ 
+ | Surface | Stability guarantee | Drift gate | Bumps |
+ |---------|---------------------|------------|-------|
+-| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` covers tool-name removals/renames and required-arg tightening (CI: `mcp-schema-breaking-detector`). The `mcp-schema-lint` CI job (`gen_reference --check`) is a freshness check — it only catches enum/output-field changes that the contributor *forgot to regenerate* in `docs/MCP_REFERENCE.md`; if the contributor regenerates the docs, an enum narrow / output rename will pass. Extending the snapshot diff to cover enums and output fields is tracked for **v1.4** (Lane I-followup). For v1.3, those narrows are policy-only and rely on the reviewer applying the `mcp-schema-breaking` label by hand. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing a value enum, or changing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
+-| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`) | Any drift against the committed snapshot requires `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed). |
+-| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (advisory in v1.3, hardened in v1.4) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the same `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) labels apply at the discretion of the reviewer. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
++| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` (CI: `mcp-schema-breaking-detector`) covers all four breaking shapes via base-vs-head snapshot diff at `$schema_version >= 3`: tool removal/rename, required-arg tightening, input-schema enum narrowing, and output-property removal / output enum narrowing. 3-valued exit code: 0 unchanged, 2 intentional breaking, other nonzero script failure. Fixture coverage: `scripts/cli-public-api-snapshot.test.sh` (CI: `mcp-schema-breaking-fixture-tests`). The `mcp-schema-lint` job (`gen_reference --check`) remains as a rendered-doc backstop. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing an input or output value enum, or removing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
++| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`, **HARD — drift always fails; labels classify but do not waive**) | Any drift against the committed snapshot must be regenerated and committed in the same PR (`./scripts/cli-public-api-snapshot.sh && git add .agent/v1.3/cli-public-api.snapshot.json`). The PR then carries `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed) or `mcp-schema-breaking` (MCP tool list / required-arg / enum / output change) to classify the regenerated diff. |
++| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (R2: HARD GATE, label-required) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the matching `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) PR label is mandatory and the gate fails closed without one. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
+ 
+ ## What counts as "public surface"
+ 
+@@ -95,12 +95,102 @@ these crates as path dependencies must pin to an exact workspace version.
+ Once any crate is published independently to crates.io (Lane H.5), its own
+ semver lifecycle decouples from the rev_scraping project version.
+ 
++## MCP schema breaking — worked examples
++
++The MCP tool catalog is a structured contract: callers depend on tool names,
++required input args, accepted input enum values, output property names, and
++output enum values. The `scripts/mcp-schema-breaking.sh` detector classifies
++each diff against the base snapshot into one of four breaking shapes plus
++two non-breaking shapes. The table below pins down how to bump on each.
++
++| Shape | Example | Breaking? | Required label | Required bump |
++|---|---|---|---|---|
++| Tool removal / rename | `cf_evaluate` removed from `mcp_tools.names` | yes | `mcp-schema-breaking` | major (cliff after 2-major visibility) |
++| Required-arg added | `spider.required` gains `timeout_ms` while `url` is kept | yes | `mcp-schema-breaking` | major |
++| Input enum narrowed | `vpn_rotate.strategy` drops the `random` value | yes | `mcp-schema-breaking` | major |
++| Output property removed | `recipe_show.output.properties` drops `endpoints` | yes | `mcp-schema-breaking` | major |
++| Output enum narrowed | `recipe_show.output.enums.status` drops `Pending` | yes | `mcp-schema-breaking` | major |
++| New tool added | new entry in `mcp_tools.names` | no | `api-additive` | minor |
++| Required-arg relaxed | a previously required arg becomes optional | no | `api-additive` | minor |
++
++### Case 1 — Enum narrowing (output): `recipe_show.status` loses `Pending`
++
++```diff
++- "enums": { "status": ["Active", "Pending", "Retired"] }
+++ "enums": { "status": ["Active", "Retired"] }
++```
++
++A consumer that previously did `match status { Pending => … }` now silently
++loses the branch. This is **major-bump breaking**, not minor — even though
++the response payload still parses. Label: `mcp-schema-breaking`. The
++detector emits the line:
++
++```
++[mcp-schema-breaking] BREAKING vs <base>: output enum narrowed
++    - recipe_show.status: removed "Pending"
++```
++
++### Case 2 — Required field added (input): keep `url`, add new required `timeout_ms`
++
++```diff
++- "required": ["url"]
+++ "required": ["timeout_ms", "url"]
++```
++
++Old callers that omit `timeout_ms` will be rejected by the input-schema
++validator, so this is **major-bump breaking**. Label:
++`mcp-schema-breaking`. The detector emits:
++
++```
++[mcp-schema-breaking] BREAKING vs <base>: tightened required-args
++    - spider.timeout_ms
++```
++
++If instead the new field were *optional*, the change would be additive —
++`api-additive` + minor bump.
++
++### Case 3 — Output type changed: `auth_status.status` widens from a free-form string to a closed enum
++
++```diff
++  "properties": {
++    "status": {
++-     "type": "string"
+++     "type": "string",
+++     "enum": ["Valid", "ExpiringSoon", "ExpiringCritical",
+++              "PartiallyExpired", "AllExpired", "Missing"]
++    }
++  }
++```
++
++This is **subtle**: narrowing the *type* (from any-string to a closed enum)
++locks future server-side additions to a follow-up bump, but existing callers
++that already only emit valid values are unaffected. The R2 detector flags
++this as an **output enum narrowing** vs *no enum at all* in the base
++snapshot — but the relevant `mcp_tools.schemas.auth_status.output.enums`
++entry **did not exist** in the base snapshot, so the narrowing detector
++does not fire. To make this break the gate, the snapshot must already
++carry the prior enum literal; if it doesn't (i.e. the field was previously
++documented as a free-form string), promote this PR to
++`mcp-schema-breaking` manually and bump major. Rule of thumb: any
++*type-shape* change is a major bump even when the detector cannot prove
++it from the snapshot diff alone.
++
+ ## Where to look next
+ 
+-- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface.
++- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface
++  (`$schema_version = 3` carries enum constraints + output-schema fields).
+ - `scripts/cli-public-api-snapshot.sh` — regenerator + drift checker.
+-- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker.
+-- `CHANGELOG.rev_scraping.md` — project-level changelog (keep-a-changelog).
++- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker with the
++  3-valued exit-code contract (0 = unchanged, 2 = breaking diff, other
++  nonzero = script execution failure).
++- `scripts/cli-public-api-snapshot.test.sh` — fixture tests covering the
++  additive / breaking / drift scenarios.
++- `scripts/changelog-keepachangelog-lint.py` — structural lint that gates
++  the `## [Unreleased]` cursor release-please depends on.
++- `CHANGELOG.rev_scraping.md` — project-level changelog (keep-a-changelog),
++  the path `release-please-config.json` targets.
+ - `docs/MCP_REFERENCE.md` — current MCP tool catalog.
+-- `.github/workflows/ci.yml` — `cli-public-api-snapshot`, `cargo-public-api-diff`,
+-  `mcp-schema-breaking-detector` jobs.
++- `.github/workflows/ci.yml` — `cli-public-api-snapshot`,
++  `cargo-public-api-diff` (hard gate, label-aware),
++  `mcp-schema-breaking-detector` (label-aware),
++  `mcp-schema-breaking-fixture-tests`, `changelog-lint` jobs.
+
+exec
+/bin/bash -lc 'rg -n "cli-public-api-snapshot|cargo-public-api|workspace-lib-crates|public-api|HARD|labels classify|drift" .github/workflows/ci.yml docs/compat.md scripts/cli-public-api-snapshot.test.sh scripts/workspace-lib-crates.py' in $REPO_ROOT
+ succeeded in 0ms:
+scripts/workspace-lib-crates.py:7:(only `bin` targets) are excluded because cargo-public-api silently
+scripts/workspace-lib-crates.py:10:This is a thin helper for the `cargo-public-api-diff` CI job so it does
+scripts/workspace-lib-crates.py:25:        print(f"::error::workspace-lib-crates: invalid cargo metadata JSON: {exc}", file=sys.stderr)
+scripts/cli-public-api-snapshot.test.sh:4:# We do not exercise `cli-public-api-snapshot.sh` end-to-end (that requires
+scripts/cli-public-api-snapshot.test.sh:12:#   3. drift      — script execution failure (malformed JSON) → rc != 0,2
+scripts/cli-public-api-snapshot.test.sh:15:# `git show $BASE_REF:.agent/v1.3/cli-public-api.snapshot.json`. We stand
+scripts/cli-public-api-snapshot.test.sh:50:  # the file itself is only consulted by cli-public-api-snapshot.sh, not by
+scripts/cli-public-api-snapshot.test.sh:60:    printf '%s\n' "$base_json" > .agent/v1.3/cli-public-api.snapshot.json
+scripts/cli-public-api-snapshot.test.sh:65:  printf '%s\n' "$live_json" > "$case_dir/.agent/v1.3/cli-public-api.snapshot.json"
+scripts/cli-public-api-snapshot.test.sh:255:# catches this scenario is `cli-public-api-snapshot --check` (the
+scripts/cli-public-api-snapshot.test.sh:256:# regenerator + drift check in the workflow), NOT this detector.
+scripts/cli-public-api-snapshot.test.sh:262:# lives in the workflow step `regenerate + check snapshot (HARD)`,
+scripts/cli-public-api-snapshot.test.sh:263:# which fails closed on any drift without a waiver.
+scripts/cli-public-api-snapshot.test.sh:267:run_case "$CASE2F" 0 "stale-snapshot baseline: identical base==live ⇒ rc=0 (detector by design; bypass is caught by the snapshot drift gate, not here)"
+scripts/cli-public-api-snapshot.test.sh:270:# Case 3: drift — malformed JSON in the LIVE snapshot. The script
+scripts/cli-public-api-snapshot.test.sh:276:CASE3="$BASE_DIR_BASE/case3-drift-malformed"
+scripts/cli-public-api-snapshot.test.sh:285:  echo "::error::[fixture-test] FAIL: drift case must NOT exit 0 or 2 (got $got3 — script silently accepted malformed JSON)" >&2
+scripts/cli-public-api-snapshot.test.sh:289:  echo "[fixture-test] PASS: drift (malformed JSON → rc=$got3, neither 0 nor 2)"
+docs/compat.md:14:| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` (CI: `mcp-schema-breaking-detector`) covers all four breaking shapes via base-vs-head snapshot diff at `$schema_version >= 3`: tool removal/rename, required-arg tightening, input-schema enum narrowing, and output-property removal / output enum narrowing. 3-valued exit code: 0 unchanged, 2 intentional breaking, other nonzero script failure. Fixture coverage: `scripts/cli-public-api-snapshot.test.sh` (CI: `mcp-schema-breaking-fixture-tests`). The `mcp-schema-lint` job (`gen_reference --check`) remains as a rendered-doc backstop. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing an input or output value enum, or removing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
+docs/compat.md:15:| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`, **HARD — drift always fails; labels classify but do not waive**) | Any drift against the committed snapshot must be regenerated and committed in the same PR (`./scripts/cli-public-api-snapshot.sh && git add .agent/v1.3/cli-public-api.snapshot.json`). The PR then carries `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed) or `mcp-schema-breaking` (MCP tool list / required-arg / enum / output change) to classify the regenerated diff. |
+docs/compat.md:16:| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (R2: HARD GATE, label-required) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the matching `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) PR label is mandatory and the gate fails closed without one. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
+docs/compat.md:23:- Tool names (16 in v1.3 — see `.agent/v1.3/cli-public-api.snapshot.json`).
+docs/compat.md:180:- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface
+docs/compat.md:182:- `scripts/cli-public-api-snapshot.sh` — regenerator + drift checker.
+docs/compat.md:183:- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker with the
+docs/compat.md:186:- `scripts/cli-public-api-snapshot.test.sh` — fixture tests covering the
+docs/compat.md:187:  additive / breaking / drift scenarios.
+docs/compat.md:193:- `.github/workflows/ci.yml` — `cli-public-api-snapshot`,
+docs/compat.md:194:  `cargo-public-api-diff` (hard gate, label-aware),
+.github/workflows/ci.yml:456:  # I.1: cli-public-api snapshot drift gate. Drift = any byte-level diff
+.github/workflows/ci.yml:457:  # against `.agent/v1.3/cli-public-api.snapshot.json`. To merge a drifting
+.github/workflows/ci.yml:461:  cli-public-api-snapshot:
+.github/workflows/ci.yml:462:    name: CLI public-API snapshot drift
+.github/workflows/ci.yml:477:      - name: regenerate + check snapshot (HARD — drift always fails)
+.github/workflows/ci.yml:490:          #   2. `./scripts/cli-public-api-snapshot.sh` to regenerate
+.github/workflows/ci.yml:495:          ./scripts/cli-public-api-snapshot.sh --check
+.github/workflows/ci.yml:497:  # I.2: cargo-public-api Rust API diff gate (HARD).
+.github/workflows/ci.yml:504:  # fails closed if a drift exists without the corresponding label.
+.github/workflows/ci.yml:510:  cargo-public-api-diff:
+.github/workflows/ci.yml:511:    name: cargo-public-api diff (hard gate)
+.github/workflows/ci.yml:519:      # cargo-public-api consumes rustdoc JSON, whose schema changes per
+.github/workflows/ci.yml:520:      # nightly. Pin the nightly to the date that cargo-public-api 0.39.x is
+.github/workflows/ci.yml:522:      # https://github.com/cargo-public-api/cargo-public-api/blob/main/scripts/release-helper/src/version_info.rs).
+.github/workflows/ci.yml:523:      # Floating `nightly` can break this job between cargo-public-api
+.github/workflows/ci.yml:524:      # releases. Re-pin in lockstep when bumping cargo-public-api in v1.4.
+.github/workflows/ci.yml:533:      - name: install cargo-public-api
+.github/workflows/ci.yml:534:        run: cargo install cargo-public-api --locked --version 0.39.0
+.github/workflows/ci.yml:550:          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`.
+.github/workflows/ci.yml:554:          # cargo-public-api 0.39.0 returns rc=1 for BOTH "surface diverged
+.github/workflows/ci.yml:558:          #   Pass 1: `cargo public-api --package <crate> diff <range>`
+.github/workflows/ci.yml:562:          #   Pass 2: `cargo public-api --package <crate> diff --deny=all <range>`
+.github/workflows/ci.yml:574:          # silently dropped by cargo-public-api, so we filter to lib targets.
+.github/workflows/ci.yml:588:          if ! python3 scripts/workspace-lib-crates.py < "$metadata_json" > "$crate_list"; then
+.github/workflows/ci.yml:589:            echo "::error::scripts/workspace-lib-crates.py failed; cannot enumerate workspace lib crates."
+.github/workflows/ci.yml:597:          echo "[cargo-public-api] workspace lib crates (${#WORKSPACE_LIBS[@]}): ${WORKSPACE_LIBS[*]}"
+.github/workflows/ci.yml:599:            echo "::group::cargo public-api diff -p $crate"
+.github/workflows/ci.yml:603:            cargo public-api --package "$crate" \
+.github/workflows/ci.yml:610:              echo "::error::cargo public-api -p $crate (pass 1, no --deny) exited rc=$smoke_rc — treating as tool/build failure, NOT a diff. Labels do not waive this."
+.github/workflows/ci.yml:618:            cargo public-api --package "$crate" \
+.github/workflows/ci.yml:631:            echo "::error::cargo-public-api hard gate cannot evaluate label compliance because at least one crate's pass-1 smoke run failed. Fix the underlying tool/build error; labels do not waive this."
+.github/workflows/ci.yml:636:            echo "[cargo-public-api] no public-surface diff vs $BASE_REF — gate PASS."
+.github/workflows/ci.yml:647:          echo "[cargo-public-api] PR labels = '${labels_csv:-<none>}'"
+.github/workflows/ci.yml:660:            echo "::error::cargo-public-api detected a public-surface diff vs $BASE_REF but no \`api-additive\` or \`api-breaking\` PR label is set."
+.github/workflows/ci.yml:671:          echo "[cargo-public-api] surface diverged; one explicit label found ⇒ gate PASS (additive=$has_additive, breaking=$has_breaking)."
+.github/workflows/ci.yml:738:  # Lane G.3 (v1.3 Black-Belt CLI): shell-completion drift gate.
+.github/workflows/ci.yml:744:  # CommandFactory tree — so the gate also covers --help drift in
+.github/workflows/ci.yml:746:  completion-drift:
+.github/workflows/ci.yml:747:    name: shell-completion drift
+.github/workflows/ci.yml:787:            echo "::error::shell completion scripts drifted (modified content). Run \`./scripts/gen_completions.sh\` and commit the result." >&2
+.github/workflows/ci.yml:798:          drift="$(git status --porcelain -- target/completions/)"
+.github/workflows/ci.yml:799:          if [[ -n "$drift" ]]; then
+.github/workflows/ci.yml:801:            echo "$drift" >&2
+.github/workflows/ci.yml:819:        run: bash scripts/cli-public-api-snapshot.test.sh
+
+codex
+差分上は、前回の主要懸念3点に直接対応する変更が入っています。次に、CIジョブの実際の制御フローとfixtureの中身を読み、スコアを下げるべき抜けが残っていないかを確認します。
+exec
+/bin/bash -lc "sed -n '456,676p' .github/workflows/ci.yml" in $REPO_ROOT
+ succeeded in 0ms:
+  # I.1: cli-public-api snapshot drift gate. Drift = any byte-level diff
+  # against `.agent/v1.3/cli-public-api.snapshot.json`. To merge a drifting
+  # PR, the contributor must regenerate the snapshot, commit the diff, and
+  # apply the `api-additive` (new flag/cmd/env) or `api-breaking` (removed,
+  # renamed, semantically changed) PR label.
+  cli-public-api-snapshot:
+    name: CLI public-API snapshot drift
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo build -p rev-stealth
+        run: cargo build -p rev-stealth
+      - name: regenerate + check snapshot (HARD — drift always fails)
+        run: |
+          set -euo pipefail
+          # R2 hardening (Codex R2 scoring finding): a contributor MUST commit
+          # the regenerated snapshot in the same PR as the change that mutated
+          # the public surface — labels NEVER waive this. Why: if the snapshot
+          # gate could be waived with `api-additive`, the BASE-vs-HEAD
+          # mcp-schema-breaking detector would diff a stale base snapshot
+          # against the same stale live snapshot, miss the real breaking
+          # change, and let the PR merge with the wrong label.
+          #
+          # Acceptable PR flow:
+          #   1. mutate CLI / MCP source
+          #   2. `./scripts/cli-public-api-snapshot.sh` to regenerate
+          #   3. commit the snapshot diff in the same PR
+          #   4. add `api-additive` / `api-breaking` / `mcp-schema-breaking`
+          #      based on the regenerated diff (label classifies; it does
+          #      not waive the regeneration requirement).
+          ./scripts/cli-public-api-snapshot.sh --check
+
+  # I.2: cargo-public-api Rust API diff gate (HARD).
+  #
+  # R2 hardening (Lane I fix-up): promoted from advisory to hard gate. When the
+  # rustdoc-JSON-derived public surface of any covered crate changes against
+  # the PR base, the PR MUST carry exactly one of the labels
+  # `api-additive` (new pub items) or `api-breaking` (removed/renamed/retyped
+  # pub items). The label check runs unconditionally on PR; the diff step then
+  # fails closed if a drift exists without the corresponding label.
+  #
+  # Rationale: the v1.3 R1 advisory mode meant a reviewer could miss a silent
+  # `pub` removal. The R2 hard gate forces an explicit ack via PR label and
+  # makes the snapshot pipeline (Lane I.1) and Rust pub-API pipeline (I.2)
+  # symmetric in enforcement strength.
+  cargo-public-api-diff:
+    name: cargo-public-api diff (hard gate)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    # NOTE: continue-on-error intentionally OMITTED — this is now blocking.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # cargo-public-api consumes rustdoc JSON, whose schema changes per
+      # nightly. Pin the nightly to the date that cargo-public-api 0.39.x is
+      # validated against (see
+      # https://github.com/cargo-public-api/cargo-public-api/blob/main/scripts/release-helper/src/version_info.rs).
+      # Floating `nightly` can break this job between cargo-public-api
+      # releases. Re-pin in lockstep when bumping cargo-public-api in v1.4.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-10-13
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-nightly-2024-10-13
+          workspaces: |
+            . -> target
+      - name: install cargo-public-api
+        run: cargo install cargo-public-api --locked --version 0.39.0
+      - name: fetch base ref
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin "$BASE_REF"
+      - name: diff against base + enforce label
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`.
+          BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+
+          # cargo-public-api 0.39.0 returns rc=1 for BOTH "surface diverged
+          # under --deny=all" AND "rustdoc/build failure". To distinguish
+          # diff-vs-exec-failure we run two passes per crate:
+          #
+          #   Pass 1: `cargo public-api --package <crate> diff <range>`
+          #           — no --deny. rc != 0 ⇒ tool/build/range failure
+          #             (a real diff is allowed; the tool only emits the diff
+          #              to stdout and exits 0 without --deny).
+          #   Pass 2: `cargo public-api --package <crate> diff --deny=all <range>`
+          #           — `--deny` MUST come AFTER `diff` (0.39 clap rejects
+          #             `--deny` as a top-level option). rc != 0 ⇒ surface
+          #             diverged.
+          #
+          # If pass 1 is healthy and pass 2 is non-zero, we know it is a real
+          # diff and the label gate applies. If pass 1 fails, the gate fails
+          # closed — labels cannot waive a broken invocation.
+          #
+          # Workspace coverage (Codex R2 scoring finding): enumerate ALL
+          # workspace members that have library targets via cargo metadata
+          # instead of hand-listing six. binary-only crates (no [lib]) are
+          # silently dropped by cargo-public-api, so we filter to lib targets.
+          diff_seen=0
+          exec_fail=0
+          tmpdir="$(mktemp -d)"
+          # Process-substitution pipelines do NOT propagate exit status under
+          # `set -euo pipefail` (Codex R2 hardening finding). Materialize the
+          # crate list to a temp file with explicit exit-code checks at each
+          # stage so a metadata/helper failure cannot pretend "no diff".
+          metadata_json="$tmpdir/cargo-metadata.json"
+          if ! cargo metadata --no-deps --format-version=1 > "$metadata_json"; then
+            echo "::error::cargo metadata --no-deps failed; cannot enumerate workspace lib crates."
+            exit 1
+          fi
+          crate_list="$tmpdir/workspace-libs.txt"
+          if ! python3 scripts/workspace-lib-crates.py < "$metadata_json" > "$crate_list"; then
+            echo "::error::scripts/workspace-lib-crates.py failed; cannot enumerate workspace lib crates."
+            exit 1
+          fi
+          mapfile -t WORKSPACE_LIBS < "$crate_list"
+          if [[ "${#WORKSPACE_LIBS[@]}" -eq 0 ]]; then
+            echo "::error::workspace lib crate list is empty — refusing to fall through with zero coverage. Inspect $crate_list."
+            exit 1
+          fi
+          echo "[cargo-public-api] workspace lib crates (${#WORKSPACE_LIBS[@]}): ${WORKSPACE_LIBS[*]}"
+          for crate in "${WORKSPACE_LIBS[@]}"; do
+            echo "::group::cargo public-api diff -p $crate"
+
+            # Pass 1: smoke run, no --deny. Non-zero ⇒ exec failure.
+            smoke_rc=0
+            cargo public-api --package "$crate" \
+              diff "$BASE_SHA..$HEAD_SHA" \
+              > "$tmpdir/${crate}.smoke.out" 2> "$tmpdir/${crate}.smoke.err" \
+              || smoke_rc=$?
+            cat "$tmpdir/${crate}.smoke.out"
+            cat "$tmpdir/${crate}.smoke.err" >&2
+            if [[ "$smoke_rc" -ne 0 ]]; then
+              echo "::error::cargo public-api -p $crate (pass 1, no --deny) exited rc=$smoke_rc — treating as tool/build failure, NOT a diff. Labels do not waive this."
+              exec_fail=1
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Pass 2: deny-all run. Non-zero ⇒ real surface diff.
+            deny_rc=0
+            cargo public-api --package "$crate" \
+              diff --deny=all "$BASE_SHA..$HEAD_SHA" \
+              > "$tmpdir/${crate}.deny.out" 2> "$tmpdir/${crate}.deny.err" \
+              || deny_rc=$?
+            cat "$tmpdir/${crate}.deny.out"
+            cat "$tmpdir/${crate}.deny.err" >&2
+            if [[ "$deny_rc" -ne 0 ]]; then
+              diff_seen=1
+            fi
+            echo "::endgroup::"
+          done
+
+          if [[ "$exec_fail" -ne 0 ]]; then
+            echo "::error::cargo-public-api hard gate cannot evaluate label compliance because at least one crate's pass-1 smoke run failed. Fix the underlying tool/build error; labels do not waive this."
+            exit 1
+          fi
+
+          if [[ "$diff_seen" -eq 0 ]]; then
+            echo "[cargo-public-api] no public-surface diff vs $BASE_REF — gate PASS."
+            exit 0
+          fi
+
+          # Step 2: surface diverged ⇒ a label is mandatory. Read labels from
+          # the PR event payload (no extra API call required); fall back to
+          # the REST API if the payload is empty (defensive).
+          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+          if [[ -z "$labels_csv" ]]; then
+            labels_csv="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/labels" --jq '[.[].name] | join(",")' || echo "")"
+          fi
+          echo "[cargo-public-api] PR labels = '${labels_csv:-<none>}'"
+
+          has_additive=0
+          has_breaking=0
+          IFS=',' read -ra arr <<< "$labels_csv"
+          for l in "${arr[@]}"; do
+            case "$l" in
+              api-additive)  has_additive=1 ;;
+              api-breaking)  has_breaking=1 ;;
+            esac
+          done
+
+          if [[ "$has_additive" -eq 0 && "$has_breaking" -eq 0 ]]; then
+            echo "::error::cargo-public-api detected a public-surface diff vs $BASE_REF but no \`api-additive\` or \`api-breaking\` PR label is set."
+            echo "::error::Decide: pure additions (new pub item, no removal/rename) ⇒ apply \`api-additive\`."
+            echo "::error::Decide: any removal, rename, signature change, or visibility narrowing ⇒ apply \`api-breaking\` AND bump per docs/compat.md."
+            exit 1
+          fi
+
+          if [[ "$has_additive" -eq 1 && "$has_breaking" -eq 1 ]]; then
+            echo "::error::Both \`api-additive\` and \`api-breaking\` labels are set; choose exactly one (a PR is either additive or breaking)."
+            exit 1
+          fi
+
+          echo "[cargo-public-api] surface diverged; one explicit label found ⇒ gate PASS (additive=$has_additive, breaking=$has_breaking)."
+
+  # I.5: MCP tool-schema breaking-change detector. Mirrors mcp-schema-lint
+  # but specifically asserts the canonical 16-tool list (Lane I.1 snapshot)
+  # has not been mutated. Drift requires `mcp-schema-breaking` PR label.
+  mcp-schema-breaking-detector:
+
+exec
+/bin/bash -lc "sed -n '1,220p' docs/roles/reviewer/specialties/staff-code-reviewer.md" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,220p' scripts/workspace-lib-crates.py" in $REPO_ROOT
+ succeeded in 0ms:
+#!/usr/bin/env python3
+"""Lane I R2 — emit the sorted unique list of workspace lib crates.
+
+Reads `cargo metadata --no-deps --format-version=1` from stdin and prints
+one crate name per line, sorted. A crate is included when at least one of
+its targets has kind `lib`, `rlib`, or `proc-macro`. Pure binary crates
+(only `bin` targets) are excluded because cargo-public-api silently
+ignores them.
+
+This is a thin helper for the `cargo-public-api-diff` CI job so it does
+not have to embed multi-line Python inside a YAML `run: |` block (an
+inline heredoc would terminate the block under literal-block indent
+rules — see Codex Sub-phase A round 1 / round 2 findings).
+"""
+from __future__ import annotations
+
+import json
+import sys
+
+
+def main() -> int:
+    try:
+        meta = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        print(f"::error::workspace-lib-crates: invalid cargo metadata JSON: {exc}", file=sys.stderr)
+        return 1
+
+    out: set[str] = set()
+    for pkg in meta.get("packages", []):
+        for tgt in pkg.get("targets", []):
+            kinds = tgt.get("kind", [])
+            if any(k in ("lib", "rlib", "proc-macro") for k in kinds):
+                out.add(pkg["name"])
+                break
+
+    for name in sorted(out):
+        print(name)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+ succeeded in 0ms:
+# Specialty: Staff Code Reviewer
+
+```json
+{
+  "schema_version": 1,
+  "slug": "staff-code-reviewer",
+  "canonical_role": "reviewer",
+  "allowed_runtime_roles": ["reviewer"],
+  "required_output_sections": ["Findings", "Block Reason", "Residual Risk", "Missing Context", "Verdict"],
+  "matrix_fields_allowed": ["task_class", "schema_profile", "change_surface", "in_scope", "out_of_scope", "required_checks", "evidence_destination", "completion_boundary", "worker_outcome", "review_request_target", "reviewer_verdict", "task_id", "slice_id", "prior_slice_id"],
+  "thin_skill_projection": {
+    "enabled": true,
+    "description_seed": "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+  },
+  "summary_oneline": "Find merge-blocking bugs, release risks, regressions, and missing tests with evidence-first review.",
+  "deprecated_aliases_forbidden": true
+}
+```
+
+## Purpose
+
+This specialty reviews submitted code or diffs for problems that should block PR progress, require pre-release fixes, or require explicit risk acceptance. It prioritizes correctness, security, performance, operational behavior, and meaningful test coverage over style preference. It is a Reviewer narrowing and cannot edit code.
+
+## Canonical Role Authority
+
+This specialty is a narrowing of the `reviewer` canonical role per `docs/roles/reviewer.md`. It does NOT redefine role boundaries or replace canonical authority.
+
+## Allowed Actions
+
+- Read code, diffs, tests, logs, requirements, existing patterns, and handoff evidence.
+- Report bugs, edge cases, regressions, security issues, performance risks, design risks, and missing tests.
+- Suggest concrete fixes and verification steps.
+- Order findings by severity with file, line, symbol, command, or artifact evidence.
+- Issue a matrix-valid verdict only when required evidence and gates are present.
+
+## Forbidden
+
+- Do not edit code.
+- Do not lead with style preferences.
+- Do not issue LGTM unless the Revharness reviewer contract is satisfied.
+- Do not convert review-comment count into `remaining issues: N`.
+- Do not downgrade fail-closed conditions into soft suggestions.
+
+## Required Output Sections
+
+The handoff envelope emitted by this specialty MUST contain these `##` headings in order:
+
+1. Findings
+2. Block Reason
+3. Residual Risk
+4. Missing Context
+5. Verdict
+
+(These names match `required_output_sections` in the manifest above.)
+
+## Findings
+
+Lead with concrete defects, ordered by severity, and include file, line, symbol, command, or artifact evidence. A finding must explain the user-visible, operational, security, or maintainability risk clearly enough for the author to fix it.
+
+## Block Reason
+
+If the verdict blocks progress, name the exact gate, invariant, missing evidence, or regression that blocks it. If nothing blocks progress, state that no blocking reason was found within the reviewed scope.
+
+## Residual Risk
+
+Record risks that remain after the reviewed diff and checks, including out-of-scope areas and assumptions that could invalidate the verdict. Do not convert risk notes into an exact remaining-issues count unless the matrix conditions for exact counts are satisfied.
+
+## Missing Context
+
+List any missing diff, test output, artifact, requirement, or lineage evidence that limits review confidence. If missing context is severe enough to make the request invalid, reflect that in the verdict instead of treating it as a soft note.
+
+## Verdict
+
+Return a matrix-valid reviewer verdict and next-status implication for the request target. `LGTM` is allowed only when the required contract, deterministic checks, and artifact traceability are current for the reviewed scope.
+
+## Common Handoff Block
+
+This specialty uses the canonical handoff envelope per `docs/manual/matrix-vocabulary.json`. Field `handoff_state` (NOT `status`) is the lifecycle field per `_policy.domain_local.handoff_state`.
+
+```yaml
+handoff:
+  role: "reviewer"
+  task_class: "..."
+  schema_profile: "..."
+  handoff_state: "ready_for_next | needs_fix | needs_more_context | blocked"
+  ...
+  specialty_id: "staff-code-reviewer"
+  canonical_role: "reviewer"
+  manifest_hash: "<sha256 from agent-core specialty lint output>"
+```
+
+(See `docs/prompts/_archive/role-operating-templates-v0.md` for the historical full common-handoff-block example.)
+
+exec
+/bin/bash -lc "sed -n '1,340p' scripts/cli-public-api-snapshot.test.sh" in $REPO_ROOT
+ succeeded in 0ms:
+#!/usr/bin/env bash
+# Lane I R2 — fixture tests for the MCP schema breaking-change detector.
+#
+# We do not exercise `cli-public-api-snapshot.sh` end-to-end (that requires
+# a built rev-stealth + tools.rs). Instead we feed
+# `scripts/mcp-schema-breaking.sh` synthetic BASE and LIVE snapshot blobs
+# constructed inline (schema_version = 3) and assert the script's exit
+# code + stderr signal across three fixture scenarios:
+#
+#   1. additive   — new tool added, all existing tools unchanged → rc=0
+#   2. breaking   — required-arg tightened OR enum narrowed → rc=2
+#   3. drift      — script execution failure (malformed JSON) → rc != 0,2
+#
+# Implementation detail: the production script reads the base snapshot from
+# `git show $BASE_REF:.agent/v1.3/cli-public-api.snapshot.json`. We stand
+# up a throwaway git repo under $TMPDIR, commit each base fixture as a
+# single isolated repo state, then point the script at it via BASE_REF +
+# CWD swap. This keeps the test hermetic from the host repo's actual
+# snapshot history.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT="$REPO_ROOT/scripts/mcp-schema-breaking.sh"
+
+if [[ ! -x "$SCRIPT" ]]; then
+  echo "[fixture-test] cannot find $SCRIPT" >&2
+  exit 1
+fi
+
+fail() {
+  echo "::error::[fixture-test] $*" >&2
+  exit 1
+}
+
+pass_count=0
+fail_count=0
+
+# write_fixture <case-dir> <base-json> <live-json>
+#   sets up a git repo with BASE committed on `main` and LIVE in the
+#   working tree, then echoes the dir.
+write_fixture() {
+  local case_dir="$1"
+  local base_json="$2"
+  local live_json="$3"
+  mkdir -p "$case_dir/.agent/v1.3"
+  mkdir -p "$case_dir/scripts"
+  mkdir -p "$case_dir/crates/stealth-mcp/src"
+  # Minimal `tools.rs` — the script reads it via SNAPSHOT_PATH path-only;
+  # the file itself is only consulted by cli-public-api-snapshot.sh, not by
+  # mcp-schema-breaking.sh. Touch it for completeness.
+  : > "$case_dir/crates/stealth-mcp/src/tools.rs"
+
+  # 1. Commit BASE.
+  (
+    cd "$case_dir"
+    git init -q -b main
+    git config user.email fixture@example.invalid
+    git config user.name fixture
+    printf '%s\n' "$base_json" > .agent/v1.3/cli-public-api.snapshot.json
+    git add .
+    git commit -qm base
+  )
+  # 2. Overwrite with LIVE in working tree (uncommitted).
+  printf '%s\n' "$live_json" > "$case_dir/.agent/v1.3/cli-public-api.snapshot.json"
+}
+
+# run_case <case-dir> <expected-rc-equal-or-not> <description>
+#   expected-rc is the literal numeric rc we expect.
+run_case() {
+  local case_dir="$1"
+  local expected_rc="$2"
+  local desc="$3"
+  local got_rc=0
+  (
+    cd "$case_dir"
+    # Set BASE_REF to local main so the script's `git show main:...` resolves.
+    MCP_SCHEMA_BREAKING_REPO_ROOT="$(pwd)" BASE_REF=main bash "$SCRIPT" --check
+  ) >"$case_dir/out" 2>"$case_dir/err" || got_rc=$?
+  if [[ "$got_rc" == "$expected_rc" ]]; then
+    pass_count=$((pass_count + 1))
+    echo "[fixture-test] PASS: $desc (rc=$got_rc)"
+  else
+    fail_count=$((fail_count + 1))
+    echo "::error::[fixture-test] FAIL: $desc — expected rc=$expected_rc got rc=$got_rc" >&2
+    echo "--- stdout ---" >&2; cat "$case_dir/out" >&2
+    echo "--- stderr ---" >&2; cat "$case_dir/err" >&2
+  fi
+}
+
+# ----- Shared base snapshot (16 mock tools, schema_version=3) -----
+make_base_json() {
+  python3 - <<'PY'
+import json
+base = {
+    "$schema_version": 3,
+    "binary_name": "rev-stealth",
+    "version_string": "rev-stealth fixture",
+    "env_vars": [],
+    "exit_codes": {},
+    "global": {"usage": "", "flags": [], "subcommands": []},
+    "commands": {},
+    "mcp_tools": {
+        "count": 2,
+        "names": ["spider", "recipe_show"],
+        "schemas": {
+            "spider": {
+                "required": ["url"],
+                "input_enums": {"mobile_preset": ["iphone", "pixel"]},
+                "output": {
+                    "properties": ["ok", "operation", "result"],
+                    "required": ["ok"],
+                    "enums": {
+                        "operation": ["spider", "spider_fast"]
+                    },
+                },
+            },
+            "recipe_show": {
+                "required": ["domain"],
+                "input_enums": {},
+                "output": {
+                    "properties": ["domain", "status", "endpoints"],
+                    "required": ["domain", "status"],
+                    "enums": {"status": ["Active", "Pending", "Retired"]},
+                },
+            },
+        },
+    },
+    "error_kinds": {"count": 0, "variants": []},
+    "deprecated_attrs": [],
+    "_notes": [],
+}
+print(json.dumps(base, indent=2, sort_keys=True))
+PY
+}
+
+BASE_DIR_BASE="$(mktemp -d -t mcp-fixture-base.XXXXXX)"
+# Trap MUST preserve the script's intended exit status. Under `set -e` a
+# failing cleanup (e.g. `rm -rf` racing with another tool, or a leftover
+# .git/objects pack with bad permissions) would otherwise overwrite the
+# pass/fail status with the trap's own rc. We capture $? first, disable
+# `-e` for the duration of the cleanup, then re-exit with the captured
+# status. (Codex round-2 Sub-phase B+C finding.)
+cleanup() {
+  local status=$?
+  set +e
+  rm -rf "$BASE_DIR_BASE"
+  exit "$status"
+}
+trap cleanup EXIT
+
+BASE_JSON="$(make_base_json)"
+
+# ============================================================
+# Case 1: additive — new tool `new_tool` appears, nothing else
+# changes. Expected rc=0.
+# ============================================================
+case1_live="$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d["mcp_tools"]["count"] = 3
+d["mcp_tools"]["names"] = sorted(d["mcp_tools"]["names"] + ["new_tool"])
+d["mcp_tools"]["schemas"]["new_tool"] = {
+    "required": [], "input_enums": {},
+    "output": {"properties": [], "required": [], "enums": {}},
+}
+print(json.dumps(d, indent=2, sort_keys=True))
+')"
+CASE1="$BASE_DIR_BASE/case1-additive"
+write_fixture "$CASE1" "$BASE_JSON" "$case1_live"
+run_case "$CASE1" 0 "additive: new MCP tool added"
+
+# ============================================================
+# Case 2: breaking — recipe_show.status enum loses "Pending"
+# (a previously-emitted value vanishes from output). Expected rc=2.
+# ============================================================
+case2_live="$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d["mcp_tools"]["schemas"]["recipe_show"]["output"]["enums"]["status"] = ["Active", "Retired"]
+print(json.dumps(d, indent=2, sort_keys=True))
+')"
+CASE2="$BASE_DIR_BASE/case2-breaking-enum"
+write_fixture "$CASE2" "$BASE_JSON" "$case2_live"
+run_case "$CASE2" 2 "breaking: output enum narrowing (Pending removed)"
+
+# ============================================================
+# Case 2b: breaking — required-arg tightening (spider gains a new
+# required arg `timeout_ms`). Expected rc=2.
+# ============================================================
+case2b_live="$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d["mcp_tools"]["schemas"]["spider"]["required"] = sorted(d["mcp_tools"]["schemas"]["spider"]["required"] + ["timeout_ms"])
+print(json.dumps(d, indent=2, sort_keys=True))
+')"
+CASE2B="$BASE_DIR_BASE/case2b-breaking-required"
+write_fixture "$CASE2B" "$BASE_JSON" "$case2b_live"
+run_case "$CASE2B" 2 "breaking: required-arg tightening (timeout_ms added)"
+
+# ============================================================
+# Case 2c: breaking — output property removal (recipe_show.endpoints
+# disappears from response). Expected rc=2.
+# ============================================================
+case2c_live="$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+props = d["mcp_tools"]["schemas"]["recipe_show"]["output"]["properties"]
+d["mcp_tools"]["schemas"]["recipe_show"]["output"]["properties"] = [p for p in props if p != "endpoints"]
+print(json.dumps(d, indent=2, sort_keys=True))
+')"
+CASE2C="$BASE_DIR_BASE/case2c-breaking-output-prop"
+write_fixture "$CASE2C" "$BASE_JSON" "$case2c_live"
+run_case "$CASE2C" 2 "breaking: output property removed (recipe_show.endpoints)"
+
+# ============================================================
+# Case 2d: breaking — input enum narrowing. spider.mobile_preset
+# drops the `pixel` value, so old callers that pass it will fail.
+# Expected rc=2.
+# ============================================================
+case2d_live="$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d["mcp_tools"]["schemas"]["spider"]["input_enums"] = {"mobile_preset": ["iphone"]}
+print(json.dumps(d, indent=2, sort_keys=True))
+')"
+CASE2D="$BASE_DIR_BASE/case2d-breaking-input-enum"
+write_fixture "$CASE2D" "$BASE_JSON" "$case2d_live"
+run_case "$CASE2D" 2 "breaking: input enum narrowing (spider.mobile_preset drops pixel)"
+
+# ============================================================
+# Case 2e: breaking — tool removal. recipe_show vanishes from
+# the names list AND the schemas map. Expected rc=2.
+# ============================================================
+case2e_live="$(printf '%s' "$BASE_JSON" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+names = [n for n in d["mcp_tools"]["names"] if n != "recipe_show"]
+d["mcp_tools"]["count"] = len(names)
+d["mcp_tools"]["names"] = names
+d["mcp_tools"]["schemas"].pop("recipe_show", None)
+print(json.dumps(d, indent=2, sort_keys=True))
+')"
+CASE2E="$BASE_DIR_BASE/case2e-breaking-tool-removal"
+write_fixture "$CASE2E" "$BASE_JSON" "$case2e_live"
+run_case "$CASE2E" 2 "breaking: tool removal (recipe_show)"
+
+# ============================================================
+# Case 2f: stale-snapshot bypass attempt. The contributor mutated
+# real source (which would show in the regenerator's output) but
+# committed an unchanged snapshot AND did not regenerate. The
+# mcp-schema-breaking detector compares stale base vs stale live
+# — both identical — so it reports "no change". The fixture
+# verifies this by feeding identical snapshots; the GATE that
+# catches this scenario is `cli-public-api-snapshot --check` (the
+# regenerator + drift check in the workflow), NOT this detector.
+# This case documents the intended division of labor — the
+# detector is INTENTIONALLY blind to stale-snapshot bypass; the
+# snapshot regeneration step is the gate that catches it. We
+# assert here only that the detector reports rc=0 on identical
+# blobs (no false positive). The actual stale-snapshot defense
+# lives in the workflow step `regenerate + check snapshot (HARD)`,
+# which fails closed on any drift without a waiver.
+# ============================================================
+CASE2F="$BASE_DIR_BASE/case2f-stale-snapshot-identical"
+write_fixture "$CASE2F" "$BASE_JSON" "$BASE_JSON"
+run_case "$CASE2F" 0 "stale-snapshot baseline: identical base==live ⇒ rc=0 (detector by design; bypass is caught by the snapshot drift gate, not here)"
+
+# ============================================================
+# Case 3: drift — malformed JSON in the LIVE snapshot. The script
+# must NOT report rc=0 OR rc=2 (silently passing OR pretending it's
+# a real breaking diff). We assert rc is neither 0 nor 2; the
+# specific value depends on the failing stage.
+# ============================================================
+malformed='{ this is not valid json'
+CASE3="$BASE_DIR_BASE/case3-drift-malformed"
+write_fixture "$CASE3" "$BASE_JSON" "$malformed"
+got3=0
+(
+  cd "$CASE3"
+  MCP_SCHEMA_BREAKING_REPO_ROOT="$(pwd)" BASE_REF=main bash "$SCRIPT" --check
+) >"$CASE3/out" 2>"$CASE3/err" || got3=$?
+if [[ "$got3" -eq 0 || "$got3" -eq 2 ]]; then
+  fail_count=$((fail_count + 1))
+  echo "::error::[fixture-test] FAIL: drift case must NOT exit 0 or 2 (got $got3 — script silently accepted malformed JSON)" >&2
+  cat "$CASE3/err" >&2
+else
+  pass_count=$((pass_count + 1))
+  echo "[fixture-test] PASS: drift (malformed JSON → rc=$got3, neither 0 nor 2)"
+fi
+
+echo ""
+echo "[fixture-test] results: $pass_count passed, $fail_count failed"
+# Explicit exit codes so the script status is deterministic. (Without this
+# `exit 0`, `set -euo pipefail` causes the falsey `[[ ... ]]` test to
+# propagate as exit 1 — Codex round-2 finding.)
+if [[ "$fail_count" -gt 0 ]]; then
+  exit 1
+fi
+exit 0
+
+codex
+CIの設計としては、snapshot driftは完全にHARD化され、cargo-public-apiはworkspace lib自動列挙に変わっています。念のため、fixture test、helperの実列挙、YAML構文をローカルで確認して、採点根拠を実行結果にも寄せます。
+exec
+/bin/bash -lc 'bash scripts/cli-public-api-snapshot.test.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'python3 scripts/changelog-keepachangelog-lint.py' in $REPO_ROOT
+ exited 2 in 0ms:
+usage: changelog-keepachangelog-lint.py <path> [<path>...]
+
+exec
+/bin/bash -lc 'cargo metadata --no-deps --format-version=1 | python3 scripts/workspace-lib-crates.py' in $REPO_ROOT
+ succeeded in 0ms:
+captcha-bypass
+mobile-fp
+obscura-bridge
+rev-stealth
+stealth-agent-contracts
+stealth-auth
+stealth-cf
+stealth-core
+stealth-mcp
+stealth-parse
+stealth-sanitize
+stealth-sites
+vpn-rotate
+
+exec
+/bin/bash -lc "ruby -e 'require \"yaml\"; YAML.load_file(\".github/workflows/ci.yml\"); puts \"yaml ok\"'" in $REPO_ROOT
+ succeeded in 0ms:
+yaml ok
+
+ succeeded in 3318ms:
+[fixture-test] PASS: additive: new MCP tool added (rc=0)
+[fixture-test] PASS: breaking: output enum narrowing (Pending removed) (rc=2)
+[fixture-test] PASS: breaking: required-arg tightening (timeout_ms added) (rc=2)
+[fixture-test] PASS: breaking: output property removed (recipe_show.endpoints) (rc=2)
+[fixture-test] PASS: breaking: input enum narrowing (spider.mobile_preset drops pixel) (rc=2)
+[fixture-test] PASS: breaking: tool removal (recipe_show) (rc=2)
+[fixture-test] PASS: stale-snapshot baseline: identical base==live ⇒ rc=0 (detector by design; bypass is caught by the snapshot drift gate, not here) (rc=0)
+[fixture-test] PASS: drift (malformed JSON → rc=1, neither 0 nor 2)
+
+[fixture-test] results: 8 passed, 0 failed
+
+codex
+helperは13 crateを返し、YAMLは構文OKです。changelog lintは引数必須のスクリプトなので、CIと同じ呼び出しを確認してから再実行します。
+exec
+/bin/bash -lc "sed -n '780,828p' .github/workflows/ci.yml" in $REPO_ROOT
+ succeeded in 0ms:
+          fi
+      - name: regenerate completions
+        run: ./scripts/gen_completions.sh
+      - name: diff committed vs regenerated (modifications)
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- target/completions/; then
+            echo "::error::shell completion scripts drifted (modified content). Run \`./scripts/gen_completions.sh\` and commit the result." >&2
+            exit 1
+          fi
+      - name: diff committed vs regenerated (untracked / additions)
+        # Defensive sibling to the previous step: `git diff --exit-code` does
+        # not flag untracked files, so a regen producing a *new* file (e.g.
+        # add a future shell) would silently pass the diff above. `git status
+        # --porcelain` lists tracked-modified AND untracked entries; we fail
+        # if anything under target/completions/ is reported.
+        run: |
+          set -euo pipefail
+          drift="$(git status --porcelain -- target/completions/)"
+          if [[ -n "$drift" ]]; then
+            echo "::error::untracked / unexpected completion files detected:" >&2
+            echo "$drift" >&2
+            echo "::error::commit them via ./scripts/gen_completions.sh + git add." >&2
+            exit 1
+          fi
+
+  # I.8 (R2): fixture tests for scripts/mcp-schema-breaking.sh. Asserts the
+  # 3-valued exit-code contract (0/2/other) and the four breaking-change
+  # detectors (tool removal, required-arg tightening, input enum narrowing,
+  # output property removal / output enum narrowing) against synthetic
+  # schema_version=3 snapshot blobs. Catches regressions in the detector
+  # itself before they let a real breaking PR through.
+  mcp-schema-breaking-fixture-tests:
+    name: MCP schema breaking detector — fixture tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: run fixture tests
+        run: bash scripts/cli-public-api-snapshot.test.sh
+
+  # I.7 (R2): keep-a-changelog 1.1 structural lint for
+  # CHANGELOG.rev_scraping.md. Mirrors the release-please-config.json
+  # `changelog-path` setting and gates the `## [Unreleased]` cursor that
+  # release-please relies on to compute the next bump. A malformed file
+  # would fail release-please at release time instead of at PR time, so
+  # we shift the check left.
+  changelog-lint:
+    name: CHANGELOG keep-a-changelog lint
+
+exec
+/bin/bash -lc 'rg -n "changelog-keepachangelog-lint|changelog-lint|CHANGELOG" .github/workflows/ci.yml scripts/changelog-keepachangelog-lint.py' in $REPO_ROOT
+ succeeded in 0ms:
+.github/workflows/ci.yml:822:  # CHANGELOG.rev_scraping.md. Mirrors the release-please-config.json
+.github/workflows/ci.yml:827:  changelog-lint:
+.github/workflows/ci.yml:828:    name: CHANGELOG keep-a-changelog lint
+.github/workflows/ci.yml:834:        run: python3 scripts/changelog-keepachangelog-lint.py CHANGELOG.rev_scraping.md
+scripts/changelog-keepachangelog-lint.py:2:"""Lane I R2 — keep-a-changelog 1.1 structural lint for CHANGELOG.rev_scraping.md.
+scripts/changelog-keepachangelog-lint.py:47:    # that config so a release-please-authored CHANGELOG section does not
+scripts/changelog-keepachangelog-lint.py:142:        print("usage: changelog-keepachangelog-lint.py <path> [<path>...]", file=sys.stderr)
+scripts/changelog-keepachangelog-lint.py:152:            f"docs/compat.md and CHANGELOG.rev_scraping.md preamble.",
+
+exec
+/bin/bash -lc "sed -n '828,846p' .github/workflows/ci.yml" in $REPO_ROOT
+ succeeded in 0ms:
+    name: CHANGELOG keep-a-changelog lint
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: changelog structural lint
+        run: python3 scripts/changelog-keepachangelog-lint.py CHANGELOG.rev_scraping.md
+
+exec
+/bin/bash -lc 'python3 scripts/changelog-keepachangelog-lint.py CHANGELOG.rev_scraping.md' in $REPO_ROOT
+ succeeded in 0ms:
+changelog lint OK
+
+exec
+/bin/bash -lc 'cargo metadata --no-deps --format-version=1 >/tmp/rev_scraping_metadata_check.json && python3 scripts/workspace-lib-crates.py </tmp/rev_scraping_metadata_check.json | wc -l' in $REPO_ROOT
+ succeeded in 0ms:
+      13
+
+exec
+/bin/bash -lc "sed -n '1,260p' scripts/cli-public-api-snapshot.sh" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,260p' scripts/mcp-schema-breaking.sh" in $REPO_ROOT
+ succeeded in 0ms:
+#!/usr/bin/env bash
+# Lane I.1 — capture the rev-stealth CLI public surface as deterministic JSON.
+#
+# Output: .agent/v1.3/cli-public-api.snapshot.json
+#
+# Modes:
+#   ./scripts/cli-public-api-snapshot.sh           # regenerate snapshot
+#   ./scripts/cli-public-api-snapshot.sh --check   # exit 1 if drift detected
+#
+# Public-surface coverage (per v1.3 ExecPlan Lane I.1 + R2 expansion):
+#   - every subcommand + nested subcommand (depth 1 & 2)
+#   - every flag (long + short), default value, value-set when enum,
+#     env-var binding (captured across wrapped help lines)
+#   - every documented env var (REV_STEALTH_OBSCURA, REV_SCRAPING_*, etc.)
+#   - every documented exit code from --help bodies (0/1/3/7/10)
+#   - MCP tool surface (16 tools: names + required input-schema fields +
+#     R2: input-schema enum constraints + output-schema top-level property
+#     names + output-schema enum constraints sourced from
+#     docs/json-schemas/<tool>.output.json)
+#   - R2: full 26-variant ErrorKind closed-set (wire_name strings) extracted
+#     from crates/stealth-agent-contracts/src/error.rs
+#   - R2: every `#[deprecated]` attribute's `replace_with=…` (or "Use …" /
+#     "Prefer …" / "replaced by …") replacement hint, indexed by source
+#     path:line so silent removal of the replacement string is caught.
+#   - rev-stealth --version string
+#
+# Schema version: R2 bumps `$schema_version` from 2 → 3 (additive — fields
+# only appended). Snapshot consumers must re-parse on bump.
+#
+# Schema-stable JSON: keys sorted alphabetically at every level. Drift = any
+# byte-level diff against the committed snapshot.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+SNAPSHOT_PATH=".agent/v1.3/cli-public-api.snapshot.json"
+BIN="${REV_STEALTH_BIN:-./target/debug/rev-stealth}"
+
+if [[ ! -x "$BIN" ]]; then
+  echo "[snapshot] building stealth-cli (debug)..." >&2
+  cargo build -p rev-stealth >&2
+fi
+
+# All top-level subcommands declared in the workspace today. We use `__` as the
+# helpfile separator (never appears in clap subcommand names) so multi-hyphen
+# commands like `cf-evaluate` survive round-tripping.
+TOP_CMDS=(captcha browser vpn doctor spider relocate cf-evaluate auth measure config hermes)
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+"$BIN" --help > "$tmpdir/help__ROOT.txt" 2>&1 || true
+
+for cmd in "${TOP_CMDS[@]}"; do
+  "$BIN" "$cmd" --help > "$tmpdir/help__${cmd}.txt" 2>&1 || true
+  awk '/^Commands:/{f=1;next} /^Options:/{f=0} f' "$tmpdir/help__${cmd}.txt" \
+    | awk '{print $1}' \
+    | { grep -Ev '^(help)?$' || true; } \
+    | while read -r sub; do
+        [[ -n "$sub" ]] || continue
+        "$BIN" "$cmd" "$sub" --help \
+          > "$tmpdir/help__${cmd}__${sub}.txt" 2>&1 || true
+      done
+done
+
+VERSION_LINE="$("$BIN" --version 2>&1 | tr -d '\n')"
+
+python3 - "$tmpdir" "$SNAPSHOT_PATH" "$VERSION_LINE" <<'PY'
+import json, os, re, sys, subprocess
+from pathlib import Path
+
+tmpdir, snapshot_path, version_line = sys.argv[1], sys.argv[2], sys.argv[3]
+tmp = Path(tmpdir)
+
+ENV_VARS = sorted([
+    "REV_STEALTH_OBSCURA",
+    "REV_SCRAPING_HOME",
+    "REV_SCRAPING_POLICY",
+    "REV_SCRAPING_AUTHORIZED",
+    "REV_SCRAPING_AUTH_DIR",
+    "REV_SCRAPING_AUTH_PASSPHRASE",
+    "REV_SCRAPING_PROFILES_ROOT",
+    "REV_SCRAPING_AUP_ACK",
+    "REV_SCRAPING_CONFIG_LENIENT",
+    "REV_SCRAPING_VPN_INSTANCES",
+    "REV_SCRAPING_REQUIRE_VPN",
+])
+
+EXIT_CODES = {
+    "0":  "success",
+    "1":  "generic CLI / validation error",
+    "3":  "permanent runtime failure (browser launch, VPS deploy readiness)",
+    "7":  "doctor fail-closed (leak detected)",
+    "10": "relocate Ambiguous result under --strict",
+}
+
+FLAG_RE = re.compile(r"--[a-zA-Z0-9][a-zA-Z0-9_-]*")
+SHORT_RE = re.compile(r"(?<![-\w])-[a-zA-Z](?![-\w])")
+ENV_RE = re.compile(r"\[env:\s*([A-Z0-9_]+)=")
+DEFAULT_RE = re.compile(r"\[default:\s*([^\]]*)\]")
+POSSIBLE_RE = re.compile(r"\[possible values:\s*([^\]]+)\]")
+
+def parse_help(text):
+    """Extract usage, flags (with multi-line continuation), nested cmds."""
+    usage = ""
+    nested = []
+    raw_lines = text.splitlines()
+
+    # Locate Options: / Commands: sections.
+    sections = {}
+    for idx, line in enumerate(raw_lines):
+        s = line.strip()
+        if s.startswith("Usage:"):
+            usage = s[len("Usage:"):].strip()
+        if s == "Options:":
+            sections["options"] = idx
+        elif s == "Commands:":
+            sections["commands"] = idx
+
+    # Nested subcommands: scan the Commands: block.
+    if "commands" in sections:
+        start = sections["commands"] + 1
+        for line in raw_lines[start:]:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("-") or stripped.endswith(":"):
+                if stripped == "Options:" or stripped.endswith(":"):
+                    break
+                continue
+            tok = stripped.split(None, 1)[0]
+            if tok and tok != "help" and not tok.startswith("-"):
+                nested.append(tok)
+
+    # Flags: iterate Options: block. A flag spans from the line starting with
+    # "--" (or "-X, --") until the next flag-introducing line OR a blank line
+    # followed by a non-indented section header. We collect every continuation
+    # line into the flag's "block" so [env:...], [default:...], and
+    # [possible values:...] tokens are captured even when wrapped.
+    flags_by_name = {}
+    if "options" in sections:
+        start = sections["options"] + 1
+        # Detect indentation of a flag line: clap uses "      --flag" (6 spaces)
+        # or "  -X, --flag". We treat any line whose stripped form begins with
+        # "-" as a flag-start line.
+        i = start
+        while i < len(raw_lines):
+            line = raw_lines[i]
+            stripped = line.strip()
+            if stripped == "Options:" or stripped == "Commands:":
+                i += 1
+                continue
+            if stripped and stripped.startswith("-"):
+                # Accumulate block until next flag-start or end.
+                block_lines = [line]
+                j = i + 1
+                while j < len(raw_lines):
+                    nxt = raw_lines[j]
+                    nxt_stripped = nxt.strip()
+                    if nxt_stripped.startswith("-") and (
+                        FLAG_RE.search(nxt) or SHORT_RE.search(nxt)
+                    ):
+                        # Heuristic: next line is a new flag if it has -short
+                        # or --long AND starts with a dash after the leading
+                        # whitespace (clap convention).
+                        # Guard against description text that begins with "-":
+                        # require ≤ 8 leading spaces (clap flag-line indent).
+                        leading = len(nxt) - len(nxt.lstrip(" "))
+                        if leading <= 8:
+                            break
+                    block_lines.append(nxt)
+                    j += 1
+                block = "\n".join(block_lines)
+                long_flags = sorted(set(FLAG_RE.findall(block_lines[0])))
+                # Short forms only from the first line (clap puts both forms
+                # on the head line, never wrapped).
+                short_forms = sorted(set(SHORT_RE.findall(block_lines[0])))
+                env_match = ENV_RE.search(block)
+                default_match = DEFAULT_RE.search(block)
+                possible_match = POSSIBLE_RE.search(block)
+                for f in long_flags:
+                    entry = {"flag": f}
+                    if short_forms:
+                        entry["short"] = short_forms[0]
+                    if env_match:
+                        entry["env"] = env_match.group(1)
+                    if default_match:
+                        entry["default"] = default_match.group(1).strip()
+                    if possible_match:
+                        entry["values"] = sorted(
+                            v.strip() for v in possible_match.group(1).split(",")
+                        )
+                    prev = flags_by_name.get(f)
+                    if not prev or len(entry) > len(prev):
+                        flags_by_name[f] = entry
+                i = j
+            else:
+                i += 1
+
+    return {
+        "usage": usage,
+        "flags": sorted(flags_by_name.values(), key=lambda x: x["flag"]),
+        "subcommands": sorted(set(nested)),
+    }
+
+root_help = parse_help((tmp / "help__ROOT.txt").read_text())
+
+commands = {}
+for help_file in sorted(tmp.glob("help__*.txt")):
+    stem = help_file.stem.removeprefix("help__")
+    if stem == "ROOT":
+        continue
+    if "__" in stem:
+        cmd, sub = stem.split("__", 1)
+    else:
+        cmd, sub = stem, None
+    commands.setdefault(cmd, {"help": {}, "subcommands": {}})
+    parsed = parse_help(help_file.read_text())
+    if sub is None:
+        commands[cmd]["help"] = parsed
+    else:
+        commands[cmd]["subcommands"][sub] = parsed
+
+# MCP tool surface — parse tools.rs for `name: "<tool>"` AND each
+# tool's required-arg names. We extract the schema's "required" array as a
+# best-effort proxy for the public input contract.
+tools_src = Path("crates/stealth-mcp/src/tools.rs").read_text()
+tool_names = sorted(set(re.findall(r'name:\s*"([a-z_][a-z0-9_]*)"', tools_src)))
+
+# Extract required arrays by scanning ToolDefinition blocks. We look for the
+# nearest "required": [...] literal after each name and parse strings out.
+def extract_required(src, name):
+    """Extract the top-level `"required": [...]` array of the tool's
+    input_schema, bounded to *this* tool's block.
+
+    Strategy: locate `name: "<name>"`, then bound the window from the next
+    `input_schema: json!({` to the matching `})`. Inside that window, only the
+    *first* `"required": [...]` after `"properties":` decreases nesting depth
+    counts as the top-level required (nested object schemas may also use
+    `"required"`, e.g. `recipe_propose_endpoint.properties.endpoint.required`).
+    We approximate top-level by counting braces from the input_schema head
+    and returning the required array whose surrounding brace-depth is 1.
+    """
+    m = re.search(r'name:\s*"' + re.escape(name) + r'"', src)
+    if not m:
+        return []
+    tail = src[m.end():]
+    # Find this tool's input_schema literal.
+    js = re.search(r'input_schema:\s*json!\(\{', tail)
+    if not js:
+        return []
+    start = js.end() - 1  # at the leading `{`
+    depth = 0
+    end = None
+    for i in range(start, min(len(tail), start + 20000)):
+        c = tail[i]
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+
+ succeeded in 0ms:
+#!/usr/bin/env bash
+# Lane I.5 — MCP tool-schema breaking-change detector.
+#
+# Drift model: a tool is "in the surface" if it appears in the BASE branch's
+# committed snapshot (e.g. main). A removal/rename only becomes invisible if
+# the contributor regenerates the snapshot in their PR — so a meaningful
+# detector MUST compare the live (PR head) tool list against the BASE
+# branch's `.agent/v1.3/cli-public-api.snapshot.json`, not against the
+# PR's own (potentially regenerated) copy.
+#
+# Behavior (R2 contract — 3-valued exit code):
+#   - removed-or-renamed tool / tightened required-args ⇒ exit 2 ⇒
+#     INTENTIONAL breaking diff ⇒ PR must carry `mcp-schema-breaking`.
+#   - added tool ⇒ exit 0 ⇒ PR carries `api-additive`.
+#   - unchanged ⇒ exit 0.
+#   - any other nonzero ⇒ script execution failure (bash/python/jq/etc.);
+#     the CI wrapper MUST NOT honor a label waiver in that case.
+#
+# Modes:
+#   ./scripts/mcp-schema-breaking.sh           # human-readable
+#   ./scripts/mcp-schema-breaking.sh --check   # exit-coded for CI
+#
+# CI usage: the workflow fetches the PR base ref, then invokes this script
+# with `BASE_REF=origin/<base>` in the environment. Local invocation defaults
+# to comparing against `origin/main` (or `main` when origin is absent).
+
+set -euo pipefail
+
+# Repo-root resolution. Default: this script's parent directory (the
+# rev_scraping checkout that ships it). Override via
+# MCP_SCHEMA_BREAKING_REPO_ROOT for fixture / dry-run scenarios where the
+# caller wants to point the detector at a synthetic snapshot tree (see
+# scripts/cli-public-api-snapshot.test.sh).
+REPO_ROOT="${MCP_SCHEMA_BREAKING_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+cd "$REPO_ROOT"
+
+SNAPSHOT_PATH=".agent/v1.3/cli-public-api.snapshot.json"
+BASE_REF="${BASE_REF:-origin/main}"
+
+# Resolve the base-branch snapshot. If the base ref is unavailable (fresh
+# fork checkout, first commit on a branch), fall back to local HEAD~1; this
+# still catches "remove a tool in a single PR" within a feature branch's
+# own history. If even that fails, exit 0 with an info note.
+resolve_base_snapshot() {
+  local ref="$1"
+  if git show "$ref:$SNAPSHOT_PATH" >/dev/null 2>&1; then
+    git show "$ref:$SNAPSHOT_PATH"
+    return 0
+  fi
+  return 1
+}
+
+base_blob=""
+if resolved=$(resolve_base_snapshot "$BASE_REF" 2>/dev/null); then
+  base_blob="$resolved"
+elif resolved=$(resolve_base_snapshot "HEAD~1" 2>/dev/null); then
+  base_blob="$resolved"
+  echo "[mcp-schema-breaking] note: base ref $BASE_REF unreachable; using HEAD~1" >&2
+else
+  echo "[mcp-schema-breaking] note: no base snapshot reachable; skipping diff (first PR introducing the snapshot, or shallow checkout)." >&2
+  if [[ "${1:-}" == "--check" ]]; then
+    exit 0
+  fi
+  exit 0
+fi
+
+# Compare via the live (PR head) snapshot. R2 widens the diff to cover four
+# breaking-change kinds:
+#   1. tool removal/rename
+#   2. tightened required-args (was optional, now required)
+#   3. input-schema enum NARROWING (a previously-accepted value vanishes)
+#   4. output-schema property removal (a documented response field vanishes,
+#      so existing callers that read it will break) AND output enum narrowing
+# Plus the additive/relaxed signals for advisory output. Snapshot
+# `$schema_version` >= 3 carries the input_enums/output blocks; we fall back
+# to the v2-compatible name+required diff when the base snapshot predates v3.
+
+live_blob="$(cat "$SNAPSHOT_PATH")"
+
+diff_report="$(python3 - "$base_blob" "$live_blob" <<'PY'
+import json, sys
+
+base = json.loads(sys.argv[1])
+live = json.loads(sys.argv[2])
+
+base_tools = set(base["mcp_tools"]["names"])
+live_tools = set(live["mcp_tools"]["names"])
+added = sorted(live_tools - base_tools)
+removed = sorted(base_tools - live_tools)
+
+base_schemas = base.get("mcp_tools", {}).get("schemas", {})
+live_schemas = live.get("mcp_tools", {}).get("schemas", {})
+tightened = []          # list of [tool, newly-required-arg]
+relaxed = []            # list of [tool, removed-required-arg]
+input_enum_narrowed = [] # [tool, prop, removed_value]
+output_prop_removed = []  # [tool, removed_property]
+output_enum_narrowed = []  # [tool, path, removed_value]
+
+def _required(schemas, tool):
+    return set(schemas.get(tool, {}).get("required", []) or [])
+
+def _input_enums(schemas, tool):
+    return schemas.get(tool, {}).get("input_enums", {}) or {}
+
+def _output(schemas, tool):
+    return schemas.get(tool, {}).get("output", {}) or {}
+
+base_schema_version = base.get("$schema_version", 1)
+live_schema_version = live.get("$schema_version", 1)
+schema_v3 = base_schema_version >= 3 and live_schema_version >= 3
+
+for tool in sorted(live_tools & base_tools):
+    base_req = _required(base_schemas, tool)
+    live_req = _required(live_schemas, tool)
+    for arg in sorted(live_req - base_req):
+        tightened.append([tool, arg])
+    for arg in sorted(base_req - live_req):
+        relaxed.append([tool, arg])
+
+    if schema_v3:
+        # Input enum narrowing: a value present in BASE but absent in LIVE
+        # ⇒ a caller that previously sent that value will now be rejected.
+        b_in = _input_enums(base_schemas, tool)
+        l_in = _input_enums(live_schemas, tool)
+        for prop in sorted(set(b_in) & set(l_in)):
+            bvals = set(b_in[prop] or [])
+            lvals = set(l_in[prop] or [])
+            for v in sorted(bvals - lvals):
+                input_enum_narrowed.append([tool, prop, v])
+
+        # Output property removal: a documented response field disappears.
+        b_out = _output(base_schemas, tool)
+        l_out = _output(live_schemas, tool)
+        b_props = set(b_out.get("properties", []) or [])
+        l_props = set(l_out.get("properties", []) or [])
+        for prop in sorted(b_props - l_props):
+            output_prop_removed.append([tool, prop])
+
+        # Output enum narrowing: a value previously emitted may now be
+        # impossible, but callers built `if x in {…}` against the old set
+        # will silently miss the now-removed branch. We treat this as
+        # breaking conservatively.
+        b_oe = b_out.get("enums", {}) or {}
+        l_oe = l_out.get("enums", {}) or {}
+        for path in sorted(set(b_oe) & set(l_oe)):
+            bvals = set(b_oe[path] or [])
+            lvals = set(l_oe[path] or [])
+            for v in sorted(bvals - lvals):
+                output_enum_narrowed.append([tool, path, v])
+
+print(json.dumps({
+    "added": added,
+    "removed": removed,
+    "tightened": tightened,
+    "relaxed": relaxed,
+    "input_enum_narrowed": input_enum_narrowed,
+    "output_prop_removed": output_prop_removed,
+    "output_enum_narrowed": output_enum_narrowed,
+    "schema_v3": schema_v3,
+}))
+PY
+)"
+
+count_field() { echo "$diff_report" | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('$1', [])))"; }
+added_count="$(count_field added)"
+removed_count="$(count_field removed)"
+tightened_count="$(count_field tightened)"
+relaxed_count="$(count_field relaxed)"
+input_enum_narrowed_count="$(count_field input_enum_narrowed)"
+output_prop_removed_count="$(count_field output_prop_removed)"
+output_enum_narrowed_count="$(count_field output_enum_narrowed)"
+
+mode="${1:-}"
+# R2 exit-code contract (distinguishes breaking-diff from script failure):
+#   0 — surface unchanged (no diff)
+#   2 — INTENTIONAL BREAKING DIFF detected (label gate may waive with
+#       `mcp-schema-breaking`)
+#   anything else (1, 126, 127, etc.) — script execution failure (bash/python/
+#       set -e/jq/etc.); label gate MUST NOT waive these.
+# This separation matters because previously rc=1 collapsed both meanings,
+# which let a malformed snapshot pretend to be a "real" breaking change.
+exit_code=0
+
+if [[ "$removed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: removed/renamed tool(s):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for t in json.load(sys.stdin)['removed']:
+    print(f'    - {t}', file=sys.stderr)
+" >&2
+  exit_code=2
+fi
+
+if [[ "$tightened_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: tightened required-args" >&2
+  echo "    (an arg that was optional is now required — old callers will fail):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, arg in json.load(sys.stdin)['tightened']:
+    print(f'    - {tool}.{arg}', file=sys.stderr)
+" >&2
+  exit_code=2
+fi
+
+if [[ "$input_enum_narrowed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: input enum narrowed" >&2
+  echo "    (a value previously accepted is no longer accepted — old callers will fail):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, prop, val in json.load(sys.stdin).get('input_enum_narrowed', []):
+    print(f'    - {tool}.{prop}: removed \"{val}\" from accepted set', file=sys.stderr)
+" >&2
+  exit_code=2
+fi
+
+if [[ "$output_prop_removed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: output property removed" >&2
+  echo "    (a documented response field disappeared — readers will see missing key):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, prop in json.load(sys.stdin).get('output_prop_removed', []):
+    print(f'    - {tool}: response no longer carries \"{prop}\"', file=sys.stderr)
+" >&2
+  exit_code=2
+fi
+
+if [[ "$output_enum_narrowed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: output enum narrowed" >&2
+  echo "    (a value previously possible no longer appears — exhaustive-match callers will silently miss it):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, path, val in json.load(sys.stdin).get('output_enum_narrowed', []):
+    print(f'    - {tool}.{path}: removed \"{val}\"', file=sys.stderr)
+" >&2
+  exit_code=2
+fi
+
+if [[ "$exit_code" -ne 0 ]]; then
+  echo "" >&2
+  echo "Action: apply PR label \`mcp-schema-breaking\` and bump the MCP" >&2
+  echo "        schema version per docs/compat.md (2-major guarantee)." >&2
+fi
+
+if [[ "$added_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] additive vs $BASE_REF: new tool(s):"
+  echo "$diff_report" | python3 -c "
+import json, sys
+for t in json.load(sys.stdin)['added']:
+    print(f'    + {t}')
+"
+  echo "Action: apply PR label \`api-additive\`."
+fi
+
+if [[ "$relaxed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] relaxed (non-breaking) required-args:"
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, arg in json.load(sys.stdin)['relaxed']:
+    print(f'    - {tool}.{arg} (was required, now optional)')
+"
+
+exec
+/bin/bash -lc "sed -n '260,560p' scripts/mcp-schema-breaking.sh && sed -n '260,620p' scripts/cli-public-api-snapshot.sh" in $REPO_ROOT
+ succeeded in 0ms:
+"
+fi
+
+if [[ "$added_count" -eq 0 && "$removed_count" -eq 0 \
+      && "$tightened_count" -eq 0 && "$relaxed_count" -eq 0 \
+      && "$input_enum_narrowed_count" -eq 0 \
+      && "$output_prop_removed_count" -eq 0 \
+      && "$output_enum_narrowed_count" -eq 0 ]]; then
+  live_count="$(python3 -c "import json; print(len(json.load(open('$SNAPSHOT_PATH'))['mcp_tools']['names']))")"
+  schema_v3="$(echo "$diff_report" | python3 -c "import json,sys; print(json.load(sys.stdin).get('schema_v3', False))")"
+  if [[ "$schema_v3" == "True" ]]; then
+    echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args + input enums + output schemas)."
+  else
+    echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args; base snapshot pre-v3 — enum/output diff skipped)."
+  fi
+fi
+
+# R2 coverage note: enum narrowing + output-property removal + output enum
+# narrowing are now checked here whenever both snapshots are
+# $schema_version >= 3. The existing `mcp-schema-lint` job
+# (`gen_reference --check`) still serves as the rendered-doc backstop, but
+# this detector is now the primary source-of-truth gate.
+
+if [[ "$mode" == "--check" ]]; then
+  exit $exit_code
+fi
+exit 0
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is None:
+        return []
+    schema = tail[start:end + 1]
+    # Walk through schema char-by-char; record every `"required": [...]` whose
+    # surrounding depth is exactly 1 (i.e. immediate child of the root object).
+    depth = 0
+    i = 0
+    candidates = []
+    while i < len(schema):
+        c = schema[i]
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+        elif c == '"' and schema[i:i+11] == '"required":' and depth == 1:
+            # Found top-level required. Capture its array literal.
+            arr = re.match(r'"required"\s*:\s*\[([^\]]*)\]', schema[i:])
+            if arr:
+                candidates.append(arr.group(1))
+                i += arr.end()
+                continue
+        i += 1
+    if not candidates:
+        return []
+    return sorted(set(re.findall(r'"([a-zA-Z_][a-zA-Z0-9_]*)"', candidates[0])))
+
+# R2: extract per-tool input-schema enum constraints (property → values).
+# A narrowing of an enum's value-set (e.g. removing a `Pending` variant)
+# is a breaking change for callers, so we capture the full {property:
+# sorted([values])} map per tool. We parse the tool's input_schema block
+# the same way `extract_required` does.
+def extract_input_enums(src, name):
+    m = re.search(r'name:\s*"' + re.escape(name) + r'"', src)
+    if not m:
+        return {}
+    tail = src[m.end():]
+    js = re.search(r'input_schema:\s*json!\(\{', tail)
+    if not js:
+        return {}
+    start = js.end() - 1
+    depth = 0
+    end = None
+    for i in range(start, min(len(tail), start + 20000)):
+        c = tail[i]
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is None:
+        return {}
+    schema = tail[start:end + 1]
+    # Walk properties looking for `"<prop>": { ... "enum": [...] ... }` at any
+    # depth. Record property name + sorted values. We deliberately flatten
+    # nesting (recipe_propose_endpoint.endpoint.method becomes "endpoint.method"
+    # so a tightening anywhere is caught).
+    enums = {}
+    # Heuristic: scan `"enum": [ ... ]` literals and walk backwards from each
+    # match to find the enclosing "<prop>": { context. Property nesting depth
+    # is approximated by the brace-stack closest to the enum.
+    for m_enum in re.finditer(r'"enum"\s*:\s*\[([^\]]*)\]', schema):
+        values = sorted(set(re.findall(r'"([^"\\]*)"', m_enum.group(1))))
+        if not values:
+            continue
+        # Walk back from the enum match for the nearest preceding
+        # `"<prop>": {` at brace-depth 0 from the enum's standpoint.
+        prefix = schema[: m_enum.start()]
+        prop_match = list(re.finditer(r'"([a-zA-Z_][a-zA-Z0-9_]*)"\s*:\s*\{', prefix))
+        if not prop_match:
+            continue
+        prop_name = prop_match[-1].group(1)
+        enums[prop_name] = values
+    return enums
+
+
+# R2: extract per-tool output-schema field names + enum constraints from
+# docs/json-schemas/<tool>.output.json. The MCP layer references these via
+# include_str!, so the file IS the source of truth for the response shape.
+def extract_output_schema_summary(tool_name):
+    p = Path(f"docs/json-schemas/{tool_name}.output.json")
+    if not p.exists():
+        return {"properties": [], "enums": {}, "required": []}
+    try:
+        schema = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return {"properties": [], "enums": {}, "required": []}
+
+    props = schema.get("properties", {}) or {}
+    top_level_props = sorted(props.keys())
+    top_required = sorted(schema.get("required", []) or [])
+
+    # Walk the schema recursively, recording any `enum` arrays we find at any
+    # depth. Property path is dotted (e.g. "result.outcome", "result.diff.kind").
+    enums = {}
+    def walk(node, path):
+        if isinstance(node, dict):
+            if "enum" in node and isinstance(node["enum"], list):
+                values = sorted(str(v) for v in node["enum"])
+                enums[path or "<root>"] = values
+            for k, v in node.items():
+                if k == "properties" and isinstance(v, dict):
+                    for prop, sub in v.items():
+                        walk(sub, f"{path}.{prop}" if path else prop)
+                elif k in ("items", "additionalProperties") and isinstance(v, dict):
+                    walk(v, f"{path}.{k}")
+                elif k == "oneOf" or k == "anyOf" or k == "allOf":
+                    if isinstance(v, list):
+                        for i, sub in enumerate(v):
+                            walk(sub, f"{path}.{k}[{i}]")
+        # Skip non-dict nodes — only object schemas can carry enums/properties.
+    walk(schema, "")
+    return {
+        "properties": top_level_props,
+        "required": top_required,
+        "enums": {k: enums[k] for k in sorted(enums)},
+    }
+
+
+mcp_tool_schemas = {
+    name: {
+        "required": extract_required(tools_src, name),
+        "input_enums": extract_input_enums(tools_src, name),
+        "output": extract_output_schema_summary(name),
+    }
+    for name in tool_names
+}
+
+# R2: 26 ErrorKind variants. Parse the closed enum directly from
+# crates/stealth-agent-contracts/src/error.rs. The enum is serialized via
+# `#[serde(rename_all = "snake_case")]`, so we emit both the Rust variant
+# names AND their wire (snake_case) forms — a rename in either direction is
+# a breaking change.
+def to_snake_case(camel):
+    out = []
+    for i, c in enumerate(camel):
+        if c.isupper() and i > 0 and not camel[i - 1].isupper():
+            out.append("_")
+        out.append(c.lower())
+    return "".join(out)
+
+
+error_src = Path("crates/stealth-agent-contracts/src/error.rs").read_text()
+# Locate `pub enum ErrorKind {` … matching `}`.
+ek_match = re.search(r"pub enum ErrorKind\s*\{", error_src)
+error_kinds: list[dict] = []
+if ek_match:
+    depth = 0
+    start = ek_match.end() - 1
+    end = None
+    for i in range(start, len(error_src)):
+        c = error_src[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is not None:
+        body = error_src[start + 1:end]
+        # Strip doc comments + attributes; only collect variant identifiers.
+        for raw in body.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("//") or line.startswith("#["):
+                continue
+            tok = re.match(r"([A-Z][A-Za-z0-9]*)", line)
+            if tok:
+                variant = tok.group(1)
+                error_kinds.append({
+                    "variant": variant,
+                    "wire_name": to_snake_case(variant),
+                })
+# Sort by variant name so the snapshot remains deterministic across reorderings
+# of the enum body (the enum order is significant for human review but not
+# for the public-surface contract; we sort the snapshot copy for stability).
+error_kinds.sort(key=lambda d: d["variant"])
+
+# R2: collect every `#[deprecated(...)]` attribute's replacement hint.
+# Walk crates/*/src/ for .rs files (skipping tests/), regex each attribute,
+# and record path:line:since:note:replace_with so a silent regression
+# (someone removes the replacement string from the note) shows up as drift.
+def collect_deprecated_attrs():
+    found = []
+    skip_dirs = {"target", "vendor", "_refs", "node_modules", ".git", "tests"}
+    crates_root = Path("crates")
+    for crate_dir in sorted(crates_root.iterdir()):
+        src_dir = crate_dir / "src"
+        if not src_dir.is_dir():
+            continue
+        for path in sorted(src_dir.rglob("*.rs")):
+            if any(p in skip_dirs for p in path.parts):
+                continue
+            text = path.read_text()
+            for m in re.finditer(r"#\[deprecated\b", text):
+                # Find balanced parens — re-use the same approach as the
+                # Rust test in crates/stealth-cli/tests/deprecated_completeness.rs.
+                start = m.start()
+                line_no = text[:start].count("\n") + 1
+                # Skip bare `#[deprecated]` form for now (the Rust test rejects it).
+                paren = text.find("(", start)
+                if paren < 0 or paren - start > 16:
+                    continue
+                depth = 1
+                i = paren + 1
+                in_string = False
+                escape = False
+                while i < len(text) and depth > 0:
+                    c = text[i]
+                    if escape:
+                        escape = False
+                    elif in_string:
+                        if c == "\\":
+                            escape = True
+                        elif c == '"':
+                            in_string = False
+                    else:
+                        if c == '"':
+                            in_string = True
+                        elif c == "(":
+                            depth += 1
+                        elif c == ")":
+                            depth -= 1
+                    i += 1
+                block = text[paren + 1:i - 1]
+                since = re.search(r'since\s*=\s*"([^"]*)"', block)
+                note = re.search(r'note\s*=\s*"((?:[^"\\]|\\.)*)"', block)
+                replace_with = None
+                if note:
+                    note_value = note.group(1)
+                    # Recognized replacement-hint syntaxes (kept aligned
+                    # with deprecated_completeness.rs::HINTS).
+                    rw = re.search(r'replace_with\s*=\s*([^\s,;]+)', note_value)
+                    if rw:
+                        replace_with = rw.group(1).strip("`\"',.")
+                    else:
+                        use = re.search(r'(?:Use|use|Prefer|prefer|replaced by)\s+`?([A-Za-z0-9_:\.]+)', note_value)
+                        if use:
+                            replace_with = use.group(1)
+                rel = path.as_posix()
+                found.append({
+                    "path": rel,
+                    "line": line_no,
+                    "since": since.group(1) if since else None,
+                    "replace_with": replace_with,
+                })
+    found.sort(key=lambda d: (d["path"], d["line"]))
+    return found
+
+
+deprecated_attrs = collect_deprecated_attrs()
+
+snapshot = {
+    "$schema_version": 3,
+    "binary_name": "rev-stealth",
+    "version_string": version_line,
+    "env_vars": ENV_VARS,
+    "exit_codes": EXIT_CODES,
+    "global": root_help,
+    "commands": commands,
+    "mcp_tools": {
+        "count": len(tool_names),
+        "names": tool_names,
+        "schemas": mcp_tool_schemas,
+    },
+    "error_kinds": {
+        "count": len(error_kinds),
+        "variants": error_kinds,
+    },
+    "deprecated_attrs": deprecated_attrs,
+    "_notes": [
+        "Generated by scripts/cli-public-api-snapshot.sh. Do not edit by hand.",
+        "Drift means a public-surface change. Rebuild + commit alongside the change",
+        "and apply PR label api-additive / api-breaking / mcp-schema-breaking",
+        "per docs/compat.md.",
+        "Schema version 3 (R2): adds mcp_tools.schemas.*.input_enums,",
+        "mcp_tools.schemas.*.output, error_kinds, and deprecated_attrs.",
+    ],
+}
+
+out = Path(snapshot_path)
+out.parent.mkdir(parents=True, exist_ok=True)
+serialized = json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
+out.write_text(serialized)
+print(f"[snapshot] wrote {snapshot_path} ({len(serialized)} bytes)")
+print(f"[snapshot] commands={len(commands)} mcp_tools={len(tool_names)}")
+PY
+
+if [[ "${1:-}" == "--check" ]]; then
+  # Drift gate semantics:
+  #
+  #   - If the snapshot exists in HEAD, the regenerated file must match what
+  #     is committed/staged.
+  #   - If the snapshot is brand new on this branch (not in HEAD, but staged
+  #     for the first commit that introduces it), we accept it: the
+  #     contributor is the one introducing the snapshot.
+  #   - If the snapshot file isn't on disk at all after running the
+  #     regenerator, something is badly wrong — exit 1.
+  if [[ ! -f "$SNAPSHOT_PATH" ]]; then
+    echo "[snapshot] ERROR: $SNAPSHOT_PATH missing after regeneration." >&2
+    exit 1
+  fi
+  if git cat-file -e "HEAD:$SNAPSHOT_PATH" 2>/dev/null; then
+    # Snapshot is in HEAD — compare working-tree against HEAD for drift.
+    if ! git diff HEAD --quiet -- "$SNAPSHOT_PATH" 2>/dev/null; then
+      echo "[snapshot] DRIFT — public surface changed without snapshot update." >&2
+      git --no-pager diff HEAD -- "$SNAPSHOT_PATH" 2>/dev/null | head -200 >&2
+      echo "" >&2
+      echo "Rebuild with: ./scripts/cli-public-api-snapshot.sh" >&2
+      echo "Then commit + apply PR label api-additive | api-breaking | mcp-schema-breaking." >&2
+      exit 1
+    fi
+  else
+    echo "[snapshot] note: $SNAPSHOT_PATH absent in HEAD (first PR introducing it). Accepting."
+  fi
+  echo "[snapshot] CLI public surface unchanged."
+fi
+
+exec
+/bin/bash -lc "sed -n '676,738p' .github/workflows/ci.yml" in $REPO_ROOT
+ succeeded in 0ms:
+  mcp-schema-breaking-detector:
+    name: MCP tool schema breaking-change
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: gen_reference freshness
+        run: cargo run -q -p stealth-mcp --bin gen_reference -- --check
+      - name: fetch base ref
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags --depth=200 origin "$BASE_REF"
+      - name: mcp-schema-breaking diff vs base (label-aware)
+        env:
+          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # R2 label gate. The script uses a 3-valued exit-code contract:
+          #   0 — surface unchanged
+          #   2 — INTENTIONAL breaking diff (label waiver applies)
+          #   any other nonzero — script execution failure (NEVER waiveable)
+          # `$?` after `if/fi` returns 0 from the un-taken branch (bash spec);
+          # capture via `|| rc=$?` instead so the real exit code survives.
+          rc=0
+          ./scripts/mcp-schema-breaking.sh --check || rc=$?
+          if [[ "$rc" -eq 0 ]]; then
+            exit 0
+          fi
+          if [[ "$rc" -ne 2 ]]; then
+            echo "::error::mcp-schema-breaking.sh exited rc=$rc (script execution failure, not a breaking diff). Labels do not waive this. Fix the underlying error."
+            exit "$rc"
+          fi
+          if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
+            exit "$rc"
+          fi
+          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+          echo "[mcp-schema-breaking] PR labels = '${labels_csv:-<none>}'"
+          has_breaking=0
+          IFS=',' read -ra arr <<< "$labels_csv"
+          for l in "${arr[@]}"; do
+            [[ "$l" == "mcp-schema-breaking" ]] && has_breaking=1
+          done
+          if [[ "$has_breaking" -eq 1 ]]; then
+            echo "::warning::MCP schema breaking change detected and explicit \`mcp-schema-breaking\` label is set; gate PASS."
+            exit 0
+          fi
+          echo "::error::MCP tool-schema breaking change requires the \`mcp-schema-breaking\` PR label (and a 2-major bump per docs/compat.md)."
+          exit "$rc"
+
+  # I.6: see crates/stealth-cli/tests/deprecated_completeness.rs (unit test).
+
+  # Lane G.3 (v1.3 Black-Belt CLI): shell-completion drift gate.
+
+exec
+/bin/bash -lc "python3 - <<'PY'
+import json
+p='.agent/v1.3/cli-public-api.snapshot.json'
+d=json.load(open(p))
+print('schema', d.get('"'$schema_version'"'))
+print('mcp_count', d.get('mcp_tools',{}).get('count'), len(d.get('mcp_tools',{}).get('names',[])))
+print('schemas', len(d.get('mcp_tools',{}).get('schemas',{})))
+print('has_input_enums', sum(bool(s.get('input_enums')) for s in d.get('mcp_tools',{}).get('schemas',{}).values()))
+print('has_output_summaries', sum('output' in s for s in d.get('mcp_tools',{}).get('schemas',{}).values()))
+print('error_kinds', d.get('error_kinds',{}).get('count'), len(d.get('error_kinds',{}).get('variants',[])))
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+schema 3
+mcp_count 16 16
+schemas 16
+has_input_enums 2
+has_output_summaries 16
+error_kinds 26 26
+
+exec
+/bin/bash -lc "python3 - <<'PY'
+import json, subprocess, sys
+meta=json.loads(subprocess.check_output(['cargo','metadata','--no-deps','--format-version=1']))
+libs=[]
+for pkg in meta['packages']:
+    for t in pkg['targets']:
+        if any(k in ('lib','rlib','proc-macro') for k in t.get('kind', [])):
+            libs.append(pkg['name']); break
+print(len(sorted(set(libs))), 'metadata-lib-targets')
+print('\\n'.join(sorted(set(libs))))
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+13 metadata-lib-targets
+captcha-bypass
+mobile-fp
+obscura-bridge
+rev-stealth
+stealth-agent-contracts
+stealth-auth
+stealth-cf
+stealth-core
+stealth-mcp
+stealth-parse
+stealth-sanitize
+stealth-sites
+vpn-rotate
+
+codex
+1点、採点上の残リスクを確認しています。snapshot drift自体はHARD化されていますが、再生成後のCLI-only差分に対するPRラベル強制が別ジョブで残っているかを検索します。
+exec
+/bin/bash -lc 'rg -n "api-additive|api-breaking|mcp-schema-breaking|PR_LABELS_JSON|pull_request.labels|label" .github/workflows scripts docs/compat.md' in $REPO_ROOT
+ succeeded in 0ms:
+docs/compat.md:14:| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` (CI: `mcp-schema-breaking-detector`) covers all four breaking shapes via base-vs-head snapshot diff at `$schema_version >= 3`: tool removal/rename, required-arg tightening, input-schema enum narrowing, and output-property removal / output enum narrowing. 3-valued exit code: 0 unchanged, 2 intentional breaking, other nonzero script failure. Fixture coverage: `scripts/cli-public-api-snapshot.test.sh` (CI: `mcp-schema-breaking-fixture-tests`). The `mcp-schema-lint` job (`gen_reference --check`) remains as a rendered-doc backstop. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing an input or output value enum, or removing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
+docs/compat.md:15:| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`, **HARD — drift always fails; labels classify but do not waive**) | Any drift against the committed snapshot must be regenerated and committed in the same PR (`./scripts/cli-public-api-snapshot.sh && git add .agent/v1.3/cli-public-api.snapshot.json`). The PR then carries `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed) or `mcp-schema-breaking` (MCP tool list / required-arg / enum / output change) to classify the regenerated diff. |
+docs/compat.md:16:| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (R2: HARD GATE, label-required) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the matching `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) PR label is mandatory and the gate fails closed without one. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
+docs/compat.md:50:  `api-additive` label.
+docs/compat.md:52:  tier. PRs must carry the `api-breaking` or `mcp-schema-breaking` label, and
+docs/compat.md:56:  may still carry `api-additive` / `api-breaking` labels for reviewer
+docs/compat.md:102:output enum values. The `scripts/mcp-schema-breaking.sh` detector classifies
+docs/compat.md:106:| Shape | Example | Breaking? | Required label | Required bump |
+docs/compat.md:108:| Tool removal / rename | `cf_evaluate` removed from `mcp_tools.names` | yes | `mcp-schema-breaking` | major (cliff after 2-major visibility) |
+docs/compat.md:109:| Required-arg added | `spider.required` gains `timeout_ms` while `url` is kept | yes | `mcp-schema-breaking` | major |
+docs/compat.md:110:| Input enum narrowed | `vpn_rotate.strategy` drops the `random` value | yes | `mcp-schema-breaking` | major |
+docs/compat.md:111:| Output property removed | `recipe_show.output.properties` drops `endpoints` | yes | `mcp-schema-breaking` | major |
+docs/compat.md:112:| Output enum narrowed | `recipe_show.output.enums.status` drops `Pending` | yes | `mcp-schema-breaking` | major |
+docs/compat.md:113:| New tool added | new entry in `mcp_tools.names` | no | `api-additive` | minor |
+docs/compat.md:114:| Required-arg relaxed | a previously required arg becomes optional | no | `api-additive` | minor |
+docs/compat.md:125:the response payload still parses. Label: `mcp-schema-breaking`. The
+docs/compat.md:129:[mcp-schema-breaking] BREAKING vs <base>: output enum narrowed
+docs/compat.md:142:`mcp-schema-breaking`. The detector emits:
+docs/compat.md:145:[mcp-schema-breaking] BREAKING vs <base>: tightened required-args
+docs/compat.md:150:`api-additive` + minor bump.
+docs/compat.md:174:`mcp-schema-breaking` manually and bump major. Rule of thumb: any
+docs/compat.md:183:- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker with the
+docs/compat.md:194:  `cargo-public-api-diff` (hard gate, label-aware),
+docs/compat.md:195:  `mcp-schema-breaking-detector` (label-aware),
+docs/compat.md:196:  `mcp-schema-breaking-fixture-tests`, `changelog-lint` jobs.
+.github/workflows/bench.yml:8:# regression > 10% triggers a "bench-regression" label.
+scripts/cross-family-live-artifact-smoke.sh:87:  local label="$1"
+scripts/cross-family-live-artifact-smoke.sh:96:      add_violation "$label must be a relative path under $prefix: $input"
+scripts/cross-family-live-artifact-smoke.sh:101:      add_violation "$label must stay under $prefix: $input"
+scripts/cross-family-live-artifact-smoke.sh:108:      add_violation "$label contains unsafe path components: $input"
+scripts/cross-family-live-artifact-smoke.sh:116:      add_violation "$label contains unsafe path component: $input"
+scripts/cross-family-live-artifact-smoke.sh:121:      add_violation "$label contains symlink component: $current"
+.github/workflows/ci.yml:459:  # apply the `api-additive` (new flag/cmd/env) or `api-breaking` (removed,
+.github/workflows/ci.yml:460:  # renamed, semantically changed) PR label.
+.github/workflows/ci.yml:482:          # the public surface — labels NEVER waive this. Why: if the snapshot
+.github/workflows/ci.yml:483:          # gate could be waived with `api-additive`, the BASE-vs-HEAD
+.github/workflows/ci.yml:484:          # mcp-schema-breaking detector would diff a stale base snapshot
+.github/workflows/ci.yml:486:          # change, and let the PR merge with the wrong label.
+.github/workflows/ci.yml:492:          #   4. add `api-additive` / `api-breaking` / `mcp-schema-breaking`
+.github/workflows/ci.yml:493:          #      based on the regenerated diff (label classifies; it does
+.github/workflows/ci.yml:501:  # the PR base, the PR MUST carry exactly one of the labels
+.github/workflows/ci.yml:502:  # `api-additive` (new pub items) or `api-breaking` (removed/renamed/retyped
+.github/workflows/ci.yml:503:  # pub items). The label check runs unconditionally on PR; the diff step then
+.github/workflows/ci.yml:504:  # fails closed if a drift exists without the corresponding label.
+.github/workflows/ci.yml:507:  # `pub` removal. The R2 hard gate forces an explicit ack via PR label and
+.github/workflows/ci.yml:542:      - name: diff against base + enforce label
+.github/workflows/ci.yml:547:          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+.github/workflows/ci.yml:568:          # diff and the label gate applies. If pass 1 fails, the gate fails
+.github/workflows/ci.yml:569:          # closed — labels cannot waive a broken invocation.
+.github/workflows/ci.yml:631:            echo "::error::cargo-public-api hard gate cannot evaluate label compliance because at least one crate's pass-1 smoke run failed. Fix the underlying tool/build error; labels do not waive this."
+.github/workflows/ci.yml:640:          # Step 2: surface diverged ⇒ a label is mandatory. Read labels from
+.github/workflows/ci.yml:643:          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+.github/workflows/ci.yml:644:          if [[ -z "$labels_csv" ]]; then
+.github/workflows/ci.yml:645:            labels_csv="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/labels" --jq '[.[].name] | join(",")' || echo "")"
+.github/workflows/ci.yml:647:          echo "[cargo-public-api] PR labels = '${labels_csv:-<none>}'"
+.github/workflows/ci.yml:651:          IFS=',' read -ra arr <<< "$labels_csv"
+.github/workflows/ci.yml:654:              api-additive)  has_additive=1 ;;
+.github/workflows/ci.yml:655:              api-breaking)  has_breaking=1 ;;
+.github/workflows/ci.yml:660:            echo "::error::cargo-public-api detected a public-surface diff vs $BASE_REF but no \`api-additive\` or \`api-breaking\` PR label is set."
+.github/workflows/ci.yml:661:            echo "::error::Decide: pure additions (new pub item, no removal/rename) ⇒ apply \`api-additive\`."
+.github/workflows/ci.yml:662:            echo "::error::Decide: any removal, rename, signature change, or visibility narrowing ⇒ apply \`api-breaking\` AND bump per docs/compat.md."
+.github/workflows/ci.yml:667:            echo "::error::Both \`api-additive\` and \`api-breaking\` labels are set; choose exactly one (a PR is either additive or breaking)."
+.github/workflows/ci.yml:671:          echo "[cargo-public-api] surface diverged; one explicit label found ⇒ gate PASS (additive=$has_additive, breaking=$has_breaking)."
+.github/workflows/ci.yml:675:  # has not been mutated. Drift requires `mcp-schema-breaking` PR label.
+.github/workflows/ci.yml:676:  mcp-schema-breaking-detector:
+.github/workflows/ci.yml:697:      - name: mcp-schema-breaking diff vs base (label-aware)
+.github/workflows/ci.yml:700:          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+.github/workflows/ci.yml:704:          # R2 label gate. The script uses a 3-valued exit-code contract:
+.github/workflows/ci.yml:706:          #   2 — INTENTIONAL breaking diff (label waiver applies)
+.github/workflows/ci.yml:711:          ./scripts/mcp-schema-breaking.sh --check || rc=$?
+.github/workflows/ci.yml:716:            echo "::error::mcp-schema-breaking.sh exited rc=$rc (script execution failure, not a breaking diff). Labels do not waive this. Fix the underlying error."
+.github/workflows/ci.yml:722:          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
+.github/workflows/ci.yml:723:          echo "[mcp-schema-breaking] PR labels = '${labels_csv:-<none>}'"
+.github/workflows/ci.yml:725:          IFS=',' read -ra arr <<< "$labels_csv"
+.github/workflows/ci.yml:727:            [[ "$l" == "mcp-schema-breaking" ]] && has_breaking=1
+.github/workflows/ci.yml:730:            echo "::warning::MCP schema breaking change detected and explicit \`mcp-schema-breaking\` label is set; gate PASS."
+.github/workflows/ci.yml:733:          echo "::error::MCP tool-schema breaking change requires the \`mcp-schema-breaking\` PR label (and a 2-major bump per docs/compat.md)."
+.github/workflows/ci.yml:806:  # I.8 (R2): fixture tests for scripts/mcp-schema-breaking.sh. Asserts the
+.github/workflows/ci.yml:812:  mcp-schema-breaking-fixture-tests:
+scripts/cli-public-api-snapshot.sh:538:        "and apply PR label api-additive / api-breaking / mcp-schema-breaking",
+scripts/cli-public-api-snapshot.sh:574:      echo "Then commit + apply PR label api-additive | api-breaking | mcp-schema-breaking." >&2
+scripts/rev-harness-src-promote.sh:62:  local label="$1"
+scripts/rev-harness-src-promote.sh:64:  [[ -d "$path" ]] || die "$label must be an existing directory: $path"
+scripts/rev-harness-src-promote.sh:65:  (cd "$path" && pwd -P) || die "cannot resolve $label: $path"
+scripts/rev-harness-src-promote.sh:69:  local label="$1"
+scripts/rev-harness-src-promote.sh:73:  [[ -d "$parent" ]] || die "$label parent must be an existing directory: $parent"
+scripts/rev-harness-src-promote.sh:74:  (cd "$parent" && pwd -P) || die "cannot resolve $label parent: $parent"
+scripts/rev-harness-src-promote.sh:78:  local label="$1"
+scripts/rev-harness-src-promote.sh:86:  [[ "$trimmed" == /* ]] || die "$label must resolve to an absolute path: $absolute_path"
+scripts/rev-harness-src-promote.sh:99:      die "$label contains a symlink path component: $current"
+.github/workflows/release.yml:288:          labels: ${{ steps.meta.outputs.labels }}
+scripts/rev-harness-upgrade.sh:128:  local label="${3:-path}"
+scripts/rev-harness-upgrade.sh:132:  [[ "$path" == /* ]] || die "$label must be absolute after normalization: $path"
+scripts/rev-harness-upgrade.sh:141:      die "refusing $label with symlink component: $current"
+scripts/rev-harness-upgrade.sh:147:      die "$label component does not exist: $current"
+scripts/cli-public-api-snapshot.test.sh:6:# `scripts/mcp-schema-breaking.sh` synthetic BASE and LIVE snapshot blobs
+scripts/cli-public-api-snapshot.test.sh:24:SCRIPT="$REPO_ROOT/scripts/mcp-schema-breaking.sh"
+scripts/cli-public-api-snapshot.test.sh:51:  # mcp-schema-breaking.sh. Touch it for completeness.
+scripts/cli-public-api-snapshot.test.sh:252:# mcp-schema-breaking detector compares stale base vs stale live
+scripts/cross-family-live-smoke-preflight.sh:73:  local label="$1"
+scripts/cross-family-live-smoke-preflight.sh:82:      add_violation "$label must be a relative path under $prefix: $path"
+scripts/cross-family-live-smoke-preflight.sh:89:      add_violation "$label must not contain parent traversal segments: $path"
+scripts/cross-family-live-smoke-preflight.sh:97:      add_violation "$label must be under $prefix/<task>: $path"
+scripts/cross-family-live-smoke-preflight.sh:106:  local label="$1"
+scripts/cross-family-live-smoke-preflight.sh:122:      add_violation "$label contains symlink path component: $accum"
+scripts/run_soak.sh:60:  # $1 = label, $2..$N = argv
+scripts/run_soak.sh:61:  local label="$1"; shift
+scripts/run_soak.sh:73:    echo "  step=$label rc=$rc latency_ms=$dt_ms CRASH" | tee -a "$SUMMARY"
+scripts/run_soak.sh:76:    echo "  step=$label rc=$rc latency_ms=$dt_ms error" | tee -a "$SUMMARY"
+scripts/run_soak.sh:78:    echo "  step=$label rc=$rc latency_ms=$dt_ms ok" | tee -a "$SUMMARY"
+scripts/mcp-schema-breaking.sh:13:#     INTENTIONAL breaking diff ⇒ PR must carry `mcp-schema-breaking`.
+scripts/mcp-schema-breaking.sh:14:#   - added tool ⇒ exit 0 ⇒ PR carries `api-additive`.
+scripts/mcp-schema-breaking.sh:17:#     the CI wrapper MUST NOT honor a label waiver in that case.
+scripts/mcp-schema-breaking.sh:20:#   ./scripts/mcp-schema-breaking.sh           # human-readable
+scripts/mcp-schema-breaking.sh:21:#   ./scripts/mcp-schema-breaking.sh --check   # exit-coded for CI
+scripts/mcp-schema-breaking.sh:58:  echo "[mcp-schema-breaking] note: base ref $BASE_REF unreachable; using HEAD~1" >&2
+scripts/mcp-schema-breaking.sh:60:  echo "[mcp-schema-breaking] note: no base snapshot reachable; skipping diff (first PR introducing the snapshot, or shallow checkout)." >&2
+scripts/mcp-schema-breaking.sh:176:#   2 — INTENTIONAL BREAKING DIFF detected (label gate may waive with
+scripts/mcp-schema-breaking.sh:177:#       `mcp-schema-breaking`)
+scripts/mcp-schema-breaking.sh:179:#       set -e/jq/etc.); label gate MUST NOT waive these.
+scripts/mcp-schema-breaking.sh:185:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: removed/renamed tool(s):" >&2
+scripts/mcp-schema-breaking.sh:195:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: tightened required-args" >&2
+scripts/mcp-schema-breaking.sh:206:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: input enum narrowed" >&2
+scripts/mcp-schema-breaking.sh:217:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: output property removed" >&2
+scripts/mcp-schema-breaking.sh:228:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: output enum narrowed" >&2
+scripts/mcp-schema-breaking.sh:240:  echo "Action: apply PR label \`mcp-schema-breaking\` and bump the MCP" >&2
+scripts/mcp-schema-breaking.sh:245:  echo "[mcp-schema-breaking] additive vs $BASE_REF: new tool(s):"
+scripts/mcp-schema-breaking.sh:251:  echo "Action: apply PR label \`api-additive\`."
+scripts/mcp-schema-breaking.sh:255:  echo "[mcp-schema-breaking] relaxed (non-breaking) required-args:"
+scripts/mcp-schema-breaking.sh:271:    echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args + input enums + output schemas)."
+scripts/mcp-schema-breaking.sh:273:    echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args; base snapshot pre-v3 — enum/output diff skipped)."
+scripts/rev-harness-janitor.sh:68:  local label="$1"
+scripts/rev-harness-janitor.sh:78:  [[ "$abs" == /* ]] || die "$label must resolve to an absolute path: $input"
+scripts/rev-harness-janitor.sh:96:    [[ ! -L "$current" ]] || die "$label cannot contain a symlink path component: $input"
+scripts/rev-harness-janitor.sh:101:  local label="$1"
+scripts/rev-harness-janitor.sh:107:  [[ "$abs" != "/" ]] || die "$label cannot be /"
+scripts/rev-harness-janitor.sh:108:  reject_symlink_path_components "$label" "$input"
+scripts/rev-harness-janitor.sh:109:  [[ ! -L "$abs" ]] || die "$label cannot be a symlink: $input"
+scripts/rev-harness-janitor.sh:110:  [[ -d "$abs" ]] || die "$label must be an existing directory: $input"
+scripts/harness-active-artifact-pruner.sh:52:  local label="$1"
+scripts/harness-active-artifact-pruner.sh:62:  [[ "$abs" == /* ]] || die "$label must resolve to an absolute path: $input"
+scripts/harness-active-artifact-pruner.sh:73:    [[ ! -L "$current" ]] || die "$label cannot contain a symlink path component: $input"
+scripts/harness-active-artifact-pruner.sh:78:  local label="$1"
+scripts/harness-active-artifact-pruner.sh:84:  [[ "$abs" != "/" ]] || die "$label cannot be /"
+scripts/harness-active-artifact-pruner.sh:85:  reject_symlink_path_components "$label" "$input"
+scripts/harness-active-artifact-pruner.sh:86:  [[ ! -L "$abs" ]] || die "$label cannot be a symlink: $input"
+scripts/harness-active-artifact-pruner.sh:87:  [[ -d "$abs" ]] || die "$label must be an existing directory: $input"
+scripts/model-policy.sh:95:  local label="$2"
+scripts/model-policy.sh:96:  [[ "$model" =~ ^gpt-[0-9]+\.[0-9]+([-.][A-Za-z0-9_-]+)?$ ]] || die "$label must be a gpt-X.Y model id: $model"
+scripts/harness-benchmark.sh:114:  local label="$2"
+scripts/harness-benchmark.sh:116:  [[ -n "$value" ]] || fail "missing required argument: $label"
+scripts/harness-benchmark.sh:117:  [[ "$value" != "." && "$value" != ".." ]] || fail "invalid $label: $value"
+scripts/harness-benchmark.sh:118:  [[ "$value" != *"/"* && "$value" != *"\\"* ]] || fail "invalid $label: $value"
+scripts/harness-benchmark.sh:119:  [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid $label: $value"
+scripts/harness-benchmark.sh:254:  local run_label=""
+scripts/harness-benchmark.sh:256:  run_label="$(run_tag "$run_number")"
+scripts/harness-benchmark.sh:257:  time_output_file="$(mktemp "$ARTIFACT_ROOT/.${subject}_run${run_label}.XXXXXX")"
+scripts/harness-benchmark.sh:258:  command_stdout_file="$(mktemp "$ARTIFACT_ROOT/.${subject}_run${run_label}.stdout.XXXXXX")"
+scripts/harness-benchmark.sh:259:  command_stderr_file="$(mktemp "$ARTIFACT_ROOT/.${subject}_run${run_label}.stderr.XXXXXX")"
+scripts/harness-benchmark.sh:275:      fail "$subject run${run_label} failed (rc=$status)"
+scripts/harness-benchmark.sh:290:      fail "$subject run${run_label} failed (rc=$status)"
+scripts/harness-runtime-baseline.sh:58:  local label="$2"
+scripts/harness-runtime-baseline.sh:60:  [[ -n "$value" ]] || fail "missing required argument: $label"
+scripts/harness-runtime-baseline.sh:61:  [[ "$value" != "." && "$value" != ".." ]] || fail "invalid $label: $value"
+scripts/harness-runtime-baseline.sh:62:  [[ "$value" != *"/"* && "$value" != *"\\"* ]] || fail "invalid $label: $value"
+scripts/harness-runtime-baseline.sh:63:  [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid $label: $value"
+scripts/bench_runner.sh:29:  local label="$3"
+scripts/bench_runner.sh:31:    echo "[bench] assertion failed: $label ($lhs > $rhs)" >&2
+scripts/bench_runner.sh:39:  local label="$3"
+scripts/bench_runner.sh:41:    echo "[bench] assertion failed: $label ($lhs >= $rhs)" >&2
+scripts/_canonical-guard.sh:86:  local label="$1"  # "advisory" or "strict"
+scripts/_canonical-guard.sh:90:      printf '[rev-harness] identity-check (%s): source-style project_id outside the official source checkout\n' "$label" >&2
+scripts/_canonical-guard.sh:98:      printf '[rev-harness] identity-check (%s): repo identity is missing or malformed\n' "$label" >&2
+scripts/_canonical-guard.sh:106:  if [[ "$label" == "strict" ]]; then
+scripts/cursor-wrapper.sh:285:  local wrapper_role_label
+scripts/cursor-wrapper.sh:286:  wrapper_role_label="cursor-${RESOLVED_ROLE}"
+scripts/cursor-wrapper.sh:299:    --arg wrapper_role "${wrapper_role_label}" \
+scripts/project-id.sh:180:  local label="$2"
+scripts/project-id.sh:184:  [[ ! -L "$path" ]] || die "${label} must not be a symlink: $path"
+scripts/project-id.sh:185:  [[ -f "$path" ]] || die "${label} is invalid: $path"
+scripts/project-id.sh:191:    die "${label} is invalid: $path"
+scripts/project-id.sh:195:  [[ -n "$line" ]] || die "${label} is invalid: $path"
+scripts/project-id.sh:582:  local label="$2"
+scripts/project-id.sh:586:    printf 'missing\t%s\t\n' "$label"
+scripts/project-id.sh:590:    printf 'invalid\t%s\t\n' "$label"
+scripts/project-id.sh:595:    printf 'valid\t%s\t%s\n' "$label" "$value"
+scripts/project-id.sh:597:    printf 'invalid\t%s\t\n' "$label"
+scripts/rev-harness-admission.sh:123:  local label="$2"
+scripts/rev-harness-admission.sh:126:  grep -F -- "$label" <<<"$section" | grep -F -- "$value" >/dev/null 2>&1
+scripts/rev-harness-admission.sh:133:  local label="$4"
+scripts/rev-harness-admission.sh:146:    add_reason "missing counter: $label"
+scripts/rev-harness-admission.sh:151:    add_reason "invalid counter format for $label: $raw"
+scripts/rev-harness-admission.sh:158:    add_reason "counter over ceiling: $label=$raw"
+scripts/rev-harness-admission.sh:161:  if ! section_contains_line_value "$ledger_section" "$label" "$raw"; then
+scripts/rev-harness-admission.sh:162:    add_reason "ledger does not carry counter $label=$raw"
+scripts/rev-harness-admission.sh:168:    add_reason "missing previous counter for carried lineage: $label"
+scripts/rev-harness-admission.sh:174:      add_reason "invalid previous counter format for $label: $previous"
+scripts/rev-harness-admission.sh:180:      add_reason "counter reset detected for $label: previous=$previous current=$raw"
+scripts/rev-harness-admission.sh:183:      add_reason "counter ceiling changed for $label: previous=$previous current=$raw"
+scripts/semantic-mcp-server/src/tools/registry.ts:890:function validateRegistryUpsertCollectionEnvelope(input: JsonObject, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:891:  validateRegistryCollectionEnvelope(input, REGISTRY_UPSERT_COLLECTION_ALLOWED_KEYS, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:894:function validateRegistryUpsertAliasEnvelope(input: JsonObject, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:895:  assertAllowedKeys(input, REGISTRY_UPSERT_ALIAS_ALLOWED_KEYS, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:897:    throw new Error(`${label}.delta is required`);
+scripts/semantic-mcp-server/src/tools/registry.ts:900:  validateRegistryDeltaEnvelopeValue(input.delta, `${label}.delta`);
+scripts/semantic-mcp-server/src/tools/registry.ts:903:function validateRegistryDeltaCollectionEnvelope(input: JsonObject, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:904:  validateRegistryCollectionEnvelope(input, REGISTRY_DELTA_COLLECTION_ALLOWED_KEYS, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:907:function validateRegistryDeltaAliasEnvelope(input: JsonObject, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:908:  assertAllowedKeys(input, REGISTRY_DELTA_ALIAS_ALLOWED_KEYS, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:914:    throw new Error(`${label} must specify exactly one of component/after/value`);
+scripts/semantic-mcp-server/src/tools/registry.ts:919:    asRequiredObject(input[aliasKey], `${label}.${aliasKey}`),
+scripts/semantic-mcp-server/src/tools/registry.ts:920:    `${label}.${aliasKey}`
+scripts/semantic-mcp-server/src/tools/registry.ts:927:  label: string
+scripts/semantic-mcp-server/src/tools/registry.ts:929:  assertAllowedKeys(input, allowedKeys, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:934:      throw new Error(`${label}.components must be an array`);
+scripts/semantic-mcp-server/src/tools/registry.ts:939:        asRequiredObject(component, `${label}.components[${index}]`),
+scripts/semantic-mcp-server/src/tools/registry.ts:940:        `${label}.components[${index}]`
+scripts/semantic-mcp-server/src/tools/registry.ts:948:      throw new Error(`${label}.deltas must be an array`);
+scripts/semantic-mcp-server/src/tools/registry.ts:952:      validateRegistryDeltaItemPayload(delta, `${label}.deltas[${index}]`);
+scripts/semantic-mcp-server/src/tools/registry.ts:957:function validateRegistryDeltaEnvelopeValue(value: unknown, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:960:      throw new Error(`${label} must not be empty`);
+scripts/semantic-mcp-server/src/tools/registry.ts:964:      validateRegistryDeltaItemPayload(entry, `${label}[${index}]`);
+scripts/semantic-mcp-server/src/tools/registry.ts:969:  const envelope = asRequiredObject(value, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:972:    validateRegistryDeltaCollectionEnvelope(envelope, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:977:    validateRegistryDeltaAliasEnvelope(envelope, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:981:  validateRegistryComponentPayload(envelope, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:984:function validateRegistryDeltaItemPayload(value: unknown, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:985:  const item = asRequiredObject(value, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:988:    validateRegistryDeltaAliasEnvelope(item, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:992:  validateRegistryComponentPayload(item, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:995:function validateRegistryComponentPayload(payload: JsonObject, label: string): void {
+scripts/semantic-mcp-server/src/tools/registry.ts:996:  assertAllowedKeys(payload, REGISTRY_COMPONENT_ALLOWED_KEYS, label);
+scripts/semantic-mcp-server/src/tools/registry.ts:1059:  label: string
+scripts/semantic-mcp-server/src/tools/registry.ts:1065:    throw new Error(`${label} contains unexpected keys: ${unexpectedKeys.join(", ")}`);
+scripts/semantic-mcp-server/src/tools/registry.ts:1367:  label: string
+scripts/semantic-mcp-server/src/tools/registry.ts:1384:      throw new Error(`${label} aliases must match`);
+scripts/semantic-mcp-server/src/tools/registry.ts:1394:  label: string
+scripts/semantic-mcp-server/src/tools/registry.ts:1411:      throw new Error(`${label} aliases must match`);
+scripts/semantic-mcp-server/src/tools/registry.ts:1421:  label: string
+scripts/semantic-mcp-server/src/tools/registry.ts:1444:      throw new Error(`${label} aliases must match`);
+scripts/semantic-mcp-server/src/tools/search.ts:332:function asRequiredObject(value: unknown, label: string): JsonObject {
+scripts/semantic-mcp-server/src/tools/search.ts:334:    throw new Error(`${label} must be an object`);
+scripts/semantic-mcp-server/src/tools/search.ts:339:function assertAllowedKeys(input: JsonObject, allowedKeys: readonly string[], label: string): void {
+scripts/semantic-mcp-server/src/tools/search.ts:342:    throw new Error(`${label} contains unexpected keys: ${unexpectedKeys.join(", ")}`);
+scripts/semantic-mcp-server/src/tools/search.ts:375:  label: string
+scripts/semantic-mcp-server/src/tools/search.ts:384:      throw new Error(`${label} aliases must match`);
+scripts/semantic-mcp-server/src/tools/search.ts:390:function parseInteger(value: unknown, label: string): number | undefined {
+scripts/semantic-mcp-server/src/tools/search.ts:400:  throw new Error(`${label} must be an integer`);
+scripts/semantic-mcp-server/src/tools/search.ts:407:function assertInsideRepo(repoRoot: string, target: string, label: string): void {
+scripts/semantic-mcp-server/src/tools/search.ts:412:  throw new Error(`${label} must stay inside repo root`);
+
+exec
+/bin/bash -lc 'rg -n "snapshot.*base|base.*snapshot|cli-public-api.*label|public-API.*label|regen|regenerate" .github/workflows/ci.yml scripts' in $REPO_ROOT
+ succeeded in 0ms:
+.github/workflows/ci.yml:284:    # when a contributor forgets to regenerate the doc.
+.github/workflows/ci.yml:458:  # PR, the contributor must regenerate the snapshot, commit the diff, and
+.github/workflows/ci.yml:477:      - name: regenerate + check snapshot (HARD — drift always fails)
+.github/workflows/ci.yml:481:          # the regenerated snapshot in the same PR as the change that mutated
+.github/workflows/ci.yml:484:          # mcp-schema-breaking detector would diff a stale base snapshot
+.github/workflows/ci.yml:490:          #   2. `./scripts/cli-public-api-snapshot.sh` to regenerate
+.github/workflows/ci.yml:493:          #      based on the regenerated diff (label classifies; it does
+.github/workflows/ci.yml:494:          #      not waive the regeneration requirement).
+.github/workflows/ci.yml:761:        # the committed completions and the gate would still pass after regen.
+.github/workflows/ci.yml:763:        # we regenerate.
+.github/workflows/ci.yml:778:            echo "::error::commit the missing target/completions/ files (regen via ./scripts/gen_completions.sh)." >&2
+.github/workflows/ci.yml:781:      - name: regenerate completions
+.github/workflows/ci.yml:783:      - name: diff committed vs regenerated (modifications)
+.github/workflows/ci.yml:790:      - name: diff committed vs regenerated (untracked / additions)
+.github/workflows/ci.yml:792:        # not flag untracked files, so a regen producing a *new* file (e.g.
+scripts/cli-public-api-snapshot.sh:7:#   ./scripts/cli-public-api-snapshot.sh           # regenerate snapshot
+scripts/cli-public-api-snapshot.sh:556:  #   - If the snapshot exists in HEAD, the regenerated file must match what
+scripts/cli-public-api-snapshot.sh:562:  #     regenerator, something is badly wrong — exit 1.
+scripts/cli-public-api-snapshot.sh:564:    echo "[snapshot] ERROR: $SNAPSHOT_PATH missing after regeneration." >&2
+scripts/mcp-schema-breaking.sh:6:# the contributor regenerates the snapshot in their PR — so a meaningful
+scripts/mcp-schema-breaking.sh:9:# PR's own (potentially regenerated) copy.
+scripts/mcp-schema-breaking.sh:40:# Resolve the base-branch snapshot. If the base ref is unavailable (fresh
+scripts/mcp-schema-breaking.sh:44:resolve_base_snapshot() {
+scripts/mcp-schema-breaking.sh:54:if resolved=$(resolve_base_snapshot "$BASE_REF" 2>/dev/null); then
+scripts/mcp-schema-breaking.sh:56:elif resolved=$(resolve_base_snapshot "HEAD~1" 2>/dev/null); then
+scripts/mcp-schema-breaking.sh:60:  echo "[mcp-schema-breaking] note: no base snapshot reachable; skipping diff (first PR introducing the snapshot, or shallow checkout)." >&2
+scripts/mcp-schema-breaking.sh:76:# to the v2-compatible name+required diff when the base snapshot predates v3.
+scripts/mcp-schema-breaking.sh:273:    echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args; base snapshot pre-v3 — enum/output diff skipped)."
+scripts/gen_completions.sh:6:# `target/completions/{bash,zsh,fish,nushell}/`. The drift between regen and
+scripts/gen_completions.sh:44:echo "regenerated $OUT_DIR/{bash,zsh,fish,nushell}/rev-stealth.*"
+scripts/harness-projection-preflight.sh:43:    and (.packet.baseline_snapshot_name | non_empty_string)
+scripts/cli-public-api-snapshot.test.sh:14:# Implementation detail: the production script reads the base snapshot from
+scripts/cli-public-api-snapshot.test.sh:60:    printf '%s\n' "$base_json" > .agent/v1.3/cli-public-api.snapshot.json
+scripts/cli-public-api-snapshot.test.sh:91:# ----- Shared base snapshot (16 mock tools, schema_version=3) -----
+scripts/cli-public-api-snapshot.test.sh:250:# real source (which would show in the regenerator's output) but
+scripts/cli-public-api-snapshot.test.sh:251:# committed an unchanged snapshot AND did not regenerate. The
+scripts/cli-public-api-snapshot.test.sh:256:# regenerator + drift check in the workflow), NOT this detector.
+scripts/cli-public-api-snapshot.test.sh:259:# snapshot regeneration step is the gate that catches it. We
+scripts/cli-public-api-snapshot.test.sh:262:# lives in the workflow step `regenerate + check snapshot (HARD)`,
+scripts/cli-public-api-snapshot.test.sh:267:run_case "$CASE2F" 0 "stale-snapshot baseline: identical base==live ⇒ rc=0 (detector by design; bypass is caught by the snapshot drift gate, not here)"
+scripts/rev-harness-distribution-adoption.sh:170:    and (.client_distribution.semantic_db_regeneration | type == "string" and length > 0)
+scripts/semantic-mcp-server/README.md:45:- clean distribution rule: do not ship this DB. It is regenerated on first use
+scripts/semantic-mcp-server/src/cli.ts:196:  const snapshot = withDatabase(dependencies, flags["--project-id"], (context) =>
+
+exec
+/bin/bash -lc "sed -n '38,64p' docs/compat.md" in $REPO_ROOT
+ succeeded in 0ms:
+### Internal types
+Anything that is `pub` in a workspace crate but is **not** in the snapshot
+above. These remain semver-flexible to let us refactor without dragging users
+through churn. We still avoid gratuitous renames, and we still apply the
+`#[deprecated(since=…, note=…, replace_with=…)]` lint (Lane I.6) when a name
+change is unavoidable.
+
+## Bumping rules
+
+- **Patch** (`v1.3.0 → v1.3.1`): bugfix-only. No new CLI flag, no new MCP tool,
+  no schema field change.
+- **Minor** (`v1.3.x → v1.4.0`): additive surface only. PRs must carry the
+  `api-additive` label.
+- **Major** (`v1.x → v2.0.0`): any removal or rename on the **MCP** or **CLI**
+  tier. PRs must carry the `api-breaking` or `mcp-schema-breaking` label, and
+  the CHANGELOG must include a `Breaking Changes` section with a migration
+  recipe per item. Removals or renames on the **internal Rust types** tier do
+  NOT trigger a project-major bump (per that tier's "no guarantee" rule); they
+  may still carry `api-additive` / `api-breaking` labels for reviewer
+  visibility but the version bump rule does not apply to them.
+
+## MCP 2-major guarantee in practice
+
+When `tool_X` first ships in v1.x, it remains callable through v3.x (two full
+major versions after the major in which the deprecation lands). To remove it
+cleanly:
+
+
+codex
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A. surface-coverage completeness | 9.30 | workspace lib crateが`cargo metadata`由来で13件に拡張。CLI/MCP/ErrorKind/deprecated attrsもsnapshot v3で広い。type-shape変更は一部手動判断が残る。 |
+| B. CI enforcement strength | 9.15 | snapshot driftはHARD化、cargo-public-apiはfail-closed、MCP detectorは0/2/otherの3値で実行失敗をlabel waiver不可に分離。 |
+| C. semver lifecycle clarity | 9.25 | `docs/compat.md`の表とMCP worked examplesでminor/major/labelの判断がかなり明確。 |
+| D. PR-level intent capture | 8.65 | cargo-public-api/MCP breakingはlabel gateあり。ただし再生成済みCLI-only snapshot差分の`api-additive/api-breaking`強制はCI上まだ弱く、label正当性も人間判断。 |
+| E. forward-compatibility hygiene | 9.10 | schema v3、base-vs-head比較、pinned nightly、empty-list guardでかなり堅い。pre-v3 fallbackやtype-shape diffの限界は残る。 |
+| F. test depth | 9.20 | fixture 8件でtool removal/input enum narrowing/stale baselineを追加し、rc契約も検証済み。workflow label permutationやCLI flag/env/exit-code fixtureは未拡張。 |
+| G. doc/CI fidelity | 9.05 | docsの「drift always fails; labels classify but do not waive」とCI実装は概ね一致。CLI-only label強制だけ文書要求よりCIが弱い。 |
+
+overall = 9.10 PASS
+
+Residual risk: 最大の残りは、再生成済みのCLI-only public-surface差分に対してPR labelを機械的に強制するbase-vs-head snapshot classifierがまだ無い点です。9.5超えには、CLI flag/env/exit-code/default/subcommand差分をadditive/breaking分類するCI gate、label permutation fixture、snapshot extractorのtype-shape差分検出を追加するのが必要です。ローカルではfixture 8/0、workspace lib crate 13件、YAML parse、changelog lintを確認しました。
+tokens used
+64,509
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"34c6a3db-d428-4668-9f14-69e9d14dd345","timestamp":"2026-05-22T22:06:38Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":167582,"tokens_in":64509,"tokens_out":0,"total_tokens":64509,"dry_run":false,"specialty_status":"none"}

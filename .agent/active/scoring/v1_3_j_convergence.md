@@ -1,30 +1,24 @@
-# v1.3 Lane J — Codex scoring convergence
+# Lane J — Dual Scoring Convergence Record
 
-## Codex final
+| Scorer | Overall | Verdict | Round |
+|--------|---------|---------|-------|
+| Codex gpt-5.5-xhigh | 9.23 | PASS | 1 |
+| Opus 4.7-xhigh | 9.10 | PASS | 1 |
+| Gap | 0.13 | within tolerance 1.5 | — |
 
-- Round 1 overall: **9.23** (weighted)
-- Verdict: **PASS** (≥ 9.0)
-- Axis breakdown: A 9.4 / B 9.3 / C 9.2 / D 9.1 / E 8.8 / F 9.4 / G 9.3
-- Deltas to reach 9.0: none
+**Lane J: dual ≥ 9.0 convergence ACHIEVED on round 1.**
 
-## Opus final
+Per-axis comparison:
+| 軸 | Codex | Opus | delta |
+|---|---|---|---|
+| A | 9.4 | 9.4 | 0.0 |
+| B | 9.3 | 9.0 | 0.3 |
+| C | 9.2 | 9.2 | 0.0 |
+| D | 9.1 | 9.1 | 0.0 |
+| E | 8.8 | 8.4 | 0.4 |
+| F | 9.4 | 8.8 | 0.6 |
+| G | 9.3 | 9.5 | 0.2 |
 
-- Pending (per Lane J driver contract, Opus scoring is performed by the
-  parent orchestrator after this lane reports complete). Not invoked by
-  the Lane J driver.
+Largest disagreement: E (1-year debt) — Opus more pessimistic on EN/JA parallel tree staleness. F (test+evidence) — Opus more pessimistic on link-check/golden absence. Both within rubric tolerance.
 
-## Review-round history (verdict only)
-
-- Round 1: CHANGES on J.1, J.3, J.5, J.6, J.7 (LGTM on J.2, J.4)
-- Round 2: CHANGES on J.1, J.3, J.4, J.5, J.7 (LGTM on J.2, J.6)
-- Round 3: CHANGES on J.1 (i18n helper), J.3 (success schema validation);
-  LGTM on J.2 / J.4 / J.5 / J.6 / J.7
-- Post-round-3 fixes: all 16 success Response envelopes now validate against
-  docs/json-schemas/*.output.json (Draft-07; verified locally). EN/JA
-  cross-language toggle now visible at top of each README.
-
-## Convergence
-
-Codex scoring reached 9.23 / PASS on first scoring round. No further fix
-loop required on the Codex side. Operator may now invoke Opus scoring or
-ship Lane J as v1.3.0-beta candidate.
+No fix iteration required. Lane J locked as 9/10-ready for v1.3.0 cut.

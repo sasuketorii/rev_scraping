@@ -126,7 +126,10 @@ fn parse_exit_codes_block(help: &str) -> HashSet<i32> {
             }
             // Parse leading integer.
             let stripped = line.trim_start();
-            let head: String = stripped.chars().take_while(|c| c.is_ascii_digit()).collect();
+            let head: String = stripped
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
             if let Ok(n) = head.parse::<i32>() {
                 codes.insert(n);
             }

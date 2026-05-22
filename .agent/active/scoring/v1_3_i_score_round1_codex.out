@@ -1,0 +1,19 @@
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 7.6 | I.3/I.6 は強いが、I.2 は advisory かつ label gate なし、I.4 は `CHANGELOG.rev_scraping.md` と `release-please-config.json` の `CHANGELOG.md` が不整合、I.5 は enum/output field が policy-only。I.1 も output field inventory が弱い。 |
+| B | 8.0 | snapshot / MCP diff / deprecated lint の CI はある。ただし label 条件が機械 enforcement されず、snapshot 更新だけで通る面があり adversarial gate としては未完成。 |
+| C | 8.2 | 競合比では semver 可視化はかなり良いが、hard gate・全 workspace public API・schema 全面 diff まで揃っておらず「明確に勝つ」までは届かない。 |
+| D | 7.4 | Lane I 特化要件の「semver 違反が PR レベルで止まる」は部分達成。deprecation policy はテスト化済みだが、cargo public API と label/bump/changelog の連動が未機械化。 |
+| E | 7.7 | `schema_version=2` や nightly pin は保守意識あり。ただし regex/static list ベース、古い nightly pin、release-please/changelog 不整合、v1.4 先送り範囲が残る。 |
+| F | 7.5 | `deprecated_completeness` の smoke/edge tests は良い。一方で snapshot/MCP detector の fixture-based regression、label bypass、enum/output rename simulation が不足。 |
+| G | 8.4 | `docs/compat.md` は制限を正直に書いており handoff 可能。ただし docs が label enforcement を要求する一方、CI 実装は advisory/手動依存で、読者が誤解し得る。 |
+
+overall = 7.79
+
+verdict: FAIL
+
+deltas to reach 9.0:
+- `cargo-public-api-diff` を全 workspace member 対象の hard gate にし、PR label `api-additive` / `api-breaking` を実際に検査する。
+- `mcp-schema-breaking-detector` を label-aware にし、tool removal / required tightening / enum narrowing / output field rename を base-vs-head で検出する。
+- `release-please-config.json` の `changelog-path` を `CHANGELOG.rev_scraping.md` に合わせるか、成果物を `CHANGELOG.md` に統一し、CI で keep-a-changelog parse を検証する。
+- CLI snapshot に JSON/output fields と MCP output schemas/ErrorKind を入れ、script fixture tests で drift/breaking/additive ケースを固定する。

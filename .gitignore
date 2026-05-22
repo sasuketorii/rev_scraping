@@ -1,4 +1,13 @@
-/target
+# Lane G.3 (v1.3) — committed shell-completion scripts live under
+# `target/completions/`, so the top-level target/ ignore is expressed as a
+# children-only `/target/*` glob (not `/target/`) with an explicit
+# `!/target/completions/` un-ignore. `/target/*` does NOT ignore the parent
+# directory itself, which is what lets the un-ignore work — gitignore cannot
+# re-include files inside a directory that is itself ignored. See:
+# https://git-scm.com/docs/gitignore "It is not possible to re-include a file
+# if a parent directory of that file is excluded."
+/target/*
+!/target/completions/
 /_refs/
 /vendor/*/target/
 /vendor/*/.git/
@@ -61,7 +70,11 @@ build/
 .ask-readonly-*
 harness-rust/target/
 harness-rust/target
-**/target/
+# NOTE: a broader `**/target/` glob used to live here; Lane G.3 removed it
+# because gitignore cannot re-include files inside an ignored directory, and
+# the broad glob silently re-shadowed the top-level
+# `!/target/completions/` carve-out. All known nested `target/` dirs are
+# enumerated explicitly above; add new ones explicitly if they appear.
 __pycache__/
 *.pyc
 *.rlib

@@ -61,8 +61,7 @@ async fn run_probe_inner() -> Value {
     // `REV_STEALTH_EGRESS_PROBE_URL`; default points at a well-known
     // minimal echo. We use HEAD to keep the body small and avoid pulling
     // response payloads that could contain secrets.
-    let url = option_env!("REV_STEALTH_EGRESS_PROBE_URL")
-        .unwrap_or("https://check.ifconfig.io/");
+    let url = option_env!("REV_STEALTH_EGRESS_PROBE_URL").unwrap_or("https://check.ifconfig.io/");
     // P10.5 review round-1: redact the URL before echoing it back, so
     // that if an operator points the probe at a tokenized endpoint
     // (`https://user:pw@host/...?token=...`) the credential never lands
@@ -255,7 +254,11 @@ pub fn redact_response_headers(
             || lk.contains("secret")
             || lk.contains("cookie")
             || lk.contains("auth");
-        let redacted = if sensitive { "<redacted>".to_string() } else { v };
+        let redacted = if sensitive {
+            "<redacted>".to_string()
+        } else {
+            v
+        };
         out.insert(lk, redacted);
     }
     out
@@ -277,8 +280,14 @@ mod tests {
     #[test]
     fn egress_probe_redacts_token_in_response_headers() {
         let raw = vec![
-            ("Authorization".to_string(), "Bearer super-secret".to_string()),
-            ("Set-Cookie".to_string(), "session=abc; HttpOnly".to_string()),
+            (
+                "Authorization".to_string(),
+                "Bearer super-secret".to_string(),
+            ),
+            (
+                "Set-Cookie".to_string(),
+                "session=abc; HttpOnly".to_string(),
+            ),
             ("X-Api-Key".to_string(), "k-123".to_string()),
             ("X-Custom-Token".to_string(), "t-456".to_string()),
             ("Server".to_string(), "nginx".to_string()),
@@ -298,10 +307,7 @@ mod tests {
         let v = run_probe(true).await;
         assert_eq!(v["enabled"], false);
         assert!(
-            v["reason"]
-                .as_str()
-                .unwrap()
-                .contains("vps-egress-probe"),
+            v["reason"].as_str().unwrap().contains("vps-egress-probe"),
             "reason should explain the feature gate"
         );
     }
@@ -353,8 +359,7 @@ mod tests {
             .timeout(std::time::Duration::from_millis(100))
             .build()
             .unwrap();
-        let url =
-            "http://127.0.0.1:1/probe?token=SENSITIVE_TOKEN_DO_NOT_LEAK";
+        let url = "http://127.0.0.1:1/probe?token=SENSITIVE_TOKEN_DO_NOT_LEAK";
         let err = client.head(url).send().await.unwrap_err();
         // Sanity: raw Display does contain the URL (this is the bug).
         let raw = format!("{err}");
@@ -383,8 +388,7 @@ mod tests {
             .nth(2)
             .expect("workspace root")
             .to_path_buf();
-        let gi = std::fs::read_to_string(root.join(".gitignore"))
-            .expect("read .gitignore");
+        let gi = std::fs::read_to_string(root.join(".gitignore")).expect("read .gitignore");
         assert!(
             gi.contains("!/dist/systemd"),
             "expected !/dist/systemd exception in .gitignore, got:\n{gi}"

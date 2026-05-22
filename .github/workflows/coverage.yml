@@ -2,7 +2,14 @@ name: Coverage
 
 # Lane K K.1 — `cargo-llvm-cov` soft gate.
 #
-# v1.3 thresholds: line >= 80% / branch >= 70% (warn-only / soft gate).
+# v1.3 thresholds: line >= 80% (warn-only / soft gate, primary metric).
+# v1.3 branch and function thresholds are TRACKED-ONLY and DO NOT
+# constitute v1.3 acceptance:
+#   - branch (target 70%): cargo-llvm-cov branch coverage requires
+#     nightly toolchain per its docs; v1.3 uses stable for repro, so
+#     branch% is reported (often 0 = unsupported) but never warns.
+#     Promotion to nightly + --branch is scheduled for v1.4.
+#   - function (target 75%): warn-only, informational.
 # v1.4 thresholds: line >= 85% / branch >= 75% (hard gate, blocks merge).
 #
 # The job emits an LCOV artifact + a JSON summary + a PR comment with the
@@ -32,6 +39,9 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      # Needed for the baseline lookup step to call `gh run list/download`
+      # against the previous main-branch coverage run.
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +58,11 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: cargo llvm-cov --workspace (LCOV)
+        # Branch coverage (`--branch`) currently requires nightly per
+        # cargo-llvm-cov docs; v1.3 uses stable for reproducibility, so
+        # we collect line + function coverage only and leave branch%
+        # reported as 0 (the gate step treats 0 as "unsupported, do not
+        # warn"). Promotion to nightly + --branch is tracked for v1.4.
         run: |
           set -euo pipefail
           cargo llvm-cov --workspace --no-fail-fast \
@@ -74,19 +89,49 @@ jobs:
           line_pct=$(python3 -c 'import json; d=json.load(open("coverage-summary.json"))["data"][0]["totals"]; print(round(d["lines"]["percent"],2))')
           fn_pct=$(python3 -c 'import json; d=json.load(open("coverage-summary.json"))["data"][0]["totals"]; print(round(d["functions"]["percent"],2))')
           branch_pct=$(python3 -c 'import json; d=json.load(open("coverage-summary.json"))["data"][0]["totals"]; print(round(d.get("branches",{}).get("percent",0.0),2))')
-          echo "line=$line_pct" >> "$GITHUB_OUTPUT"
-          echo "branch=$branch_pct" >> "$GITHUB_OUTPUT"
-          echo "fn=$fn_pct" >> "$GITHUB_OUTPUT"
+          {
+            echo "line=$line_pct"
+            echo "branch=$branch_pct"
+            echo "fn=$fn_pct"
+          } >> "$GITHUB_OUTPUT"
           echo "::notice title=coverage::line=$line_pct% / branch=$branch_pct% / fn=$fn_pct%"
           awk -v a="$line_pct" -v b="$COVERAGE_LINE_MIN" 'BEGIN{exit !(a+0 < b+0)}' && \
             echo "::warning::line coverage $line_pct% < soft gate ${COVERAGE_LINE_MIN}%"
           awk -v a="$fn_pct" -v b="$COVERAGE_FN_MIN" 'BEGIN{exit !(a+0 < b+0)}' && \
             echo "::warning::function coverage $fn_pct% < soft gate ${COVERAGE_FN_MIN}%"
-          awk -v a="$branch_pct" -v b="$COVERAGE_BRANCH_MIN" 'BEGIN{exit !(a+0 < b+0 && a+0 > 0)}' && \
-            echo "::warning::branch coverage $branch_pct% < soft gate ${COVERAGE_BRANCH_MIN}%"
+          # Branch warning suppressed for v1.3: cargo-llvm-cov branch
+          # coverage needs nightly; stable reports 0%. Re-enable in v1.4
+          # alongside nightly toolchain promotion.
           # v1.3 soft gate: exit 0 unconditionally. v1.4 promote to exit 1 on miss.
           exit 0
-      - name: Comment on PR with coverage delta
+      # Fetch main's last recorded coverage from the most recent main-branch
+      # workflow run artifact, compute delta, and surface it in the PR
+      # comment. If the artifact is unavailable (first run, retention
+      # eviction), we omit the delta gracefully instead of failing.
+      - name: Fetch baseline coverage from main
+        id: baseline
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/baseline
+          run_id=$(gh run list --branch main --workflow coverage.yml \
+            --status success --limit 1 --json databaseId \
+            -q '.[0].databaseId' 2>/dev/null || echo "")
+          if [ -z "$run_id" ]; then
+            echo "no baseline coverage run found yet"
+            echo "baseline_line=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh run download "$run_id" -n coverage-lcov -D /tmp/baseline \
+            || { echo "baseline artifact unavailable"; exit 0; }
+          if [ -f /tmp/baseline/coverage-summary.json ]; then
+            base_line=$(python3 -c 'import json; d=json.load(open("/tmp/baseline/coverage-summary.json"))["data"][0]["totals"]; print(round(d["lines"]["percent"],2))')
+            echo "baseline_line=$base_line" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Comment on PR with coverage + delta vs main
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
@@ -96,6 +141,7 @@ jobs:
           LINE_MIN: ${{ env.COVERAGE_LINE_MIN }}
           BRANCH_MIN: ${{ env.COVERAGE_BRANCH_MIN }}
           FN_MIN: ${{ env.COVERAGE_FN_MIN }}
+          BASELINE_LINE: ${{ steps.baseline.outputs.baseline_line }}
         with:
           script: |
             const line = process.env.LINE_PCT;
@@ -104,14 +150,21 @@ jobs:
             const lineMin = process.env.LINE_MIN;
             const branchMin = process.env.BRANCH_MIN;
             const fnMin = process.env.FN_MIN;
+            const baseLine = process.env.BASELINE_LINE;
+            let deltaCell = 'n/a (no baseline)';
+            if (baseLine && baseLine.length > 0) {
+              const d = (parseFloat(line) - parseFloat(baseLine)).toFixed(2);
+              const sign = parseFloat(d) >= 0 ? '+' : '';
+              deltaCell = `${sign}${d}% vs main (${baseLine}%)`;
+            }
             const body = [
               '### Coverage (Lane K K.1 soft gate)',
               '',
-              '| metric | value | v1.3 gate |',
-              '| ------ | ----- | --------- |',
-              `| line   | ${line}% | >= ${lineMin}% (soft) |`,
-              `| branch | ${branch}% | >= ${branchMin}% (soft, may be 0 if unsupported) |`,
-              `| fn     | ${fn}% | >= ${fnMin}% (soft) |`,
+              '| metric | value | v1.3 gate | delta |',
+              '| ------ | ----- | --------- | ----- |',
+              `| line   | ${line}% | >= ${lineMin}% (soft) | ${deltaCell} |`,
+              `| branch | ${branch}% | TRACKED-ONLY (no v1.3 gate; v1.4 nightly) | — |`,
+              `| fn     | ${fn}% | >= ${fnMin}% (soft) | — |`,
               '',
               '_v1.3 is a soft gate (warn-only). v1.4 promotes to hard gate (85 / 75)._',
             ].join('\n');

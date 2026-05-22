@@ -47,7 +47,17 @@ use clap::{Parser, Subcommand, ValueEnum};
     long_about = None,
 )]
 struct Cli {
-    /// Output format.
+    /// Output format for agent / human consumers. Default `human`; pass
+    /// `json` for machine-parseable output.
+    ///
+    /// v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for
+    /// backward compatibility with v1.2.x. Most subcommands also expose a
+    /// per-subcommand `--output-format` flag with the same value enum, which
+    /// shadows the global within the subtree. Two subcommands extend the
+    /// enum locally — `doctor --output-format {json|text}` and
+    /// `config --output-format {text|json|yaml}` — because those surfaces
+    /// pre-date the unified flag. The full matrix and JSON schemas live
+    /// under `docs/json-schemas/cli/`.
     #[arg(long, value_enum, default_value_t = OutputFormat::Human, global = true)]
     format: OutputFormat,
 
@@ -84,6 +94,10 @@ ENV:\n  \
 REV_STEALTH_CAPTCHA_SECRET  Provider secret used by `captcha verify`."
     )]
     Captcha {
+        /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+        /// global `--format`. Schema: `docs/json-schemas/cli/captcha.output.json`.
+        #[command(flatten)]
+        output_format: commands::output_format::OutputFormatOverride,
         #[command(subcommand)]
         action: captcha_cmd::CaptchaAction,
     },
@@ -104,6 +118,10 @@ ENV:\n  \
 REV_STEALTH_CHROME  Override the chrome executable path."
     )]
     Browser {
+        /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+        /// global `--format`. Schema: `docs/json-schemas/cli/browser.output.json`.
+        #[command(flatten)]
+        output_format: commands::output_format::OutputFormatOverride,
         #[command(subcommand)]
         action: browser_cmd::BrowserAction,
     },
@@ -126,6 +144,10 @@ REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard policy-wide.\n  
 VPN_INSTANCES             Pool of named VPN instances (config.vpn_instances)."
     )]
     Vpn {
+        /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+        /// global `--format`. Schema: `docs/json-schemas/cli/vpn.output.json`.
+        #[command(flatten)]
+        output_format: commands::output_format::OutputFormatOverride,
         #[command(subcommand)]
         action: vpn_cmd::VpnAction,
     },
@@ -365,18 +387,56 @@ pub async fn run_async() -> i32 {
     let cli = Cli::parse();
     init_tracing(cli.verbose);
 
+    // v1.3 Lane G.4: each subcommand that owns an Args struct now flattens an
+    // `OutputFormatOverride` shim, so `--output-format` works both at the root
+    // (via global `--format`'s positional-tolerant alias is *not* used — global
+    // remains `--format`) and per-subcommand. The shim resolves to the global
+    // value when the user did not pass `--output-format`.
     match cli.command {
-        Command::Captcha { action } => captcha_cmd::run(cli.format, action).await.as_i32(),
-        Command::Browser { action } => browser_cmd::run(cli.format, action).await.as_i32(),
-        Command::Vpn { action } => vpn_cmd::run(cli.format, action).await.as_i32(),
+        Command::Captcha {
+            action,
+            output_format,
+        } => captcha_cmd::run(output_format.resolve(cli.format), action)
+            .await
+            .as_i32(),
+        Command::Browser {
+            action,
+            output_format,
+        } => browser_cmd::run(output_format.resolve(cli.format), action)
+            .await
+            .as_i32(),
+        Command::Vpn {
+            action,
+            output_format,
+        } => vpn_cmd::run(output_format.resolve(cli.format), action)
+            .await
+            .as_i32(),
         Command::Doctor(args) => doctor::run(cli.format, args).await.as_i32(),
-        Command::Spider(args) => commands::spider::run(cli.format, args).await,
-        Command::Relocate(args) => commands::relocate::run(cli.format, args).await,
-        Command::CfEvaluate(args) => commands::cf_evaluate::run(cli.format, args).await,
-        Command::Auth(args) => commands::auth::run(cli.format, args).await,
-        Command::Measure(args) => commands::measure::run(cli.format, args).await,
+        Command::Spider(args) => {
+            let fmt = args.output_format.resolve(cli.format);
+            commands::spider::run(fmt, args).await
+        }
+        Command::Relocate(args) => {
+            let fmt = args.output_format.resolve(cli.format);
+            commands::relocate::run(fmt, args).await
+        }
+        Command::CfEvaluate(args) => {
+            let fmt = args.output_format.resolve(cli.format);
+            commands::cf_evaluate::run(fmt, args).await
+        }
+        Command::Auth(args) => {
+            let fmt = args.output_format.resolve(cli.format);
+            commands::auth::run(fmt, args).await
+        }
+        Command::Measure(args) => {
+            let fmt = args.output_format.resolve(cli.format);
+            commands::measure::run(fmt, args).await
+        }
         Command::Config(args) => commands::config_cli::run(cli.format, args).await,
-        Command::Hermes(args) => commands::hermes::run(cli.format, args).await,
+        Command::Hermes(args) => {
+            let fmt = args.output_format.resolve(cli.format);
+            commands::hermes::run(fmt, args).await
+        }
         Command::Completions(args) => {
             generate_completions(args.shell);
             0
@@ -473,6 +533,27 @@ fn strip_internal_subcommands(_cmd: clap::Command) -> clap::Command {
         fresh = fresh.subcommand(sc);
     }
     fresh
+}
+
+/// v1.3 Lane G.4 test-utility: parse a full argv slice (including the
+/// `rev-stealth` program name at position 0) through the same clap derive
+/// surface the binary uses, returning a unit-or-error so integration tests
+/// in `tests/` can assert flag-surface contracts without spawning a process.
+///
+/// This is intentionally `pub` and prefixed with `__` to mark it as a
+/// crate-private surface for our own integration tests. External callers
+/// should drive the CLI through `run` or by spawning the binary.
+#[doc(hidden)]
+pub fn __cli_parse_for_test(argv: &[&str]) -> Result<(), clap::Error> {
+    Cli::try_parse_from(argv).map(|_| ())
+}
+
+/// v1.3 Lane G.4 test-utility: hand the integration test the live clap
+/// `Command` tree (post-derive) so it can call `debug_assert()` on it.
+#[doc(hidden)]
+pub fn __cli_command_for_test() -> clap::Command {
+    use clap::CommandFactory;
+    Cli::command()
 }
 
 #[cfg(test)]

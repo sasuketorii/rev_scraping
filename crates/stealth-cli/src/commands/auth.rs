@@ -35,6 +35,11 @@ const EXIT_ABORTED: i32 = 12;
 
 #[derive(Args, Debug)]
 pub struct AuthArgs {
+    /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+    /// global `--format`. JSON schema: `docs/json-schemas/cli/auth.output.json`.
+    /// Position-tolerant: `rev-stealth auth --output-format json list` works.
+    #[command(flatten)]
+    pub output_format: crate::commands::output_format::OutputFormatOverride,
     #[command(subcommand)]
     pub action: AuthAction,
 }

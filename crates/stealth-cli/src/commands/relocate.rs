@@ -25,6 +25,10 @@ use stealth_auth::AuthStore;
 
 #[derive(Args, Debug)]
 pub struct RelocateArgs {
+    /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+    /// global `--format`. JSON schema: `docs/json-schemas/cli/relocate.output.json`.
+    #[command(flatten)]
+    pub output_format: crate::commands::output_format::OutputFormatOverride,
     /// Session id (informational; not required to open the store).
     #[arg(long)]
     pub session_id: Option<Uuid>,

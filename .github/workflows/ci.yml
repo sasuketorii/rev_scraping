@@ -474,43 +474,25 @@ jobs:
             . -> target
       - name: cargo build -p rev-stealth
         run: cargo build -p rev-stealth
-      - name: regenerate + check snapshot (label-aware)
-        env:
-          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: regenerate + check snapshot (HARD — drift always fails)
         run: |
           set -euo pipefail
-          # R2 label-aware mode: the script itself stays drift-strict; here we
-          # add a label gate so a drift PR must declare additive vs breaking
-          # vs mcp-schema-breaking, mirroring cargo-public-api-diff.
+          # R2 hardening (Codex R2 scoring finding): a contributor MUST commit
+          # the regenerated snapshot in the same PR as the change that mutated
+          # the public surface — labels NEVER waive this. Why: if the snapshot
+          # gate could be waived with `api-additive`, the BASE-vs-HEAD
+          # mcp-schema-breaking detector would diff a stale base snapshot
+          # against the same stale live snapshot, miss the real breaking
+          # change, and let the PR merge with the wrong label.
           #
-          # NOTE: do NOT capture `$?` after an `if ...; then ...; fi` block —
-          # bash returns 0 from the un-taken branch, masking the failing exit
-          # code. Use `|| drift_rc=$?` to capture the script's real status.
-          drift_rc=0
-          ./scripts/cli-public-api-snapshot.sh --check || drift_rc=$?
-          if [[ "$drift_rc" -eq 0 ]]; then
-            echo "[cli-public-api-snapshot] surface unchanged; label check not required."
-            exit 0
-          fi
-          if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
-            exit "$drift_rc"
-          fi
-          labels_csv="$(printf '%s' "$PR_LABELS_JSON" | python3 -c 'import json,sys; ls=json.load(sys.stdin) or []; print(",".join(l.get("name","") for l in ls))')"
-          echo "[cli-public-api-snapshot] PR labels = '${labels_csv:-<none>}'"
-          allowed=0
-          IFS=',' read -ra arr <<< "$labels_csv"
-          for l in "${arr[@]}"; do
-            case "$l" in
-              api-additive|api-breaking|mcp-schema-breaking) allowed=1 ;;
-            esac
-          done
-          if [[ "$allowed" -eq 1 ]]; then
-            echo "::warning::snapshot drift detected but an explicit compat label is set; PR may regenerate the snapshot and merge."
-            exit 0
-          fi
-          echo "::error::CLI public-API snapshot drift requires one of: api-additive, api-breaking, mcp-schema-breaking."
-          exit "$drift_rc"
+          # Acceptable PR flow:
+          #   1. mutate CLI / MCP source
+          #   2. `./scripts/cli-public-api-snapshot.sh` to regenerate
+          #   3. commit the snapshot diff in the same PR
+          #   4. add `api-additive` / `api-breaking` / `mcp-schema-breaking`
+          #      based on the regenerated diff (label classifies; it does
+          #      not waive the regeneration requirement).
+          ./scripts/cli-public-api-snapshot.sh --check
 
   # I.2: cargo-public-api Rust API diff gate (HARD).
   #
@@ -585,11 +567,35 @@ jobs:
           # If pass 1 is healthy and pass 2 is non-zero, we know it is a real
           # diff and the label gate applies. If pass 1 fails, the gate fails
           # closed — labels cannot waive a broken invocation.
+          #
+          # Workspace coverage (Codex R2 scoring finding): enumerate ALL
+          # workspace members that have library targets via cargo metadata
+          # instead of hand-listing six. binary-only crates (no [lib]) are
+          # silently dropped by cargo-public-api, so we filter to lib targets.
           diff_seen=0
           exec_fail=0
           tmpdir="$(mktemp -d)"
-          for crate in stealth-core stealth-auth stealth-sanitize \
-                       stealth-agent-contracts stealth-parse stealth-mcp; do
+          # Process-substitution pipelines do NOT propagate exit status under
+          # `set -euo pipefail` (Codex R2 hardening finding). Materialize the
+          # crate list to a temp file with explicit exit-code checks at each
+          # stage so a metadata/helper failure cannot pretend "no diff".
+          metadata_json="$tmpdir/cargo-metadata.json"
+          if ! cargo metadata --no-deps --format-version=1 > "$metadata_json"; then
+            echo "::error::cargo metadata --no-deps failed; cannot enumerate workspace lib crates."
+            exit 1
+          fi
+          crate_list="$tmpdir/workspace-libs.txt"
+          if ! python3 scripts/workspace-lib-crates.py < "$metadata_json" > "$crate_list"; then
+            echo "::error::scripts/workspace-lib-crates.py failed; cannot enumerate workspace lib crates."
+            exit 1
+          fi
+          mapfile -t WORKSPACE_LIBS < "$crate_list"
+          if [[ "${#WORKSPACE_LIBS[@]}" -eq 0 ]]; then
+            echo "::error::workspace lib crate list is empty — refusing to fall through with zero coverage. Inspect $crate_list."
+            exit 1
+          fi
+          echo "[cargo-public-api] workspace lib crates (${#WORKSPACE_LIBS[@]}): ${WORKSPACE_LIBS[*]}"
+          for crate in "${WORKSPACE_LIBS[@]}"; do
             echo "::group::cargo public-api diff -p $crate"
 
             # Pass 1: smoke run, no --deny. Non-zero ⇒ exec failure.

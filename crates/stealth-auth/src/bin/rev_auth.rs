@@ -551,9 +551,7 @@ fn write_xvfb_run_shim(
         )
     })?;
     let shim_path = user_data_dir.join("rev-auth-xvfb-run.sh");
-    let script = format!(
-        "#!/bin/sh\nexec '{xvfb_run_str}' -a -- '{chrome_bin_str}' \"$@\"\n"
-    );
+    let script = format!("#!/bin/sh\nexec '{xvfb_run_str}' -a -- '{chrome_bin_str}' \"$@\"\n");
     std::fs::write(&shim_path, script).map_err(|error| {
         format!(
             "failed to write xvfb-run shim {}: {error}",

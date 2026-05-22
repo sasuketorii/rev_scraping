@@ -15,6 +15,8 @@ pub mod fallback_http;
 pub mod hermes;
 // v1.1.0 (P15): local-only fingerprint measurement subcommand.
 pub mod measure;
+// v1.3 (G.4): shared `--output-format` per-subcommand override.
+pub mod output_format;
 pub mod recipe_runtime;
 pub mod relocate;
 pub mod spider;

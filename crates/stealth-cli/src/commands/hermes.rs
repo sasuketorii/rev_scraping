@@ -35,6 +35,10 @@ use crate::OutputFormat;
 /// Top-level args for `rev-stealth hermes`.
 #[derive(Args, Debug, Clone)]
 pub struct HermesArgs {
+    /// v1.3 Lane G.4: per-subcommand `--output-format` override of the
+    /// global `--format`. JSON schema: `docs/json-schemas/cli/hermes.output.json`.
+    #[command(flatten)]
+    pub output_format: crate::commands::output_format::OutputFormatOverride,
     #[command(subcommand)]
     pub action: HermesAction,
 }
@@ -219,11 +223,7 @@ pub fn default_source() -> PathBuf {
     PathBuf::from(manifest_dir)
         .parent() // crates/
         .and_then(Path::parent) // workspace root
-        .map(|root| {
-            root.join("dist")
-                .join("hermes")
-                .join(PLUGIN_DIR_NAME)
-        })
+        .map(|root| root.join("dist").join("hermes").join(PLUGIN_DIR_NAME))
         .unwrap_or_else(|| {
             PathBuf::from(manifest_dir)
                 .join("../../dist/hermes")
@@ -456,7 +456,11 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let root = dir.path();
         fs::write(root.join("plugin.yaml"), "name: rev-scraping-mcp\n").unwrap();
-        fs::write(root.join("__init__.py"), "def register(ctx):\n    return {}\n").unwrap();
+        fs::write(
+            root.join("__init__.py"),
+            "def register(ctx):\n    return {}\n",
+        )
+        .unwrap();
         fs::write(root.join("mcp_client.py"), "# stub\n").unwrap();
         fs::write(root.join("lifecycle.py"), "# stub\n").unwrap();
         fs::write(root.join("tool_proxy.py"), "# stub\n").unwrap();

@@ -19,6 +19,8 @@
 //!   cargo run -p stealth-mcp --bin gen_reference -- --check
 //!   cargo run -p stealth-mcp --bin gen_reference -- --output /tmp/out.md
 
+#![forbid(unsafe_code)]
+
 use std::env;
 use std::fs;
 use std::path::PathBuf;

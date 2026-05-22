@@ -26,6 +26,25 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  # K.6 acceptance asks for `cargo test --release` PASS on all 4 platforms
+  # declared in this workflow. linux-x86_64 + macos-arm64 are also exercised
+  # on every PR via ci.yml; re-running them nightly here gives a single
+  # workflow that reviewers can point at for the full 4-way matrix.
+  linux-x86_64:
+    name: cargo test linux-x86_64 (nightly)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-x86_64-cron
+          workspaces: |
+            . -> target
+      - name: cargo test --workspace --release
+        run: cargo test --workspace --release --no-fail-fast
+
   linux-aarch64-qemu:
     name: cargo test aarch64-unknown-linux-gnu (QEMU, nightly)
     runs-on: ubuntu-22.04
@@ -50,15 +69,30 @@ jobs:
             --target aarch64-unknown-linux-gnu -- --test-threads=2
 
   macos-x86_64:
-    name: cargo test macos-13 (x86_64 Intel, nightly)
-    runs-on: macos-13
+    name: cargo test macos-15-intel (x86_64 Intel, nightly)
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: macos-13-x86_64
+          shared-key: macos-15-intel-x86_64
+          workspaces: |
+            . -> target
+      - name: cargo test --workspace --release
+        run: cargo test --workspace --release --no-fail-fast
+
+  macos-arm64:
+    name: cargo test macos-14 (arm64 Apple Silicon, nightly)
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: macos-14-arm64-cron
           workspaces: |
             . -> target
       - name: cargo test --workspace --release

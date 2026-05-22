@@ -1,0 +1,3673 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+2026-05-22T21:03:27.286386Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5180-0e37-74d0-914c-569d9c2d21bb
+--------
+user
+あなたは Lane I scoring 担当 (Codex gpt-5.5-xhigh)。Lane I "API stability + semver" を 7 軸 rubric で 0-10 採点。
+
+## 入力
+- ExecPlan: .agent/active/v1_3_uplift_execplan_rev1.md Lane I 部
+- Quality bar: .agent/active/v1_3_quality_bar.md 7 軸 rubric
+- Baseline: v1.2.0 (b2153aa0)
+- WIP commit: 7c700a0b
+- 参考 Opus 採点: .agent/active/scoring/v1_3_i_score_round1_opus.md (overall 9.08 PASS, D 8.8 / A 9.2 が低めの軸)
+
+## Lane I 成果物
+- scripts/cli-public-api-snapshot.sh (~250 LOC, schema_version=2)
+- scripts/mcp-schema-breaking.sh (~130 LOC)
+- .agent/v1.3/cli-public-api.snapshot.json (35KB, 11 cmd / 36 spider flag / 11 env / 5 exit / 16 MCP tools)
+- docs/compat.md (~100 行 semver policy: MCP 2-major / CLI 1-major / internal unstable)
+- CHANGELOG.rev_scraping.md (~85 行 keep-a-changelog 1.1)
+- crates/stealth-cli/tests/deprecated_completeness.rs (~250 LOC, 2 tests)
+- .github/workflows/ci.yml に 3 新規 job: cli-public-api-snapshot / cargo-public-api-diff advisory / mcp-schema-breaking-detector
+- I.5 limitation: mcp-schema-lint freshness-only (base-diff 未実装) — docs/compat.md で文書化 + v1.4 backlog
+- 14 Codex review rounds, 1.1M tokens 消費
+
+## 採点指示
+7 軸 (A-G) 0-10 採点、根拠 1-3 行、overall 重み付き平均。
+重み: A 2.0 / B 1.5 / C 1.5 / D 2.0 / E 1.0 / F 1.0 / G 1.0
+
+合格 ≥ 9.0。Opus に引きずられず独立採点。
+
+## 出力形式
+| 軸 | スコア | 根拠 |
+|---|---|---|
+
+overall = X.XX
+verdict: PASS | FAIL
+deltas to 9.0 (PASS 済でも 9.5+ 強化 deltas): ...
+
+2026-05-22T21:03:28.127920Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T21:03:28.227333Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T21:03:28.499975Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+Lane I の採点に必要な rubric、ExecPlan、成果物、CI 差分をローカルで確認します。Opus 評価は参照しますが、まず実物と品質基準から独立に見ます。
+exec
+/bin/bash -lc "rg -n \"Lane I|I\\.|API stability|semver|rubric|A\\.|B\\.|C\\.|D\\.|E\\.|F\\.|G\\.\" .agent/active/v1_3_uplift_execplan_rev1.md .agent/active/v1_3_quality_bar.md .agent/active/scoring/v1_3_i_score_round1_opus.md" in $REPO_ROOT
+ succeeded in 0ms:
+.agent/active/v1_3_uplift_execplan_rev1.md:29:| G.1 | CLI public surface inventory + naming consistency review (`rev-stealth <noun> <verb>` shape) | 0.6 | `.agent/v1.3/cli-surface.json` machine-readable; review note in PR |
+.agent/active/v1_3_uplift_execplan_rev1.md:30:| G.2 | All sub-command `--help` upgraded to dictionary quality (description + 1-3 examples + exit codes + env vars consumed) | 1.0 | `cargo test --test help_dictionary_quality` PASS; CI lint blocks regressions |
+.agent/active/v1_3_uplift_execplan_rev1.md:31:| G.3 | Shell completion auto-gen for bash / zsh / fish / nushell + CI completion-drift gate | 0.7 | `target/completions/*` committed; CI fails on stale |
+.agent/active/v1_3_uplift_execplan_rev1.md:32:| G.4 | `--output-format {json\|yaml\|text}` on every sub-command + per-command JSON schema in `docs/json-schemas/cli/` | 0.8 | Each command's JSON output validates against schema; integration test |
+.agent/active/v1_3_uplift_execplan_rev1.md:33:| G.5 | `--dry-run` and `--explain` on every mutating sub-command | 0.7 | mutating commands enumerated; integration test ensures no FS / network side effect under --dry-run |
+.agent/active/v1_3_uplift_execplan_rev1.md:34:| G.6 | Idempotent-commit semantics: same input + same `--idempotency-key` returns identical output, no duplicate write | 0.8 | proptest 50-iter; `rev-stealth auth login --idempotency-key X` twice = 1 audit entry |
+.agent/active/v1_3_uplift_execplan_rev1.md:35:| G.7 | Unified error output template: `{kind, message, hint, retry_after_ms?, doc_url}` everywhere (matches ErrorEnvelope) | 0.6 | regression test: every error path emits all required fields; doc-url resolves |
+.agent/active/v1_3_uplift_execplan_rev1.md:36:| G.8 | man page (mdoc/roff) auto-generated; `man rev-stealth` + `man rev-stealth-spider` available after `make install` | 0.5 | `man rev-stealth-spider \| col -bx \| grep -c '\.SH'` ≥ 6 (NAME/SYNOPSIS/DESCRIPTION/OPTIONS/EXAMPLES/EXIT STATUS) |
+.agent/active/v1_3_uplift_execplan_rev1.md:57:## Lane I — API stability & semver
+.agent/active/v1_3_uplift_execplan_rev1.md:59:Plan A 2.14-2.15 + Lane I from my pre-pivot draft.
+.agent/active/v1_3_uplift_execplan_rev1.md:63:| I.1 | CLI public surface machine-readable snapshot (every flag, every env var, every output field) | 0.4 | `.agent/v1.3/cli-public-api.snapshot.json` committed |
+.agent/active/v1_3_uplift_execplan_rev1.md:64:| I.2 | `cargo-public-api` PR gate (workspace member crates) | 0.4 | PR adds new pub item → CI requires label `api-additive` or `api-breaking` |
+.agent/active/v1_3_uplift_execplan_rev1.md:65:| I.3 | `docs/compat.md` semver policy: MCP schema = 2-major guarantee / CLI flag = 1-major / internal types = no guarantee | 0.4 | document committed; linked from README |
+.agent/active/v1_3_uplift_execplan_rev1.md:66:| I.4 | `CHANGELOG.md` keep-a-changelog format + automation hook from `release-please` | 0.3 | machine-parseable; CI verifies on every PR |
+.agent/active/v1_3_uplift_execplan_rev1.md:67:| I.5 | MCP tool schema breaking-change detector (extend `mcp-schema-lint`) | 0.5 | schema change in `tools.rs` → fail unless `mcp-schema-breaking` label |
+.agent/active/v1_3_uplift_execplan_rev1.md:68:| I.6 | `#[deprecated(...)]` lint customization: forces `since`, `note`, and `replace_with` populated | 0.4 | clippy custom lint denies missing fields |
+.agent/active/v1_3_uplift_execplan_rev1.md:70:**Lane I total: 2.4 dev-day**
+.agent/active/v1_3_uplift_execplan_rev1.md:109:| G    | G.1 → G.2 → G.7       | 2.2 |
+.agent/active/v1_3_uplift_execplan_rev1.md:111:| I    | I.1 → I.2 → I.5       | 1.3 |
+.agent/active/v1_3_uplift_execplan_rev1.md:122:- I.5 ↔ K.6 share `cargo-public-api` (define once)
+.agent/active/v1_3_uplift_execplan_rev1.md:123:- G.4 ↔ J.3 ↔ I.5: JSON output schema is the cross-cut spec; G.4 produces schema, J.3 documents, I.5 gates breaking changes
+.agent/active/v1_3_uplift_execplan_rev1.md:141:9. **Confidence in semver**: `docs/compat.md` + `cargo-public-api` snapshot
+.agent/active/v1_3_uplift_execplan_rev1.md:160:| `cargo-public-api` snapshot churn over normal refactors | I.2 | Use `--simplified` flag; auto-bless on label `api-additive-ok` |
+.agent/active/v1_3_uplift_execplan_rev1.md:170:| I | Codex with semver semantic guide | `cargo-public-api` diffs are mechanical |
+.agent/active/v1_3_uplift_execplan_rev1.md:182:- `.agent/active/prompts/v1_3_i[1-6]_review*.md` (Lane I)
+.agent/active/scoring/v1_3_i_score_round1_opus.md:1:# Lane I Opus scoring round 1 (recorded)
+.agent/active/scoring/v1_3_i_score_round1_opus.md:5:| A | 9.2 | snapshot 6 dim + deprecated_completeness 2 tests; I.5 freshness-only documented |
+.agent/active/scoring/v1_3_i_score_round1_opus.md:6:| B | 9.0 | compat.md 3-tier + CHANGELOG keep-a-changelog 1.1 + I.5 honest disclosure |
+.agent/active/v1_3_quality_bar.md:11:3. **Codex gpt-5.5-xhigh scoring** を canonical wrapper 経由で同じ rubric で採点
+.agent/active/v1_3_quality_bar.md:16:## Scoring rubric (7 軸 × 10 点満点)
+.agent/active/v1_3_quality_bar.md:30:- Lane G なら CLI UX、Lane H なら配布、Lane I なら semver discipline、Lane J なら docs、Lane K なら quality infra
+.agent/active/v1_3_quality_bar.md:63:## Lane 別の追加軸 (rubric 上書き、上記 7 軸の D を再解釈)
+.agent/active/v1_3_quality_bar.md:69:| I — API stability | 「semver 違反が PR レベルで止まる」+「deprecation policy が機械可読」|
+
+exec
+/bin/bash -lc 'git status --short && git rev-parse --short HEAD && git rev-parse --verify b2153aa0 && git rev-parse --verify 7c700a0b' in $REPO_ROOT
+ succeeded in 0ms:
+ M .agent/active/scoring/v1_3_j_convergence.md
+ M Cargo.lock
+ M crates/stealth-agent-contracts/Cargo.toml
+ M crates/stealth-auth/Cargo.toml
+ M crates/stealth-cli/src/browser_cmd.rs
+ M crates/stealth-cli/src/captcha_cmd.rs
+ M crates/stealth-cli/src/commands/auth.rs
+ M crates/stealth-cli/src/commands/config_cli.rs
+ M crates/stealth-cli/src/commands/hermes.rs
+ M crates/stealth-cli/src/main.rs
+ M crates/stealth-cli/src/vpn_cmd.rs
+ M crates/stealth-mcp/Cargo.toml
+ M crates/stealth-sites/Cargo.toml
+ M crates/vpn-rotate/Cargo.toml
+?? .agent/active/scoring/v1_3_h_convergence_r1.md
+?? .agent/active/scoring/v1_3_h_score_round1_codex.err
+?? .agent/active/scoring/v1_3_h_score_round1_codex.md
+?? .agent/active/scoring/v1_3_h_score_round1_codex.out
+?? .agent/active/scoring/v1_3_h_score_round1_opus.md
+?? .agent/active/scoring/v1_3_i_score_round1_codex.err
+?? .agent/active/scoring/v1_3_i_score_round1_codex.out
+?? .agent/active/scoring/v1_3_i_score_round1_opus.md
+?? .agent/active/scoring/v1_3_j_score_round1_opus.md
+?? crates/stealth-agent-contracts/tests/
+?? crates/stealth-auth/benches/
+?? crates/stealth-auth/tests/proptest_envelope.rs
+?? crates/stealth-mcp/benches/
+?? crates/stealth-sites/benches/
+?? crates/vpn-rotate/tests/proptest_rotation_policy.rs
+81e2a180
+b2153aa0623d567ab68ccbb45fadbe69f41b9119
+7c700a0b544ae72ead0285ac900a7da17e92cb2a
+
+exec
+/bin/bash -lc 'ls -l scripts/cli-public-api-snapshot.sh scripts/mcp-schema-breaking.sh .agent/v1.3/cli-public-api.snapshot.json docs/compat.md CHANGELOG.rev_scraping.md crates/stealth-cli/tests/deprecated_completeness.rs .github/workflows/ci.yml' in $REPO_ROOT
+ succeeded in 0ms:
+-rw-r--r--@ 1 sasuketorii  staff  35277 May 23 05:49 .agent/v1.3/cli-public-api.snapshot.json
+-rw-r--r--@ 1 sasuketorii  staff  21398 May 23 05:46 .github/workflows/ci.yml
+-rw-r--r--@ 1 sasuketorii  staff   3828 May 23 05:36 CHANGELOG.rev_scraping.md
+-rw-r--r--@ 1 sasuketorii  staff  13220 May 23 05:30 crates/stealth-cli/tests/deprecated_completeness.rs
+-rw-r--r--@ 1 sasuketorii  staff   6571 May 23 05:48 docs/compat.md
+-rwxr-xr-x@ 1 sasuketorii  staff  13337 May 23 05:34 scripts/cli-public-api-snapshot.sh
+-rwxr-xr-x@ 1 sasuketorii  staff   6634 May 23 05:43 scripts/mcp-schema-breaking.sh
+
+codex
+作業木には他 Lane 由来と思われる未コミット変更があります。採点対象は指定どおり `7c700a0b` と baseline `b2153aa0` を基準にし、必要に応じて commit 内容を直接参照して混線を避けます。
+exec
+/bin/bash -lc "sed -n '57,75p' .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
+ succeeded in 0ms:
+## Lane I — API stability & semver
+
+Plan A 2.14-2.15 + Lane I from my pre-pivot draft.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| I.1 | CLI public surface machine-readable snapshot (every flag, every env var, every output field) | 0.4 | `.agent/v1.3/cli-public-api.snapshot.json` committed |
+| I.2 | `cargo-public-api` PR gate (workspace member crates) | 0.4 | PR adds new pub item → CI requires label `api-additive` or `api-breaking` |
+| I.3 | `docs/compat.md` semver policy: MCP schema = 2-major guarantee / CLI flag = 1-major / internal types = no guarantee | 0.4 | document committed; linked from README |
+| I.4 | `CHANGELOG.md` keep-a-changelog format + automation hook from `release-please` | 0.3 | machine-parseable; CI verifies on every PR |
+| I.5 | MCP tool schema breaking-change detector (extend `mcp-schema-lint`) | 0.5 | schema change in `tools.rs` → fail unless `mcp-schema-breaking` label |
+| I.6 | `#[deprecated(...)]` lint customization: forces `since`, `note`, and `replace_with` populated | 0.4 | clippy custom lint denies missing fields |
+
+**Lane I total: 2.4 dev-day**
+
+## Lane J — Agent-First documentation
+
+Plan A axis 5 (subset), reframed for AI-agent-dev audience.
+
+
+exec
+/bin/bash -lc "sed -n '1,140p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
+ succeeded in 0ms:
+# v1.3 Quality Bar — Dual 9/10 Convergence Protocol
+
+**Mandate (user, 2026-05-23)**: Opus 4.7-xhigh と Codex gpt-5.5-xhigh の **両方が 10 点中 9 点以上を出すまで** 各 Lane を反復する。
+
+## 評価プロトコル
+
+Lane の coder driver が LGTM (binary) で sub-phase 完走した後、**追加で graded review** を実施:
+
+1. Lane driver の完走報告を `.agent/active/reviews/v1_3_<lane>_final.md` として保存
+2. **Opus 4.7-xhigh scoring agent** を独立 dispatch — Lane 成果物を 7 軸で採点
+3. **Codex gpt-5.5-xhigh scoring** を canonical wrapper 経由で同じ rubric で採点
+4. **両方が ≥ 9.0** で合格、Lane 完了
+5. どちらか < 9.0 → 採点者の指摘を集約 → fix driver dispatch → 再採点
+6. 最大 3 ラウンドの scoring (3 回 fix で 9/10 取れなければ narrow stop で operator escalate)
+
+## Scoring rubric (7 軸 × 10 点満点)
+
+Lane 共通の評価軸。各軸 0-10 で採点、平均が overall score。
+
+### 軸 A: Acceptance criteria 充足度 (重み 2.0)
+- ExecPlan に書かれた各 sub-phase の acceptance criteria を機械的に検証
+- 全 criteria PASS → 10、半分 PASS → 5、未着手 → 0
+
+### 軸 B: 外部 verifiable / CI gate / adversarial test の 3 原則 (重み 1.5)
+- Plan A §0.2 由来。「gameable な 9/10」排除原則
+- 3 原則 ≥ 2 で 10、1 で 5、0 で 0
+
+### 軸 C: 競合比較で勝つか (重み 1.5)
+- ripgrep / fd / gh / wrangler / Crawl4AI / Browserless と並べたとき同等以上か
+- Lane G なら CLI UX、Lane H なら配布、Lane I なら semver discipline、Lane J なら docs、Lane K なら quality infra
+- 「明確に勝つ」→ 10、「同等」→ 7、「劣後」→ 3
+
+### 軸 D: AI エージェント開発者体験 (重み 2.0)
+- Claude Code / Cursor / Hermes ユーザが evaluate して reject しないか
+- JSON output / error envelope / idempotency / discoverability などが体験良く揃ってるか
+- 「最初に試すべき」レベル → 10、「使える」→ 7、「習熟前提」→ 4
+
+### 軸 E: 1 年後の負債回避 (重み 1.0)
+- 採用技術が 1 年後も maintain されているか
+- 設定ファイルや schema の breaking change リスク
+- CI / dependency が腐る速度
+- 安心 → 10、要注意点あり → 6、明確な負債 → 3
+
+### 軸 F: テスト + evidence の質 (重み 1.0)
+- 機械検証可能な test (proptest / fuzz / golden / integration) の量と質
+- 単なる happy-path test は 5、edge case + adversarial で 10
+- evidence (artifacts, logs, screenshots) の保存有無
+
+### 軸 G: ドキュメント完全性 (重み 1.0)
+- Lane 成果物が次の人 (operator / contributor / reviewer) が読んで理解可能か
+- ADR / RELEASE_NOTES 反映 / README / mdBook 整合性
+- 「次の人にハンドオフ可能」→ 10、「自分しか分からない」→ 3
+
+## 計算式
+
+```
+overall = (A*2.0 + B*1.5 + C*1.5 + D*2.0 + E*1.0 + F*1.0 + G*1.0) / 10.0
+合格: Opus overall ≥ 9.0 AND Codex overall ≥ 9.0
+```
+
+両者の score 差が 1.5 を超えた場合、disagreement reason を文書化、tie-break は operator。
+
+## Lane 別の追加軸 (rubric 上書き、上記 7 軸の D を再解釈)
+
+| Lane | D の特化 |
+|------|---------|
+| G — CLI UX 黒帯化 | 「ripgrep ファンが好む」+ 「Claude Code から `--output-format json` で安全に pipe できる」|
+| H — 配布距離ゼロ | 「`brew install rev-stealth` を 60 秒で実行できる」+「SBOM/cosign で supply-chain 監査可能」|
+| I — API stability | 「semver 違反が PR レベルで止まる」+「deprecation policy が機械可読」|
+| J — Agent-First docs | 「`docs/.../tutorial/05-claude-code.md` 通りで 5 分で動く」+「26 ErrorKind 全て個別解説」|
+| K — Quality moat | 「coverage 80%+ / fuzz nightly / cross-platform 4 matrix / SBOM/sigstore」|
+
+## Scoring agent への prompt 雛形
+
+```
+あなたは <Opus 4.7-xhigh | Codex gpt-5.5-xhigh> の v1.3 Lane <X> scoring 担当。
+
+Lane 成果物: <driver report path>
+Rubric: .agent/active/v1_3_quality_bar.md の 7 軸 (A-G)
+ExecPlan 参照: .agent/active/v1_3_uplift_execplan_rev1.md Lane <X>
+ベースライン: v1.2.0 (commit b2153aa0)
+
+各軸を 0-10 で採点、根拠を 1-3 行で記述。
+最後に overall score (重み付き平均) を出して、< 9.0 なら具体的な「9 にするための差分」を箇条書き。
+
+形式:
+| 軸 | スコア | 根拠 |
+|---|---|---|
+| A | X.X | ... |
+...
+overall = X.XX
+
+verdict: PASS (≥ 9.0) | FAIL (< 9.0)
+deltas to reach 9.0: <none | bullet list>
+```
+
+## Scoring loop ターミネーション
+
+- max 3 fix round per lane
+- 3 round で両者 9/10 未達 → narrow stop + operator escalation (v1.3.0 として ship するか、v1.3.0-rc1 で出して soak するか判断)
+- 両者 ≥ 9.0 で初回合格は理想だが現実的には 1-2 fix round 想定
+
+## Evidence 保存
+
+- Scoring prompts: `.agent/active/scoring/v1_3_<lane>_score_round{1,2,3}_<opus|codex>.md`
+- Scoring responses: `.agent/active/scoring/v1_3_<lane>_score_round{1,2,3}_<opus|codex>.out`
+- Final convergence record: `.agent/active/scoring/v1_3_<lane>_convergence.md` (両者の最終 score + delta history)
+
+## Operator visibility
+
+各 lane の Pass/Fail と差分は `.agent/active/v1_3_progress.md` (ダッシュボード markdown) に集約、operator は 1 ファイル見れば全 lane 進捗を把握可能。
+
+exec
+/bin/bash -lc "sed -n '1,120p' .agent/active/scoring/v1_3_i_score_round1_opus.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Lane I Opus scoring round 1 (recorded)
+
+| 軸 | スコア | 根拠 |
+|---|---|---|
+| A | 9.2 | snapshot 6 dim + deprecated_completeness 2 tests; I.5 freshness-only documented |
+| B | 9.0 | compat.md 3-tier + CHANGELOG keep-a-changelog 1.1 + I.5 honest disclosure |
+| C | 9.5 | Playwright/Crawl4AI/Browserless are public-API-drift-undocumented; 3 detectors here are gap-widening |
+| D | 8.8 | typed agent reads cargo-public-api CI diff; compat machine-grep-able; replace_with attr lacks schema export (-0.2) |
+| E | 9.0 | schema_version-aware snapshot script; detector has base-diff slot for future |
+| F | 9.0 | 3 CI jobs lightweight (snapshot static, public-api advisory) |
+| G | 9.0 | breaking detector advisory + schema-version fail-closed + deprecated CI catches silent removal |
+
+overall = 9.08
+verdict: PASS (>= 9.0)
+
+deltas to harden 9.0 -> 9.3+:
+- D+0.2: export #[deprecated]'s replace_with into cli-public-api.snapshot.json
+- A+0.1: add opt-in base-diff skeleton to mcp-schema-breaking.sh
+- B+0.1: add 3-case worked-example table for MCP breaking in compat.md
+- E+0.1: schema_version bump migration note section in compat.md
+- G+0.1: require removal_target_version in deprecated_completeness test
+
+exec
+/bin/bash -lc 'git show --stat --oneline --decorate --no-renames 7c700a0b' in $REPO_ROOT
+ succeeded in 0ms:
+7c700a0b wip(v1.3): partial Lane G/H/I/J/K — Black-Belt CLI synth checkpoint
+ .agent/active/prompts/v1_3_g1_review.md            |   34 +
+ .agent/active/prompts/v1_3_g1_review_round2.md     |   43 +
+ .agent/active/prompts/v1_3_g1_review_round3.md     |   28 +
+ .agent/active/prompts/v1_3_h_plumbing_review.md    |   44 +
+ .../prompts/v1_3_h_plumbing_review_round2.md       |   45 +
+ .../prompts/v1_3_h_plumbing_review_round3.md       |   40 +
+ .agent/active/prompts/v1_3_i1_review.md            |   25 +
+ .agent/active/prompts/v1_3_i1_review_round2.md     |   27 +
+ .agent/active/prompts/v1_3_i1_review_round3.md     |   29 +
+ .agent/active/prompts/v1_3_i2_review.md            |   16 +
+ .agent/active/prompts/v1_3_i2_review_round2.md     |   30 +
+ .agent/active/prompts/v1_3_i2_review_round3.md     |   32 +
+ .agent/active/prompts/v1_3_i2_review_round4.md     |   22 +
+ .agent/active/prompts/v1_3_i3_review.md            |   19 +
+ .agent/active/prompts/v1_3_i3_review_round2.md     |   25 +
+ .agent/active/prompts/v1_3_i3_review_round3.md     |   19 +
+ .agent/active/prompts/v1_3_i4_review.md            |   16 +
+ .agent/active/prompts/v1_3_i4_review_round2.md     |   22 +
+ .agent/active/prompts/v1_3_i4_review_round3.md     |   24 +
+ .agent/active/prompts/v1_3_i5_review.md            |   16 +
+ .agent/active/prompts/v1_3_i5_review_round2.md     |   24 +
+ .agent/active/prompts/v1_3_i5_review_round3.md     |   27 +
+ .agent/active/prompts/v1_3_i6_review.md            |   27 +
+ .agent/active/prompts/v1_3_i6_review_round2.md     |   27 +
+ .agent/active/prompts/v1_3_j1_review.md            |   36 +
+ .agent/active/prompts/v1_3_j2_review.md            |   36 +
+ .agent/active/prompts/v1_3_j3_review.md            |   36 +
+ .agent/active/prompts/v1_3_j4_review.md            |   36 +
+ .agent/active/prompts/v1_3_j5_review.md            |   36 +
+ .agent/active/prompts/v1_3_j6_review.md            |   36 +
+ .agent/active/prompts/v1_3_j7_review.md            |   36 +
+ .agent/active/prompts/v1_3_j_lane_review.md        |   24 +
+ .agent/active/prompts/v1_3_j_lane_review_round2.md |   17 +
+ .agent/active/prompts/v1_3_j_lane_review_round3.md |   30 +
+ .agent/active/scoring/v1_3_j_convergence.md        |   30 +
+ .agent/active/scoring/v1_3_j_score_round1_codex.md |   23 +
+ .../active/scoring/v1_3_j_score_round1_codex.out   | 2648 +++++++++++++++++++
+ .agent/v1.3/cli-naming-lint.json                   |   41 +
+ .agent/v1.3/cli-public-api.snapshot.json           | 1586 ++++++++++++
+ .agent/v1.3/cli-surface-review.md                  |   87 +
+ .agent/v1.3/cli-surface.json                       | 2695 ++++++++++++++++++++
+ .dockerignore                                      |   55 +
+ .github/workflows/bench.yml                        |   56 +
+ .github/workflows/ci.yml                           |  115 +
+ .github/workflows/coverage.yml                     |  123 +
+ .github/workflows/cross-platform-nightly.yml       |   65 +
+ .github/workflows/docs.yml                         |   88 +
+ .github/workflows/fuzz-nightly.yml                 |   69 +
+ .github/workflows/release-please.yml               |   27 +
+ .github/workflows/release.yml                      |  335 ++-
+ .github/workflows/sbom.yml                         |  116 +
+ .github/workflows/security.yml                     |   52 +
+ .release-please-manifest.json                      |    3 +
+ .trivyignore                                       |   12 +
+ CHANGELOG.rev_scraping.md                          |   84 +
+ Cargo.lock                                         |  218 +-
+ Cargo.toml                                         |   15 +
+ Dockerfile.distroless                              |   86 +
+ Formula/rev-stealth.rb                             |   80 +
+ README.md                                          |    1 +
+ crates/rev-stealth-cli/Cargo.toml                  |  103 +
+ crates/rev-stealth-cli/README.md                   |   37 +
+ crates/rev-stealth-cli/src/main.rs                 |   30 +
+ crates/stealth-agent-contracts/src/lib.rs          |    7 +
+ crates/stealth-cf/src/lib.rs                       |    4 +-
+ .../stealth-cli/tests/deprecated_completeness.rs   |  389 +++
+ crates/stealth-parse/src/lib.rs                    |    2 +
+ crates/stealth-sanitize/Cargo.toml                 |   14 +
+ .../stealth-sanitize/benches/sanitize_hotpath.rs   |   81 +
+ crates/stealth-sanitize/fuzz/.gitignore            |    5 +
+ crates/stealth-sanitize/fuzz/Cargo.toml            |   51 +
+ .../fuzz/fuzz_targets/mcp_jsonrpc_frame.rs         |   21 +
+ .../fuzz/fuzz_targets/sanitize_full.rs             |   24 +
+ .../fuzz/fuzz_targets/sanitize_l4_unicode.rs       |   25 +
+ crates/stealth-sanitize/src/layer2_envelope.rs     |    8 +-
+ crates/stealth-sanitize/src/layer3_canary.rs       |  173 +-
+ crates/stealth-sanitize/src/layer4_unicode.rs      |   20 +-
+ crates/stealth-sanitize/src/layer5_clamp.rs        |    8 +-
+ crates/stealth-sanitize/src/lib.rs                 |   81 +-
+ crates/stealth-sanitize/tests/golden_corpus.rs     |  149 +-
+ .../stealth-sanitize/tests/proptest_invariants.rs  |  106 +
+ depr_raw                                           |  Bin 0 -> 462056 bytes
+ depr_space                                         |  Bin 0 -> 462056 bytes
+ docs/book/book.toml                                |   39 +
+ docs/book/src/SUMMARY.md                           |   78 +
+ docs/book/src/en/README.md                         |   53 +
+ docs/book/src/en/compat.md                         |   16 +
+ docs/book/src/en/errors/Aborted.md                 |   50 +
+ docs/book/src/en/errors/Aup.md                     |   49 +
+ docs/book/src/en/errors/Auth.md                    |   49 +
+ docs/book/src/en/errors/AuthSessionExpired.md      |   48 +
+ docs/book/src/en/errors/AuthSessionNotFound.md     |   48 +
+ docs/book/src/en/errors/AuthSessionPending.md      |   48 +
+ docs/book/src/en/errors/BrowserCrashed.md          |   50 +
+ docs/book/src/en/errors/BrowserNotFound.md         |   48 +
+ docs/book/src/en/errors/Captcha.md                 |   49 +
+ docs/book/src/en/errors/CdpDisconnected.md         |   49 +
+ docs/book/src/en/errors/CdpInjectionFailed.md      |   49 +
+ docs/book/src/en/errors/CdpProtocol.md             |   49 +
+ docs/book/src/en/errors/CookieDecryptFailed.md     |   49 +
+ docs/book/src/en/errors/Internal.md                |   47 +
+ docs/book/src/en/errors/Network.md                 |   50 +
+ docs/book/src/en/errors/NotFound.md                |   49 +
+ docs/book/src/en/errors/README.md                  |   47 +
+ docs/book/src/en/errors/RateLimit.md               |   50 +
+ docs/book/src/en/errors/RecipeInvalid.md           |   49 +
+ docs/book/src/en/errors/RecipeNotFound.md          |   48 +
+ docs/book/src/en/errors/Ssrf.md                    |   49 +
+ docs/book/src/en/errors/Timeout.md                 |   50 +
+ docs/book/src/en/errors/Validation.md              |   49 +
+ docs/book/src/en/errors/VpnAllInstancesFailed.md   |   49 +
+ docs/book/src/en/errors/VpnCountryMismatch.md      |   49 +
+ docs/book/src/en/errors/VpnLeak.md                 |   50 +
+ docs/book/src/en/errors/VpnNotConfigured.md        |   48 +
+ docs/book/src/en/install.md                        |   81 +
+ docs/book/src/en/landscape.md                      |   66 +
+ docs/book/src/en/migration/README.md               |   10 +
+ docs/book/src/en/migration/from-crawl4ai.md        |   84 +
+ docs/book/src/en/migration/from-playwright.md      |   68 +
+ docs/book/src/en/tools/README.md                   |   39 +
+ docs/book/src/en/tools/auth_list.md                |   75 +
+ docs/book/src/en/tools/auth_login_complete.md      |   75 +
+ docs/book/src/en/tools/auth_login_start.md         |   78 +
+ docs/book/src/en/tools/auth_status.md              |   75 +
+ docs/book/src/en/tools/cf_evaluate.md              |   76 +
+ docs/book/src/en/tools/doctor.md                   |   76 +
+ docs/book/src/en/tools/recipe_export.md            |   75 +
+ docs/book/src/en/tools/recipe_import.md            |   75 +
+ docs/book/src/en/tools/recipe_list.md              |   75 +
+ docs/book/src/en/tools/recipe_propose_endpoint.md  |   76 +
+ docs/book/src/en/tools/recipe_remove.md            |   76 +
+ docs/book/src/en/tools/recipe_show.md              |   75 +
+ docs/book/src/en/tools/relocate.md                 |   79 +
+ docs/book/src/en/tools/session_show.md             |   75 +
+ docs/book/src/en/tools/spider.md                   |   82 +
+ docs/book/src/en/tools/vpn_rotate.md               |   78 +
+ docs/book/src/en/tutorial/01-local.md              |   40 +
+ docs/book/src/en/tutorial/02-recipe.md             |   39 +
+ docs/book/src/en/tutorial/03-profile.md            |   43 +
+ docs/book/src/en/tutorial/04-vpn.md                |   43 +
+ docs/book/src/en/tutorial/05-claude-code.md        |   68 +
+ docs/book/src/en/tutorial/06-hermes.md             |   57 +
+ docs/book/src/en/tutorial/07-vps.md                |   64 +
+ docs/book/src/en/tutorial/README.md                |   18 +
+ docs/book/src/intro.md                             |   11 +
+ docs/book/src/ja/README.md                         |   33 +
+ docs/book/src/ja/errors.md                         |   33 +
+ docs/book/src/ja/install.md                        |   10 +
+ docs/book/src/ja/migration.md                      |   10 +
+ docs/book/src/ja/tools.md                          |   24 +
+ docs/book/src/ja/tutorial.md                       |   13 +
+ docs/compat.md                                     |  106 +
+ docs/landscape.md                                  |   66 +
+ install.sh                                         |  164 ++
+ librust_out.rlib                                   |  Bin 0 -> 7096 bytes
+ release-please-config.json                         |   41 +
+ scripts/cli-public-api-snapshot.sh                 |  339 +++
+ scripts/cli_surface_inventory.py                   |  377 +++
+ scripts/mcp-schema-breaking.sh                     |  174 ++
+ trivy.yaml                                         |   26 +
+ 160 files changed, 15724 insertions(+), 181 deletions(-)
+
+exec
+/bin/bash -lc "git show 7c700a0b:scripts/mcp-schema-breaking.sh | sed -n '1,230p'" in $REPO_ROOT
+exec
+/bin/bash -lc "git show 7c700a0b:scripts/cli-public-api-snapshot.sh | sed -n '1,220p'" in $REPO_ROOT
+ succeeded in 0ms:
+#!/usr/bin/env bash
+# Lane I.1 — capture the rev-stealth CLI public surface as deterministic JSON.
+#
+# Output: .agent/v1.3/cli-public-api.snapshot.json
+#
+# Modes:
+#   ./scripts/cli-public-api-snapshot.sh           # regenerate snapshot
+#   ./scripts/cli-public-api-snapshot.sh --check   # exit 1 if drift detected
+#
+# Public-surface coverage (per v1.3 ExecPlan Lane I.1):
+#   - every subcommand + nested subcommand (depth 1 & 2)
+#   - every flag (long + short), default value, value-set when enum,
+#     env-var binding (captured across wrapped help lines)
+#   - every documented env var (REV_STEALTH_OBSCURA, REV_SCRAPING_*, etc.)
+#   - every documented exit code from --help bodies (0/1/3/7/10)
+#   - MCP tool surface (16 tools: names + required input-schema fields)
+#   - rev-stealth --version string
+#
+# Schema-stable JSON: keys sorted alphabetically at every level. Drift = any
+# byte-level diff against the committed snapshot.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+SNAPSHOT_PATH=".agent/v1.3/cli-public-api.snapshot.json"
+BIN="${REV_STEALTH_BIN:-./target/debug/rev-stealth}"
+
+if [[ ! -x "$BIN" ]]; then
+  echo "[snapshot] building stealth-cli (debug)..." >&2
+  cargo build -p stealth-cli >&2
+fi
+
+# All top-level subcommands declared in the workspace today. We use `__` as the
+# helpfile separator (never appears in clap subcommand names) so multi-hyphen
+# commands like `cf-evaluate` survive round-tripping.
+TOP_CMDS=(captcha browser vpn doctor spider relocate cf-evaluate auth measure config hermes)
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+"$BIN" --help > "$tmpdir/help__ROOT.txt" 2>&1 || true
+
+for cmd in "${TOP_CMDS[@]}"; do
+  "$BIN" "$cmd" --help > "$tmpdir/help__${cmd}.txt" 2>&1 || true
+  awk '/^Commands:/{f=1;next} /^Options:/{f=0} f' "$tmpdir/help__${cmd}.txt" \
+    | awk '{print $1}' \
+    | { grep -Ev '^(help)?$' || true; } \
+    | while read -r sub; do
+        [[ -n "$sub" ]] || continue
+        "$BIN" "$cmd" "$sub" --help \
+          > "$tmpdir/help__${cmd}__${sub}.txt" 2>&1 || true
+      done
+done
+
+VERSION_LINE="$("$BIN" --version 2>&1 | tr -d '\n')"
+
+python3 - "$tmpdir" "$SNAPSHOT_PATH" "$VERSION_LINE" <<'PY'
+import json, os, re, sys, subprocess
+from pathlib import Path
+
+tmpdir, snapshot_path, version_line = sys.argv[1], sys.argv[2], sys.argv[3]
+tmp = Path(tmpdir)
+
+ENV_VARS = sorted([
+    "REV_STEALTH_OBSCURA",
+    "REV_SCRAPING_HOME",
+    "REV_SCRAPING_POLICY",
+    "REV_SCRAPING_AUTHORIZED",
+    "REV_SCRAPING_AUTH_DIR",
+    "REV_SCRAPING_AUTH_PASSPHRASE",
+    "REV_SCRAPING_PROFILES_ROOT",
+    "REV_SCRAPING_AUP_ACK",
+    "REV_SCRAPING_CONFIG_LENIENT",
+    "REV_SCRAPING_VPN_INSTANCES",
+    "REV_SCRAPING_REQUIRE_VPN",
+])
+
+EXIT_CODES = {
+    "0":  "success",
+    "1":  "generic CLI / validation error",
+    "3":  "permanent runtime failure (browser launch, VPS deploy readiness)",
+    "7":  "doctor fail-closed (leak detected)",
+    "10": "relocate Ambiguous result under --strict",
+}
+
+FLAG_RE = re.compile(r"--[a-zA-Z0-9][a-zA-Z0-9_-]*")
+SHORT_RE = re.compile(r"(?<![-\w])-[a-zA-Z](?![-\w])")
+ENV_RE = re.compile(r"\[env:\s*([A-Z0-9_]+)=")
+DEFAULT_RE = re.compile(r"\[default:\s*([^\]]*)\]")
+POSSIBLE_RE = re.compile(r"\[possible values:\s*([^\]]+)\]")
+
+def parse_help(text):
+    """Extract usage, flags (with multi-line continuation), nested cmds."""
+    usage = ""
+    nested = []
+    raw_lines = text.splitlines()
+
+    # Locate Options: / Commands: sections.
+    sections = {}
+    for idx, line in enumerate(raw_lines):
+        s = line.strip()
+        if s.startswith("Usage:"):
+            usage = s[len("Usage:"):].strip()
+        if s == "Options:":
+            sections["options"] = idx
+        elif s == "Commands:":
+            sections["commands"] = idx
+
+    # Nested subcommands: scan the Commands: block.
+    if "commands" in sections:
+        start = sections["commands"] + 1
+        for line in raw_lines[start:]:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("-") or stripped.endswith(":"):
+                if stripped == "Options:" or stripped.endswith(":"):
+                    break
+                continue
+            tok = stripped.split(None, 1)[0]
+            if tok and tok != "help" and not tok.startswith("-"):
+                nested.append(tok)
+
+    # Flags: iterate Options: block. A flag spans from the line starting with
+    # "--" (or "-X, --") until the next flag-introducing line OR a blank line
+    # followed by a non-indented section header. We collect every continuation
+    # line into the flag's "block" so [env:...], [default:...], and
+    # [possible values:...] tokens are captured even when wrapped.
+    flags_by_name = {}
+    if "options" in sections:
+        start = sections["options"] + 1
+        # Detect indentation of a flag line: clap uses "      --flag" (6 spaces)
+        # or "  -X, --flag". We treat any line whose stripped form begins with
+        # "-" as a flag-start line.
+        i = start
+        while i < len(raw_lines):
+            line = raw_lines[i]
+            stripped = line.strip()
+            if stripped == "Options:" or stripped == "Commands:":
+                i += 1
+                continue
+            if stripped and stripped.startswith("-"):
+                # Accumulate block until next flag-start or end.
+                block_lines = [line]
+                j = i + 1
+                while j < len(raw_lines):
+                    nxt = raw_lines[j]
+                    nxt_stripped = nxt.strip()
+                    if nxt_stripped.startswith("-") and (
+                        FLAG_RE.search(nxt) or SHORT_RE.search(nxt)
+                    ):
+                        # Heuristic: next line is a new flag if it has -short
+                        # or --long AND starts with a dash after the leading
+                        # whitespace (clap convention).
+                        # Guard against description text that begins with "-":
+                        # require ≤ 8 leading spaces (clap flag-line indent).
+                        leading = len(nxt) - len(nxt.lstrip(" "))
+                        if leading <= 8:
+                            break
+                    block_lines.append(nxt)
+                    j += 1
+                block = "\n".join(block_lines)
+                long_flags = sorted(set(FLAG_RE.findall(block_lines[0])))
+                # Short forms only from the first line (clap puts both forms
+                # on the head line, never wrapped).
+                short_forms = sorted(set(SHORT_RE.findall(block_lines[0])))
+                env_match = ENV_RE.search(block)
+                default_match = DEFAULT_RE.search(block)
+                possible_match = POSSIBLE_RE.search(block)
+                for f in long_flags:
+                    entry = {"flag": f}
+                    if short_forms:
+                        entry["short"] = short_forms[0]
+                    if env_match:
+                        entry["env"] = env_match.group(1)
+                    if default_match:
+                        entry["default"] = default_match.group(1).strip()
+                    if possible_match:
+                        entry["values"] = sorted(
+                            v.strip() for v in possible_match.group(1).split(",")
+                        )
+                    prev = flags_by_name.get(f)
+                    if not prev or len(entry) > len(prev):
+                        flags_by_name[f] = entry
+                i = j
+            else:
+                i += 1
+
+    return {
+        "usage": usage,
+        "flags": sorted(flags_by_name.values(), key=lambda x: x["flag"]),
+        "subcommands": sorted(set(nested)),
+    }
+
+root_help = parse_help((tmp / "help__ROOT.txt").read_text())
+
+commands = {}
+for help_file in sorted(tmp.glob("help__*.txt")):
+    stem = help_file.stem.removeprefix("help__")
+    if stem == "ROOT":
+        continue
+    if "__" in stem:
+        cmd, sub = stem.split("__", 1)
+    else:
+        cmd, sub = stem, None
+    commands.setdefault(cmd, {"help": {}, "subcommands": {}})
+    parsed = parse_help(help_file.read_text())
+    if sub is None:
+        commands[cmd]["help"] = parsed
+    else:
+        commands[cmd]["subcommands"][sub] = parsed
+
+# MCP tool surface — parse tools.rs for `name: "<tool>"` AND each
+# tool's required-arg names. We extract the schema's "required" array as a
+# best-effort proxy for the public input contract.
+tools_src = Path("crates/stealth-mcp/src/tools.rs").read_text()
+tool_names = sorted(set(re.findall(r'name:\s*"([a-z_][a-z0-9_]*)"', tools_src)))
+
+# Extract required arrays by scanning ToolDefinition blocks. We look for the
+# nearest "required": [...] literal after each name and parse strings out.
+
+ succeeded in 0ms:
+#!/usr/bin/env bash
+# Lane I.5 — MCP tool-schema breaking-change detector.
+#
+# Drift model: a tool is "in the surface" if it appears in the BASE branch's
+# committed snapshot (e.g. main). A removal/rename only becomes invisible if
+# the contributor regenerates the snapshot in their PR — so a meaningful
+# detector MUST compare the live (PR head) tool list against the BASE
+# branch's `.agent/v1.3/cli-public-api.snapshot.json`, not against the
+# PR's own (potentially regenerated) copy.
+#
+# Behavior:
+#   - removed-or-renamed tool ⇒ exit 1 ⇒ PR must carry `mcp-schema-breaking`.
+#   - added tool ⇒ exit 0 ⇒ PR carries `api-additive`.
+#   - unchanged ⇒ exit 0.
+#
+# Modes:
+#   ./scripts/mcp-schema-breaking.sh           # human-readable
+#   ./scripts/mcp-schema-breaking.sh --check   # exit-coded for CI
+#
+# CI usage: the workflow fetches the PR base ref, then invokes this script
+# with `BASE_REF=origin/<base>` in the environment. Local invocation defaults
+# to comparing against `origin/main` (or `main` when origin is absent).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+SNAPSHOT_PATH=".agent/v1.3/cli-public-api.snapshot.json"
+BASE_REF="${BASE_REF:-origin/main}"
+
+# Resolve the base-branch snapshot. If the base ref is unavailable (fresh
+# fork checkout, first commit on a branch), fall back to local HEAD~1; this
+# still catches "remove a tool in a single PR" within a feature branch's
+# own history. If even that fails, exit 0 with an info note.
+resolve_base_snapshot() {
+  local ref="$1"
+  if git show "$ref:$SNAPSHOT_PATH" >/dev/null 2>&1; then
+    git show "$ref:$SNAPSHOT_PATH"
+    return 0
+  fi
+  return 1
+}
+
+base_blob=""
+if resolved=$(resolve_base_snapshot "$BASE_REF" 2>/dev/null); then
+  base_blob="$resolved"
+elif resolved=$(resolve_base_snapshot "HEAD~1" 2>/dev/null); then
+  base_blob="$resolved"
+  echo "[mcp-schema-breaking] note: base ref $BASE_REF unreachable; using HEAD~1" >&2
+else
+  echo "[mcp-schema-breaking] note: no base snapshot reachable; skipping diff (first PR introducing the snapshot, or shallow checkout)." >&2
+  if [[ "${1:-}" == "--check" ]]; then
+    exit 0
+  fi
+  exit 0
+fi
+
+# Compare via the live (PR head) snapshot, which already captures
+# names, required-arg lists, and per-tool input-schema slots. This is broader
+# than a tool-name diff: a tightened `required` array (e.g. adding a previously
+# optional arg to the required list) is a breaking change too, per
+# docs/compat.md. We delegate the full per-tool comparison to Python so the
+# diff is structured.
+
+live_blob="$(cat "$SNAPSHOT_PATH")"
+
+diff_report="$(python3 - "$base_blob" "$live_blob" <<'PY'
+import json, sys
+
+base = json.loads(sys.argv[1])
+live = json.loads(sys.argv[2])
+
+base_tools = set(base["mcp_tools"]["names"])
+live_tools = set(live["mcp_tools"]["names"])
+added = sorted(live_tools - base_tools)
+removed = sorted(base_tools - live_tools)
+
+# Per-tool required-arg comparison. A required arg that exists in BASE but
+# disappears in LIVE is harmless (relaxing). A required arg that appears in
+# LIVE but not BASE is BREAKING (tightening — old callers will fail).
+base_schemas = base.get("mcp_tools", {}).get("schemas", {})
+live_schemas = live.get("mcp_tools", {}).get("schemas", {})
+tightened = []  # list of (tool, newly-required-arg)
+relaxed = []    # list of (tool, removed-required-arg)
+for tool in sorted(live_tools & base_tools):
+    base_req = set(base_schemas.get(tool, {}).get("required", []) or [])
+    live_req = set(live_schemas.get(tool, {}).get("required", []) or [])
+    for arg in sorted(live_req - base_req):
+        tightened.append((tool, arg))
+    for arg in sorted(base_req - live_req):
+        relaxed.append((tool, arg))
+
+print(json.dumps({
+    "added": added,
+    "removed": removed,
+    "tightened": tightened,
+    "relaxed": relaxed,
+}))
+PY
+)"
+
+added_count="$(echo "$diff_report" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['added']))")"
+removed_count="$(echo "$diff_report" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['removed']))")"
+tightened_count="$(echo "$diff_report" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['tightened']))")"
+relaxed_count="$(echo "$diff_report" | python3 -c "import json,sys; print(len(json.load(sys.stdin)['relaxed']))")"
+
+mode="${1:-}"
+exit_code=0
+
+if [[ "$removed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: removed/renamed tool(s):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for t in json.load(sys.stdin)['removed']:
+    print(f'    - {t}', file=sys.stderr)
+" >&2
+  exit_code=1
+fi
+
+if [[ "$tightened_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: tightened required-args" >&2
+  echo "    (an arg that was optional is now required — old callers will fail):" >&2
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, arg in json.load(sys.stdin)['tightened']:
+    print(f'    - {tool}.{arg}', file=sys.stderr)
+" >&2
+  exit_code=1
+fi
+
+if [[ "$exit_code" -ne 0 ]]; then
+  echo "" >&2
+  echo "Action: apply PR label \`mcp-schema-breaking\` and bump the MCP" >&2
+  echo "        schema version per docs/compat.md (2-major guarantee)." >&2
+fi
+
+if [[ "$added_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] additive vs $BASE_REF: new tool(s):"
+  echo "$diff_report" | python3 -c "
+import json, sys
+for t in json.load(sys.stdin)['added']:
+    print(f'    + {t}')
+"
+  echo "Action: apply PR label \`api-additive\`."
+fi
+
+if [[ "$relaxed_count" -gt 0 ]]; then
+  echo "[mcp-schema-breaking] relaxed (non-breaking) required-args:"
+  echo "$diff_report" | python3 -c "
+import json, sys
+for tool, arg in json.load(sys.stdin)['relaxed']:
+    print(f'    - {tool}.{arg} (was required, now optional)')
+"
+fi
+
+if [[ "$added_count" -eq 0 && "$removed_count" -eq 0 \
+      && "$tightened_count" -eq 0 && "$relaxed_count" -eq 0 ]]; then
+  live_count="$(python3 -c "import json; print(len(json.load(open('$SNAPSHOT_PATH'))['mcp_tools']['names']))")"
+  echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args)."
+fi
+
+# Note on enums + output fields:
+# v1.3 snapshot schema captures tool names + required-arg arrays. Per-property
+# enums and output-schema fields are NOT yet in the snapshot ($schema_version
+# = 2) — extending the snapshot to cover those is tracked for v1.4 (see
+# docs/compat.md). For v1.3, enum/output-field breaks are caught by the
+# existing `mcp-schema-lint` job (`gen_reference --check`) which diffs the
+# rendered docs/MCP_REFERENCE.md.
+
+if [[ "$mode" == "--check" ]]; then
+  exit $exit_code
+fi
+exit 0
+
+exec
+/bin/bash -lc "git show 7c700a0b:CHANGELOG.rev_scraping.md | sed -n '1,140p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Changelog — rev_scraping
+
+All notable changes to the **rev_scraping** project (workspace crates, CLI,
+MCP server, recipe pack) are documented here. The format follows
+[Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/) and adheres to
+[Semantic Versioning 2.0](https://semver.org/) per `docs/compat.md`.
+
+> **Scope note.** The repo also carries `CHANGELOG.md` at the root, which
+> tracks the RevHarness orchestration layer (Claude/Codex wrappers, hooks,
+> skill scaffolding). The two surfaces version independently. This file is
+> the source of truth for the **rev_scraping product**: `rev-stealth` binary,
+> `stealth-mcp` server, recipe pack, AUP semantics.
+
+This file is machine-parseable. Each release section is delimited by a
+`## [<version>] - <YYYY-MM-DD>` heading, contains one or more `### <Section>`
+sub-sections drawn from the keep-a-changelog vocabulary (`Added`, `Changed`,
+`Deprecated`, `Removed`, `Fixed`, `Security`, `Breaking Changes`), and
+optionally records the PR labels that gated the change (`api-additive`,
+`api-breaking`, `mcp-schema-breaking`).
+
+PR label conventions (consumed by Lane H.7 `release-please` when it
+assembles the next release PR from the unreleased commits):
+
+- `api-additive` — new flag, new subcommand, new env var, new MCP tool, new
+  output field. Triggers a **minor** bump.
+- `api-breaking` — removed/renamed CLI flag, env var, exit code, output
+  field. Triggers a **major** bump and a `### Breaking Changes` section.
+- `mcp-schema-breaking` — removed/renamed MCP tool, narrowed value enum,
+  changed required-arg semantics. Triggers a **major** bump and a
+  `### Breaking Changes` section.
+- `security` — credential handling, sanitizer, sandbox, AUP, leak-prevention.
+  Triggers a `### Security` section regardless of version bump.
+
+## [Unreleased]
+
+### Added
+
+- **Lane I (v1.3, API stability)**: CLI public-API snapshot
+  (`.agent/v1.3/cli-public-api.snapshot.json`), `docs/compat.md` semver
+  policy, `scripts/cli-public-api-snapshot.sh` drift gate,
+  `scripts/mcp-schema-breaking.sh` MCP tool-list breaking-change detector,
+  three new CI jobs (`cli-public-api-snapshot`, `cargo-public-api-diff`,
+  `mcp-schema-breaking-detector`), and a `deprecated_completeness` workspace
+  test that requires every `#[deprecated]` attribute to populate `since`,
+  `note`, and a `replace_with` hint in the note body.
+
+
+## [1.2.0] - 2026-05-22
+
+### Added
+
+- `stealth-sanitize` 5-layer prompt-injection defense pipeline (20 canary
+  classes; envelope `<<<UNTRUSTED_CONTENT origin=… sanitize_id=NONCE>>>`;
+  `_meta.sanitize` on every MCP tool response).
+- 16 MCP tools (`spider`, `relocate`, `cf_evaluate`, `doctor`, `recipe_*`,
+  `auth_*`, `session_show`, `vpn_rotate`) — see `docs/MCP_REFERENCE.md`.
+- `rev-stealth config` subtree (`show`, `paths`, `validate`, `diff`, `get`,
+  `set`, `edit`, `migrate`, `init`, `history`, `rollback`, `gc`, `profile`).
+- `rev-stealth hermes` (`install`, `uninstall`, `verify`).
+- Strict UUID v4 manual serde for `SessionId` / `ProgressToken`.
+
+### Security
+
+- Hardened systemd unit: `NoNewPrivileges`, `ProtectSystem=strict`,
+  read-only `/etc` mount, isolated `/var/log/rev-stealth/` (mode 0700).
+- TPM2-sealed Surfshark credentials via `systemd-creds` when available.
+- AUP env-ack flow (`REV_SCRAPING_AUP_ACK`) + `--i-have-authorization` opt-in.
+
+## [1.1.0] - 2026-04-30
+
+### Added
+
+- VPN fail-closed guard family (`--require-vpn`, `--vpn-instance`,
+  `--proxy-tier`, `--no-fallback`, leak-poll background monitor).
+- `rev-stealth measure` local fingerprint diagnostics (opt-in external SaaS).
+- `doctor --deep` extended stack-health checks.
+- `doctor --vps` VPS deploy readiness checks.
+
+## [1.0.0] - 2026-03-31
+
+### Added
+
+- Initial public release: stealth browser launcher, captcha bypass, VPN
+  rotation, recipe pack, AUP gating.
+
+exec
+/bin/bash -lc "git show 7c700a0b:docs/compat.md | sed -n '1,180p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Compatibility & semver policy
+
+`rev_scraping` follows [Semantic Versioning 2.0](https://semver.org/) at the
+project level, with **three independent compatibility tiers** documented below.
+This file is the source of truth referenced from PR templates, CI gates, and
+the v1.3 ExecPlan Lane I (API stability).
+
+Last reviewed: **v1.3.0** (Lane I.3, 2026-05-23).
+
+## At-a-glance
+
+| Surface | Stability guarantee | Drift gate | Bumps |
+|---------|---------------------|------------|-------|
+| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` covers tool-name removals/renames and required-arg tightening (CI: `mcp-schema-breaking-detector`). The `mcp-schema-lint` CI job (`gen_reference --check`) is a freshness check — it only catches enum/output-field changes that the contributor *forgot to regenerate* in `docs/MCP_REFERENCE.md`; if the contributor regenerates the docs, an enum narrow / output rename will pass. Extending the snapshot diff to cover enums and output fields is tracked for **v1.4** (Lane I-followup). For v1.3, those narrows are policy-only and rely on the reviewer applying the `mcp-schema-breaking` label by hand. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing a value enum, or changing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
+| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`) | Any drift against the committed snapshot requires `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed). |
+| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (advisory in v1.3, hardened in v1.4) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the same `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) labels apply at the discretion of the reviewer. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
+
+## What counts as "public surface"
+
+### MCP layer
+Anything visible to a remote client over JSON-RPC:
+
+- Tool names (16 in v1.3 — see `.agent/v1.3/cli-public-api.snapshot.json`).
+- Each tool's required parameters, parameter types, and value enums.
+- Each tool's documented output fields and `ErrorKind` discriminants.
+- `_meta.sanitize` envelope shape.
+- JSON-RPC error codes returned by the dispatcher.
+
+### CLI layer
+Anything visible to a shell user or CI script:
+
+- Every flag (long + short).
+- Every documented environment variable (`REV_STEALTH_*`, `REV_SCRAPING_*`).
+- Every documented exit code (0 / 1 / 3 / 7 / 10).
+- Output column names + JSON field names when `--format=json` is set.
+- Default values for any flag whose default is documented in `--help`.
+
+### Internal types
+Anything that is `pub` in a workspace crate but is **not** in the snapshot
+above. These remain semver-flexible to let us refactor without dragging users
+through churn. We still avoid gratuitous renames, and we still apply the
+`#[deprecated(since=…, note=…, replace_with=…)]` lint (Lane I.6) when a name
+change is unavoidable.
+
+## Bumping rules
+
+- **Patch** (`v1.3.0 → v1.3.1`): bugfix-only. No new CLI flag, no new MCP tool,
+  no schema field change.
+- **Minor** (`v1.3.x → v1.4.0`): additive surface only. PRs must carry the
+  `api-additive` label.
+- **Major** (`v1.x → v2.0.0`): any removal or rename on the **MCP** or **CLI**
+  tier. PRs must carry the `api-breaking` or `mcp-schema-breaking` label, and
+  the CHANGELOG must include a `Breaking Changes` section with a migration
+  recipe per item. Removals or renames on the **internal Rust types** tier do
+  NOT trigger a project-major bump (per that tier's "no guarantee" rule); they
+  may still carry `api-additive` / `api-breaking` labels for reviewer
+  visibility but the version bump rule does not apply to them.
+
+## MCP 2-major guarantee in practice
+
+When `tool_X` first ships in v1.x, it remains callable through v3.x (two full
+major versions after the major in which the deprecation lands). To remove it
+cleanly:
+
+1. v1.x — ship the tool.
+2. v2.0 — `#[deprecated]` the tool implementation; add a `_meta.deprecated`
+   field to the response; keep it functionally identical. The deprecation
+   warning must be visible for the entirety of the v2.x and v3.x lines.
+3. v4.0 — remove the tool; CHANGELOG documents the replacement.
+
+This deliberately protects long-lived Claude Code / Hermes wrappers from
+breakage triggered by a single rev_scraping release. Skipping the v2.0
+deprecation step (removing in v2.0 directly) is itself a breaking-policy
+violation: the tool can only be removed in v4.0, not earlier.
+
+## CLI 1-major guarantee in practice
+
+When `--flag-x` first ships in v1.x, it remains accepted through v2.x (one
+full major version after the major in which the deprecation lands). To
+remove it:
+
+1. v1.x — ship the flag.
+2. v2.0 — emit a `[deprecated]` warning on use; add the replacement.
+3. v3.0 — remove the flag; CHANGELOG documents the replacement.
+
+Env-var renames follow the same lifecycle (warning emitted from the layer
+that consumes the legacy name).
+
+## Internal types — "no guarantee" in practice
+
+Workspace-internal modules (`stealth-core::sanitize::*`,
+`stealth-mcp::server::*`, `stealth-parse::*` non-tool helpers, etc.) may be
+renamed, refactored, or removed in any minor release. Downstream code embedding
+these crates as path dependencies must pin to an exact workspace version.
+Once any crate is published independently to crates.io (Lane H.5), its own
+semver lifecycle decouples from the rev_scraping project version.
+
+## Where to look next
+
+- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface.
+- `scripts/cli-public-api-snapshot.sh` — regenerator + drift checker.
+- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker.
+- `CHANGELOG.rev_scraping.md` — project-level changelog (keep-a-changelog).
+- `docs/MCP_REFERENCE.md` — current MCP tool catalog.
+- `.github/workflows/ci.yml` — `cli-public-api-snapshot`, `cargo-public-api-diff`,
+  `mcp-schema-breaking-detector` jobs.
+
+exec
+/bin/bash -lc "git show 7c700a0b:scripts/cli-public-api-snapshot.sh | sed -n '220,380p'" in $REPO_ROOT
+ succeeded in 0ms:
+# nearest "required": [...] literal after each name and parse strings out.
+def extract_required(src, name):
+    """Extract the top-level `"required": [...]` array of the tool's
+    input_schema, bounded to *this* tool's block.
+
+    Strategy: locate `name: "<name>"`, then bound the window from the next
+    `input_schema: json!({` to the matching `})`. Inside that window, only the
+    *first* `"required": [...]` after `"properties":` decreases nesting depth
+    counts as the top-level required (nested object schemas may also use
+    `"required"`, e.g. `recipe_propose_endpoint.properties.endpoint.required`).
+    We approximate top-level by counting braces from the input_schema head
+    and returning the required array whose surrounding brace-depth is 1.
+    """
+    m = re.search(r'name:\s*"' + re.escape(name) + r'"', src)
+    if not m:
+        return []
+    tail = src[m.end():]
+    # Find this tool's input_schema literal.
+    js = re.search(r'input_schema:\s*json!\(\{', tail)
+    if not js:
+        return []
+    start = js.end() - 1  # at the leading `{`
+    depth = 0
+    end = None
+    for i in range(start, min(len(tail), start + 20000)):
+        c = tail[i]
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end is None:
+        return []
+    schema = tail[start:end + 1]
+    # Walk through schema char-by-char; record every `"required": [...]` whose
+    # surrounding depth is exactly 1 (i.e. immediate child of the root object).
+    depth = 0
+    i = 0
+    candidates = []
+    while i < len(schema):
+        c = schema[i]
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+        elif c == '"' and schema[i:i+11] == '"required":' and depth == 1:
+            # Found top-level required. Capture its array literal.
+            arr = re.match(r'"required"\s*:\s*\[([^\]]*)\]', schema[i:])
+            if arr:
+                candidates.append(arr.group(1))
+                i += arr.end()
+                continue
+        i += 1
+    if not candidates:
+        return []
+    return sorted(set(re.findall(r'"([a-zA-Z_][a-zA-Z0-9_]*)"', candidates[0])))
+
+mcp_tool_schemas = {name: {"required": extract_required(tools_src, name)}
+                    for name in tool_names}
+
+snapshot = {
+    "$schema_version": 2,
+    "binary_name": "rev-stealth",
+    "version_string": version_line,
+    "env_vars": ENV_VARS,
+    "exit_codes": EXIT_CODES,
+    "global": root_help,
+    "commands": commands,
+    "mcp_tools": {
+        "count": len(tool_names),
+        "names": tool_names,
+        "schemas": mcp_tool_schemas,
+    },
+    "_notes": [
+        "Generated by scripts/cli-public-api-snapshot.sh. Do not edit by hand.",
+        "Drift means a public-surface change. Rebuild + commit alongside the change",
+        "and apply PR label api-additive / api-breaking / mcp-schema-breaking",
+        "per docs/compat.md.",
+    ],
+}
+
+out = Path(snapshot_path)
+out.parent.mkdir(parents=True, exist_ok=True)
+serialized = json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
+out.write_text(serialized)
+print(f"[snapshot] wrote {snapshot_path} ({len(serialized)} bytes)")
+print(f"[snapshot] commands={len(commands)} mcp_tools={len(tool_names)}")
+PY
+
+if [[ "${1:-}" == "--check" ]]; then
+  # Drift gate semantics:
+  #
+  #   - If the snapshot exists in HEAD, the regenerated file must match what
+  #     is committed/staged.
+  #   - If the snapshot is brand new on this branch (not in HEAD, but staged
+  #     for the first commit that introduces it), we accept it: the
+  #     contributor is the one introducing the snapshot.
+  #   - If the snapshot file isn't on disk at all after running the
+  #     regenerator, something is badly wrong — exit 1.
+  if [[ ! -f "$SNAPSHOT_PATH" ]]; then
+    echo "[snapshot] ERROR: $SNAPSHOT_PATH missing after regeneration." >&2
+    exit 1
+  fi
+  if git cat-file -e "HEAD:$SNAPSHOT_PATH" 2>/dev/null; then
+    # Snapshot is in HEAD — compare working-tree against HEAD for drift.
+    if ! git diff HEAD --quiet -- "$SNAPSHOT_PATH" 2>/dev/null; then
+      echo "[snapshot] DRIFT — public surface changed without snapshot update." >&2
+      git --no-pager diff HEAD -- "$SNAPSHOT_PATH" 2>/dev/null | head -200 >&2
+      echo "" >&2
+      echo "Rebuild with: ./scripts/cli-public-api-snapshot.sh" >&2
+      echo "Then commit + apply PR label api-additive | api-breaking | mcp-schema-breaking." >&2
+      exit 1
+    fi
+  else
+    echo "[snapshot] note: $SNAPSHOT_PATH absent in HEAD (first PR introducing it). Accepting."
+  fi
+  echo "[snapshot] CLI public surface unchanged."
+fi
+
+exec
+/bin/bash -lc "git show 7c700a0b:crates/stealth-cli/tests/deprecated_completeness.rs | sed -n '1,260p'" in $REPO_ROOT
+ succeeded in 0ms:
+//! Lane I.6 — `#[deprecated(...)]` lint enforced as a workspace test.
+//!
+//! Every `#[deprecated(...)]` attribute on a `pub` item in `crates/*/src/`
+//! must populate three pieces of metadata so callers can act on the warning:
+//!
+//! 1. `since = "<version>"` — when the deprecation landed (semver string).
+//! 2. `note = "..."` — a non-empty explanation.
+//! 3. Inside `note`, a replacement hint: either `replace_with = ` (the
+//!    spelling we standardize on), or the words `Use` / `use ` / `replaced
+//!    by` so AI-assisted migration tools can extract the suggested API.
+//!
+//! Rationale: a `#[deprecated]` attribute with no `since`/`note`/replacement
+//! is invisible to anyone reading clippy output — it just says "this is
+//! deprecated, sorry." The v1.3 ExecPlan (Lane I.6) requires the attribute
+//! to be actionable, and the most portable way to enforce that across the
+//! workspace is a textual test rather than a custom clippy lint (which would
+//! require a nightly toolchain on every contributor's machine).
+//!
+//! This test runs from `cargo test -p stealth-cli` and walks every other
+//! workspace crate's `src/` tree. The walk skips `target/`, `vendor/`,
+//! `_refs/`, and any file under a `tests/` directory (test code is allowed
+//! to use bare `#[deprecated]` for its own assertions).
+//!
+//! False-positive escape hatch: a deprecated attribute that lives inside a
+//! `// I6-LINT: skip` annotated block (single line containing exactly that
+//! marker immediately preceding the attribute) is exempted. Use sparingly
+//! and only for vendored / generated code.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn workspace_root() -> PathBuf {
+    // CARGO_MANIFEST_DIR = crates/stealth-cli. Go up two levels.
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("workspace root resolvable from CARGO_MANIFEST_DIR")
+        .to_path_buf()
+}
+
+fn list_rust_sources(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let skip_dir_names = ["target", "vendor", "_refs", "node_modules", ".git", "tests"];
+    let mut stack = vec![root.join("crates")];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for ent in entries.flatten() {
+            let path = ent.path();
+            if path.is_dir() {
+                let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                if skip_dir_names.iter().any(|s| *s == name) {
+                    continue;
+                }
+                stack.push(path);
+            } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                out.push(path);
+            }
+        }
+    }
+    out
+}
+
+/// Tokens that count as a replacement hint inside `note = "..."`.
+const HINTS: &[&str] = &["replace_with", "Use ", "use ", "replaced by", "Prefer ", "prefer "];
+
+#[derive(Debug)]
+struct Finding {
+    path: PathBuf,
+    line: usize,
+    reason: String,
+}
+
+/// Extract `key = "..."` pair values from a `#[deprecated(...)]` attribute
+/// block. Returns `(since, note)` where each is `Some(value)` only if the
+/// key appears as a top-level attribute argument with a non-empty string
+/// literal value. The parser tracks string-literal boundaries so it ignores
+/// any occurrence of `since` or `note` that appears inside another value.
+fn parse_deprecated_attrs(block: &str) -> (Option<String>, Option<String>) {
+    // Strip outer `#[deprecated(` ... `)]` so we only scan the argument list.
+    let Some(start) = block.find("#[deprecated(") else {
+        return (None, None);
+    };
+    let after = &block[start + "#[deprecated(".len()..];
+    // Find the matching close paren at depth 1.
+    let mut depth: i32 = 1;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut end = after.len();
+    for (idx, c) in after.char_indices() {
+        if escape {
+            escape = false;
+            continue;
+        }
+        if in_string {
+            match c {
+                '\\' => escape = true,
+                '"' => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match c {
+            '"' => in_string = true,
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = idx;
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let args = &after[..end];
+
+    // Walk top-level `key = "value"` pairs (depth-0 inside `args`).
+    let mut since: Option<String> = None;
+    let mut note: Option<String> = None;
+    let bytes = args.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        // Skip whitespace + commas.
+        while i < bytes.len() && (bytes[i].is_ascii_whitespace() || bytes[i] == b',') {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
+        // Read identifier.
+        let key_start = i;
+        while i < bytes.len()
+            && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_')
+        {
+            i += 1;
+        }
+        if key_start == i {
+            i += 1;
+            continue;
+        }
+        let key = std::str::from_utf8(&bytes[key_start..i]).unwrap_or("");
+        // Skip whitespace then expect `=`.
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b'=' {
+            continue;
+        }
+        i += 1;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b'"' {
+            continue;
+        }
+        // Read string literal.
+        i += 1;
+        let val_start = i;
+        let mut esc = false;
+        while i < bytes.len() {
+            let c = bytes[i];
+            if esc {
+                esc = false;
+            } else if c == b'\\' {
+                esc = true;
+            } else if c == b'"' {
+                break;
+            }
+            i += 1;
+        }
+        let value = std::str::from_utf8(&bytes[val_start..i]).unwrap_or("");
+        i += 1; // past closing "
+        match key {
+            "since" if since.is_none() => since = Some(value.to_string()),
+            "note" if note.is_none() => note = Some(value.to_string()),
+            _ => {}
+        }
+    }
+    (since, note)
+}
+
+fn audit_file(path: &Path) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    let Ok(text) = fs::read_to_string(path) else {
+        return findings;
+    };
+    let lines: Vec<&str> = text.lines().collect();
+
+    // Coalesce multi-line `#[deprecated( ... )]` into a single logical block.
+    let mut i = 0usize;
+    while i < lines.len() {
+        let line = lines[i];
+        if !line.contains("#[deprecated") {
+            i += 1;
+            continue;
+        }
+        // Escape hatch.
+        if i > 0 && lines[i - 1].trim() == "// I6-LINT: skip" {
+            i += 1;
+            continue;
+        }
+
+        // Accumulate balanced parens.
+        let mut block = String::new();
+        let mut depth: i32 = 0;
+        let start_line = i + 1; // 1-based for human display
+        let mut j = i;
+        let mut saw_open = false;
+        while j < lines.len() {
+            block.push_str(lines[j]);
+            for c in lines[j].chars() {
+                match c {
+                    '(' => {
+                        depth += 1;
+                        saw_open = true;
+                    }
+                    ')' => depth -= 1,
+                    _ => {}
+                }
+            }
+            j += 1;
+            if saw_open && depth <= 0 {
+                break;
+            }
+            // No-paren form is single-line; bail after the first line.
+            if !saw_open {
+                break;
+            }
+            block.push('\n');
+        }
+        i = j;
+
+        // Bare `#[deprecated]` with no parens is a violation.
+        let has_args = block.contains("#[deprecated(");
+        if !has_args {
+            findings.push(Finding {
+                path: path.to_path_buf(),
+                line: start_line,
+                reason: "#[deprecated] without arguments — must declare since + note".into(),
+            });
+            continue;
+        }
+
+        // Parse the actual `key = "value"` pairs (not just substring presence).
+        let (since, note) = parse_deprecated_attrs(&block);
+
+        if since.as_deref().unwrap_or("").is_empty() {
+            findings.push(Finding {
+                path: path.to_path_buf(),
+                line: start_line,
+                reason: format!(
+                    "#[deprecated] missing or empty `since = \"…\"` — block: {block}"
+                ),
+            });
+        }
+        match note.as_deref() {
+            None | Some("") => findings.push(Finding {
+
+exec
+/bin/bash -lc "git show 7c700a0b:.github/workflows/ci.yml | sed -n '260,560p'" in $REPO_ROOT
+ succeeded in 0ms:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+        run: |
+          export OBSCURA_BIN="$(pwd)/vendor/obscura/target/release/obscura"
+          export REV_STEALTH_OBSCURA="$OBSCURA_BIN"
+          cargo test --workspace -- --ignored cdp_shim_e2e
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdp-shim-logs
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  mcp-schema-lint:
+    # Lane E P11: freshness gate for docs/MCP_REFERENCE.md.
+    #
+    # The generator binary (`stealth-mcp/src/bin/gen_reference.rs`) renders
+    # the reference document from `tool_definitions()` and
+    # `all_error_kind_docs()`. In `--check` mode it exits 1 if the committed
+    # file disagrees with a fresh render. This complements (does not
+    # replace) the `mcp_reference_freshness` regression test in the workspace
+    # test suite; running it as its own job gives a clearer failure surface
+    # when a contributor forgets to regenerate the doc.
+    name: MCP reference freshness
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo run -p stealth-mcp --bin gen_reference -- --check
+        run: cargo run -p stealth-mcp --bin gen_reference -- --check
+
+  config-cli-smoke:
+    # Lane E P11: smoke-test `rev-stealth config init --target=policy
+    # --non-interactive --force` inside a throwaway $HOME so the CI verifies
+    # the non-interactive init path stays exit-0 on a fresh profile. The
+    # `--non-interactive` flag is the contract documented in P6.2 and must
+    # never block on stdin.
+    name: config CLI non-interactive smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo build -p stealth-cli --bin rev-stealth
+        run: cargo build -p stealth-cli --bin rev-stealth
+      - name: config init --target=policy --non-interactive --force
+        run: |
+          set -euxo pipefail
+          TMPHOME="$(mktemp -d)"
+          export HOME="$TMPHOME"
+          ./target/debug/rev-stealth config init \
+            --target=policy --non-interactive --force
+          # Verify the policy file was materialized inside the throwaway HOME.
+          test -f "$TMPHOME/.rev_scraping/policy.toml"
+
+  hermes-contract:
+    # Lane E P11: run the Hermes (rev-scraping-mcp) plugin contract tests.
+    # 20-test python suite under dist/hermes/rev-scraping-mcp/tests/ that
+    # gates the stealth-mcp <-> Hermes wire shape (lifecycle, schema bridge,
+    # tool proxy). Pure stdlib `unittest`; no extra pip install needed.
+    name: Hermes plugin contract tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: python3 -m unittest discover dist/hermes/rev-scraping-mcp/tests
+        run: python3 -m unittest discover dist/hermes/rev-scraping-mcp/tests
+
+  systemd-analyze:
+    # Lane E P11: lint the shipped systemd units.
+    #
+    # We pin `ubuntu-24.04` (systemd 255) because the shipped VPN unit at
+    # `dist/systemd/system/rev-stealth-vpn@.service` uses
+    # `LoadCredentialEncrypted=` and the `%d` credential specifier, both of
+    # which require systemd >=252. `ubuntu-22.04` (systemd 249) would let
+    # the directives parse as unknown and still report success in some
+    # cases, masking real breakage. See `docs/deploy/vps.md` for the
+    # runtime requirement that mirrors this CI pin.
+    #
+    # `verify` is run against every `.service` AND `.timer` file we ship so
+    # the doctor timer is also covered, not just the services.
+    name: systemd-analyze verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm systemd >= 252
+        run: |
+          set -euxo pipefail
+          ver="$(systemctl --version | awk 'NR==1{print $2}')"
+          echo "host systemd version: $ver"
+          if [ "$ver" -lt 252 ]; then
+            echo "systemd $ver too old for LoadCredentialEncrypted= / %d" >&2
+            exit 1
+          fi
+      - name: systemd-analyze verify (services + timer)
+        run: |
+          set -euxo pipefail
+          # Collect every unit file we ship under dist/systemd/system/. We
+          # globstar both *.service and *.timer so the doctor timer is in
+          # scope alongside the services.
+          shopt -s nullglob
+          units=( dist/systemd/system/*.service dist/systemd/system/*.timer )
+          if [ "${#units[@]}" -eq 0 ]; then
+            echo "no systemd units found under dist/systemd/system/" >&2
+            exit 1
+          fi
+          echo "verifying: ${units[*]}"
+          systemd-analyze verify "${units[@]}"
+
+  headless-auth:
+    # Lane E P11: headless authenticated-spider smoke. The real test path
+    # needs Chrome + Xvfb on Linux (or macOS), which the basic ubuntu
+    # runner can support, but the underlying coverage is gated on harness
+    # bits not yet in this lane. We keep the job as a placeholder so the
+    # workflow matrix exposes "headless-auth" in the run graph and the
+    # follow-up lane can flip `if: false` to enable it without renaming a
+    # required check.
+    name: headless authenticated smoke (skipped)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Annotate skip reason
+        run: |
+          echo "::notice title=headless-auth::skipped; opt-in gated below."
+      - name: placeholder (opt-in)
+        if: false
+        run: |
+          echo "headless-auth would run here"
+
+  test-spider-fallback:
+    name: E2E e2e_spider_fallback
+    needs: build-obscura
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Download obscura binary
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/
+      - name: chmod +x obscura
+        run: chmod +x vendor/obscura/target/release/obscura
+      - name: cargo test -- --ignored e2e_spider_fallback
+        env:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+        run: |
+          export OBSCURA_BIN="$(pwd)/vendor/obscura/target/release/obscura"
+          export REV_STEALTH_OBSCURA="$OBSCURA_BIN"
+          cargo test --workspace -- --ignored e2e_spider_fallback
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spider-fallback-logs
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  # =========================================================================
+  # Lane I — API stability & semver (v1.3)
+  # =========================================================================
+  #
+  # I.1: cli-public-api snapshot drift gate. Drift = any byte-level diff
+  # against `.agent/v1.3/cli-public-api.snapshot.json`. To merge a drifting
+  # PR, the contributor must regenerate the snapshot, commit the diff, and
+  # apply the `api-additive` (new flag/cmd/env) or `api-breaking` (removed,
+  # renamed, semantically changed) PR label.
+  cli-public-api-snapshot:
+    name: CLI public-API snapshot drift
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo build -p stealth-cli
+        run: cargo build -p stealth-cli
+      - name: regenerate + check snapshot
+        run: ./scripts/cli-public-api-snapshot.sh --check
+
+  # I.2: cargo-public-api Rust API diff gate. Failures here flag pub-item
+  # changes in any workspace member. Reviewer requires `api-additive` or
+  # `api-breaking` label on PRs that mutate the diff. Job is non-blocking
+  # in v1.3 (continue-on-error) — it will be hardened to a hard gate in v1.4
+  # once the baseline is stable. The diff artifact stays attached to every PR.
+  cargo-public-api-diff:
+    name: cargo-public-api diff (advisory)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # cargo-public-api consumes rustdoc JSON, whose schema changes per
+      # nightly. Pin the nightly to the date that cargo-public-api 0.39.x is
+      # validated against (see
+      # https://github.com/cargo-public-api/cargo-public-api/blob/main/scripts/release-helper/src/version_info.rs).
+      # Floating `nightly` can break this job between cargo-public-api
+      # releases. Re-pin in lockstep when bumping cargo-public-api in v1.4.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-10-13
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-nightly-2024-10-13
+          workspaces: |
+            . -> target
+      - name: install cargo-public-api
+        run: cargo install cargo-public-api --locked --version 0.39.0
+      - name: fetch base ref
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin "$BASE_REF"
+      - name: diff against base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`,
+          # NOT a bare ref. We materialize the range explicitly so the gate
+          # actually runs (a syntax error here would silently no-op the diff).
+          BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          for crate in stealth-core stealth-auth stealth-sanitize \
+                       stealth-agent-contracts stealth-parse stealth-mcp; do
+            echo "::group::cargo public-api diff -p $crate"
+            # Job-level `continue-on-error: true` already makes this advisory in
+            # v1.3; we deliberately do NOT mask the per-crate exit code so a
+            # genuine tool failure (missing crate, build break) surfaces.
+            cargo public-api --package "$crate" diff "$BASE_SHA..$HEAD_SHA"
+            echo "::endgroup::"
+          done
+
+  # I.5: MCP tool-schema breaking-change detector. Mirrors mcp-schema-lint
+  # but specifically asserts the canonical 16-tool list (Lane I.1 snapshot)
+  # has not been mutated. Drift requires `mcp-schema-breaking` PR label.
+  mcp-schema-breaking-detector:
+    name: MCP tool schema breaking-change
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: gen_reference freshness
+        run: cargo run -q -p stealth-mcp --bin gen_reference -- --check
+      - name: fetch base ref
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags --depth=200 origin "$BASE_REF"
+      - name: mcp-schema-breaking diff vs base
+
+exec
+/bin/bash -lc "git show 7c700a0b:.github/workflows/ci.yml | sed -n '1,260p'" in $REPO_ROOT
+ succeeded in 0ms:
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
+
+  check:
+    name: cargo check (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+        toolchain: ["1.83", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.toolchain == 'stable'
+      - uses: dtolnay/rust-toolchain@1.83.0
+        if: matrix.toolchain == '1.83'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+      - name: cargo check --workspace --all-targets
+        run: cargo check --workspace --all-targets
+
+  clippy:
+    name: cargo clippy (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+        toolchain: ["1.83", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.toolchain == 'stable'
+        with:
+          components: clippy
+      - uses: dtolnay/rust-toolchain@1.83.0
+        if: matrix.toolchain == '1.83'
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+      - name: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: cargo test (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+        toolchain: ["1.83", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.toolchain == 'stable'
+      - uses: dtolnay/rust-toolchain@1.83.0
+        if: matrix.toolchain == '1.83'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          workspaces: |
+            . -> target
+      - name: cargo test --workspace --no-fail-fast
+        run: cargo test --workspace --no-fail-fast
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}-${{ matrix.toolchain }}
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  docs:
+    name: cargo doc
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo doc --workspace --no-deps
+        run: cargo doc --workspace --no-deps
+
+  spdx:
+    name: source and license checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Check source annotations and SPDX
+        run: bash scripts/check_source_and_spdx.sh
+      - name: Check BSL contamination
+        run: bash scripts/check_bsl_contamination.sh
+
+  build-obscura:
+    name: Build vendored obscura binary
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    outputs:
+      obscura-key: ${{ steps.key.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - id: key
+        name: Compute obscura cache key
+        run: |
+          if [ -d vendor/obscura ]; then
+            HASH=$(git -C vendor/obscura rev-parse HEAD 2>/dev/null || find vendor/obscura \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' \) -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -d' ' -f1)
+          else
+            HASH=none
+          fi
+          echo "value=$HASH" >> "$GITHUB_OUTPUT"
+      - name: Cache obscura target dir
+        id: obscura-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/obscura/target
+          key: obscura-target-${{ runner.os }}-${{ steps.key.outputs.value }}
+          restore-keys: |
+            obscura-target-${{ runner.os }}-
+      - name: Build obscura --release
+        if: hashFiles('vendor/obscura/Cargo.toml') != ''
+        run: |
+          cd vendor/obscura
+          cargo build --release --bin obscura
+      - name: Upload obscura binary
+        if: hashFiles('vendor/obscura/Cargo.toml') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/obscura
+          retention-days: 1
+          if-no-files-found: error
+
+  test-obscura-lifecycle:
+    name: E2E obscura_lifecycle
+    needs: build-obscura
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Download obscura binary
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/
+      - name: chmod +x obscura
+        run: chmod +x vendor/obscura/target/release/obscura
+      - name: cargo test -- --ignored obscura_lifecycle
+        env:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+        run: |
+          export OBSCURA_BIN="$(pwd)/vendor/obscura/target/release/obscura"
+          export REV_STEALTH_OBSCURA="$OBSCURA_BIN"
+          cargo test --workspace -- --ignored obscura_lifecycle
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: obscura-lifecycle-logs
+          path: |
+            target/**/*.log
+            target/**/*.stderr
+          if-no-files-found: ignore
+
+  test-cdp-shim-lifecycle:
+    name: E2E cdp_shim_e2e
+    needs: build-obscura
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: Install Chrome (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - name: Download obscura binary
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-binary
+          path: vendor/obscura/target/release/
+      - name: chmod +x obscura
+        run: chmod +x vendor/obscura/target/release/obscura
+      - name: cargo test -- --ignored cdp_shim_e2e
+        env:
+          REV_SCRAPING_RUN_OBSCURA: "1"
+
+exec
+/bin/bash -lc "git show 7c700a0b:crates/stealth-cli/tests/deprecated_completeness.rs | sed -n '260,460p'" in $REPO_ROOT
+ succeeded in 0ms:
+            None | Some("") => findings.push(Finding {
+                path: path.to_path_buf(),
+                line: start_line,
+                reason: format!(
+                    "#[deprecated] missing or empty `note = \"…\"` — block: {block}"
+                ),
+            }),
+            Some(note_value) => {
+                let has_hint = HINTS.iter().any(|h| note_value.contains(h));
+                if !has_hint {
+                    findings.push(Finding {
+                        path: path.to_path_buf(),
+                        line: start_line,
+                        reason: format!(
+                            "#[deprecated] note lacks a replacement hint (expected one of {HINTS:?}) — note=\"{note_value}\""
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    findings
+}
+
+#[test]
+fn every_deprecated_attribute_is_actionable() {
+    let root = workspace_root();
+    let sources = list_rust_sources(&root);
+    assert!(
+        !sources.is_empty(),
+        "no .rs sources found under {}/crates — workspace layout changed?",
+        root.display()
+    );
+
+    let mut all_findings = Vec::new();
+    for path in &sources {
+        all_findings.extend(audit_file(path));
+    }
+
+    if !all_findings.is_empty() {
+        let mut msg = String::from(
+            "\nLane I.6 deprecated-attr lint failed. Every #[deprecated(...)] must declare\n\
+             `since`, `note`, and a replacement hint inside the note (one of: \
+             replace_with, \"Use \", \"use \", \"replaced by\", \"Prefer \"). \
+             See docs/compat.md.\n\nFindings:\n",
+        );
+        for f in &all_findings {
+            msg.push_str(&format!(
+                "  - {}:{} — {}\n",
+                f.path
+                    .strip_prefix(&root)
+                    .unwrap_or(&f.path)
+                    .display(),
+                f.line,
+                f.reason.replace('\n', " ")
+            ));
+        }
+        panic!("{msg}");
+    }
+}
+
+/// Self-test: the lint must actually flag malformed samples and accept
+/// a fully-populated attribute. Each case is independent.
+#[test]
+fn lint_smoke_detects_missing_metadata() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    // Case 1: bare `#[deprecated]` — missing args.
+    let p1 = dir.path().join("bare.rs");
+    fs::write(&p1, "#[deprecated]\npub fn legacy() {}\n").unwrap();
+    let f1 = audit_file(&p1);
+    assert!(
+        f1.iter().any(|f| f.reason.contains("without arguments")),
+        "expected bare-form violation, got {f1:?}"
+    );
+
+    // Case 2: empty note + missing replacement hint.
+    let p2 = dir.path().join("nohint.rs");
+    fs::write(
+        &p2,
+        "#[deprecated(since = \"1.0\", note = \"gone\")]\npub fn legacy2() {}\n",
+    )
+    .unwrap();
+    let f2 = audit_file(&p2);
+    assert!(
+        f2.iter().any(|f| f.reason.contains("replacement hint")),
+        "expected missing-hint violation, got {f2:?}"
+    );
+
+    // Case 3: missing since (only note).
+    let p3 = dir.path().join("nosince.rs");
+    fs::write(
+        &p3,
+        "#[deprecated(note = \"Use new_fn instead\")]\npub fn legacy3() {}\n",
+    )
+    .unwrap();
+    let f3 = audit_file(&p3);
+    assert!(
+        f3.iter().any(|f| f.reason.contains("`since")),
+        "expected missing-since violation, got {f3:?}"
+    );
+
+    // Case 4: well-formed attribute should produce zero findings.
+    let p4 = dir.path().join("ok.rs");
+    fs::write(
+        &p4,
+        "#[deprecated(since = \"1.3.0\", note = \"Use rev_scraping::new_api instead\")]\n\
+         pub fn legacy4() {}\n",
+    )
+    .unwrap();
+    let f4 = audit_file(&p4);
+    assert!(f4.is_empty(), "well-formed attr should not fire, got {f4:?}");
+
+    // Case 5: regression — `since` appearing inside the note value must NOT
+    // satisfy the since check. This protects against the substring-presence
+    // bug the previous implementation had.
+    let p5 = dir.path().join("substring_bug.rs");
+    fs::write(
+        &p5,
+        "#[deprecated(note = \"deprecated since v1.0; replace_with new_fn\")]\n\
+         pub fn legacy5() {}\n",
+    )
+    .unwrap();
+    let f5 = audit_file(&p5);
+    assert!(
+        f5.iter().any(|f| f.reason.contains("`since")),
+        "substring 'since' inside note must NOT count as the since= attr, got {f5:?}"
+    );
+}
+
+exec
+/bin/bash -lc "git show 7c700a0b:.github/workflows/ci.yml | sed -n '560,660p'" in $REPO_ROOT
+ succeeded in 0ms:
+      - name: mcp-schema-breaking diff vs base
+        env:
+          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+        run: ./scripts/mcp-schema-breaking.sh --check
+
+  # I.6: see crates/stealth-cli/tests/deprecated_completeness.rs (unit test).
+
+exec
+/bin/bash -lc 'git diff --name-status b2153aa0..7c700a0b -- scripts/cli-public-api-snapshot.sh scripts/mcp-schema-breaking.sh .agent/v1.3/cli-public-api.snapshot.json docs/compat.md CHANGELOG.rev_scraping.md crates/stealth-cli/tests/deprecated_completeness.rs .github/workflows/ci.yml README.md release-please-config.json .github/workflows/release-please.yml' in $REPO_ROOT
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/v1.3/cli-public-api.snapshot.json | jq '{schema_version:.\""'$schema_version", command_count:(.commands|length), spider_flag_count:(.commands.spider.help.flags|length), env_count:(.env_vars|length), exit_count:(.exit_codes|length), mcp_count:.mcp_tools.count, mcp_names:.mcp_tools.names, sample_spider_flags:[.commands.spider.help.flags[0:3][]], required_schemas:(.mcp_tools.schemas|to_entries|map({key, required:.value.required})|.[0:5])}'"'" in $REPO_ROOT
+ succeeded in 0ms:
+A	.agent/v1.3/cli-public-api.snapshot.json
+M	.github/workflows/ci.yml
+A	.github/workflows/release-please.yml
+A	CHANGELOG.rev_scraping.md
+M	README.md
+A	crates/stealth-cli/tests/deprecated_completeness.rs
+A	docs/compat.md
+A	release-please-config.json
+A	scripts/cli-public-api-snapshot.sh
+A	scripts/mcp-schema-breaking.sh
+
+ succeeded in 0ms:
+{
+  "schema_version": 2,
+  "command_count": 11,
+  "spider_flag_count": 36,
+  "env_count": 11,
+  "exit_count": 5,
+  "mcp_count": 16,
+  "mcp_names": [
+    "auth_list",
+    "auth_login_complete",
+    "auth_login_start",
+    "auth_status",
+    "cf_evaluate",
+    "doctor",
+    "recipe_export",
+    "recipe_import",
+    "recipe_list",
+    "recipe_propose_endpoint",
+    "recipe_remove",
+    "recipe_show",
+    "relocate",
+    "session_show",
+    "spider",
+    "vpn_rotate"
+  ],
+  "sample_spider_flags": [
+    {
+      "flag": "--allow-no-vpn"
+    },
+    {
+      "flag": "--auth-domain"
+    },
+    {
+      "flag": "--auto-fallback"
+    }
+  ],
+  "required_schemas": [
+    {
+      "key": "auth_list",
+      "required": []
+    },
+    {
+      "key": "auth_login_complete",
+      "required": [
+        "session_token"
+      ]
+    },
+    {
+      "key": "auth_login_start",
+      "required": [
+        "profile",
+        "url"
+      ]
+    },
+    {
+      "key": "auth_status",
+      "required": [
+        "profile"
+      ]
+    },
+    {
+      "key": "cf_evaluate",
+      "required": [
+        "url"
+      ]
+    }
+  ]
+}
+
+codex
+実装は想定より少し進んでおり、`mcp-schema-breaking.sh` は少なくとも tool removal と required-arg tightening の base diff を持っています。一方、enum/output-field までの base diff は `compat.md` 上で v1.4 backlog と明記されているため、そこを主要な減点候補として扱います。
+exec
+/bin/bash -lc 'git diff --quiet 7c700a0b -- scripts/cli-public-api-snapshot.sh scripts/mcp-schema-breaking.sh .agent/v1.3/cli-public-api.snapshot.json docs/compat.md CHANGELOG.rev_scraping.md crates/stealth-cli/tests/deprecated_completeness.rs .github/workflows/ci.yml README.md release-please-config.json .github/workflows/release-please.yml; echo $?' in $REPO_ROOT
+ succeeded in 0ms:
+0
+
+exec
+/bin/bash -lc 'git show 7c700a0b:README.md | rg -n "compat|Compatibility|semver|CHANGELOG|release-please"' in $REPO_ROOT
+ succeeded in 0ms:
+42:- [Compatibility & semver policy](docs/compat.md)
+
+exec
+/bin/bash -lc 'git show 7c700a0b:.github/workflows/ci.yml | rg -n "api-additive|api-breaking|mcp-schema-breaking|label|github.event|continue-on-error|cargo-public-api|cli-public-api-snapshot|mcp-schema-breaking-detector"' in $REPO_ROOT
+ succeeded in 0ms:
+236:    continue-on-error: true
+413:    continue-on-error: true
+459:  # apply the `api-additive` (new flag/cmd/env) or `api-breaking` (removed,
+460:  # renamed, semantically changed) PR label.
+461:  cli-public-api-snapshot:
+476:        run: ./scripts/cli-public-api-snapshot.sh --check
+478:  # I.2: cargo-public-api Rust API diff gate. Failures here flag pub-item
+479:  # changes in any workspace member. Reviewer requires `api-additive` or
+480:  # `api-breaking` label on PRs that mutate the diff. Job is non-blocking
+481:  # in v1.3 (continue-on-error) — it will be hardened to a hard gate in v1.4
+483:  cargo-public-api-diff:
+484:    name: cargo-public-api diff (advisory)
+487:    continue-on-error: true
+492:      # cargo-public-api consumes rustdoc JSON, whose schema changes per
+493:      # nightly. Pin the nightly to the date that cargo-public-api 0.39.x is
+495:      # https://github.com/cargo-public-api/cargo-public-api/blob/main/scripts/release-helper/src/version_info.rs).
+496:      # Floating `nightly` can break this job between cargo-public-api
+497:      # releases. Re-pin in lockstep when bumping cargo-public-api in v1.4.
+506:      - name: install cargo-public-api
+507:        run: cargo install cargo-public-api --locked --version 0.39.0
+509:        if: github.event_name == 'pull_request'
+511:          BASE_REF: ${{ github.event.pull_request.base.ref }}
+516:        if: github.event_name == 'pull_request'
+518:          BASE_REF: ${{ github.event.pull_request.base.ref }}
+521:          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`,
+529:            # Job-level `continue-on-error: true` already makes this advisory in
+538:  # has not been mutated. Drift requires `mcp-schema-breaking` PR label.
+539:  mcp-schema-breaking-detector:
+556:        if: github.event_name == 'pull_request'
+558:          BASE_REF: ${{ github.event.pull_request.base.ref }}
+560:      - name: mcp-schema-breaking diff vs base
+562:          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+563:        run: ./scripts/mcp-schema-breaking.sh --check
+
+exec
+/bin/bash -lc 'git show 7c700a0b:release-please-config.json && git show 7c700a0b:.github/workflows/release-please.yml' in $REPO_ROOT
+ succeeded in 0ms:
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "rust",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "rev_scraping",
+      "component": "rev-stealth",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "Formula/rev-stealth.rb"
+        }
+      ]
+    }
+  },
+  "plugins": [
+    {
+      "type": "cargo-workspace",
+      "merge": true
+    }
+  ],
+  "changelog-sections": [
+    { "type": "feat",     "section": "Features",                  "hidden": false },
+    { "type": "fix",      "section": "Bug Fixes",                 "hidden": false },
+    { "type": "perf",     "section": "Performance",               "hidden": false },
+    { "type": "security", "section": "Security",                  "hidden": false },
+    { "type": "deps",     "section": "Dependencies",              "hidden": false },
+    { "type": "docs",     "section": "Documentation",             "hidden": false },
+    { "type": "refactor", "section": "Refactoring",               "hidden": true  },
+    { "type": "test",     "section": "Tests",                     "hidden": true  },
+    { "type": "ci",       "section": "Continuous Integration",    "hidden": true  },
+    { "type": "build",    "section": "Build System",              "hidden": true  },
+    { "type": "chore",    "section": "Chores",                    "hidden": true  }
+  ]
+}
+name: release-please
+
+# Lane H.7 - release-please PR automation.
+# Runs on every push to main and opens / updates a release PR. Merging
+# that PR pushes a v* tag, which triggers release.yml to build and sign
+# artifacts.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: release-please
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+exec
+/bin/bash -lc 'git diff --stat b2153aa0..7c700a0b -- CHANGELOG.md CHANGELOG.rev_scraping.md release-please-config.json .release-please-manifest.json .github/workflows/release-please.yml' in $REPO_ROOT
+exec
+/bin/bash -lc 'git show 7c700a0b:.release-please-manifest.json || true' in $REPO_ROOT
+ succeeded in 0ms:
+{
+  ".": "1.2.0"
+}
+
+ succeeded in 0ms:
+ .github/workflows/release-please.yml | 27 ++++++++++++
+ .release-please-manifest.json        |  3 ++
+ CHANGELOG.rev_scraping.md            | 84 ++++++++++++++++++++++++++++++++++++
+ release-please-config.json           | 41 ++++++++++++++++++
+ 4 files changed, 155 insertions(+)
+
+exec
+/bin/bash -lc "git show b2153aa0:CHANGELOG.md | sed -n '1,80p'; git show 7c700a0b:CHANGELOG.md | sed -n '1,80p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+## [0.0.17] - 2026-05-21
+
+### Changed — §16.8 strict-grading R2/R3 closure + version-ref accuracy
+
+Iterative refinement of README §16.8 driven by Opus 4.7 xhigh × Codex
+gpt-5.5 xhigh strict 10-axis grading rounds:
+
+- **R2 (commit 0bf5cc6)**: closed the 3 must-fix items from R1 grading
+  (slice-designer xref backed by canonical source, sentinel-write
+  detection step, Lane A–E vocabulary defined, CHANGELOG audit
+  pointers added). Both graders → 93/100.
+- **R3 (commit 085ca21)**: closed the 1 shared nice-to-have (ps etime
+  awk regex now correctly excludes HH=00 sub-hour processes,
+  preventing false positives in the hang-detection fallback).
+  Verified with 5-input simulation (05:23, 00:05:23, 01:23:45,
+  12:34:56, 1-02:00:00 → no/no/yes/yes/yes). Both graders → ~97/100.
+- **R4 (commit ef3129d)**: added a real `REV_HARNESS_DELEGATION_METRIC`
+  JSON sample under detection step 2 (3-line comment block, schema:
+  `delegation_id` / `wrapper_role` / `exit_code` / `duration_ms` /
+  `dry_run`, dated 2026-05-21) so fresh adopters can recognize the
+  expected wrapper output without guessing. Promoted
+  `incident context (語彙定義)` from bold paragraph to `####` heading
+  to match sibling §16.8 subsections.
+
+### Fixed
+- §16.8 "既知 (まだ自動化していない)" labels referenced "(0.0.17 候補)"
+  but 0.0.17 IS this release — corrected to "(0.0.18 候補)" so the
+  forward-debt pointer accurately tracks what is deferred vs shipped.
+
+### Why this matters
+- Locks in the canonical Codex CLI bail-out diagnostic across two
+  independent strict gating passes (Opus + Codex both reach ≥ 95+ on
+  all 10 axes for the section).
+- Demonstrates the RevHarness "review-driven iteration" pattern in
+  practice: ship → strict grade → close gaps → re-grade until
+  convergence. Audit trail is the proof; each round's grading prompt
+  and verdict file is committed.
+
+### Audit trail (this release)
+- `.agent/active/prompts/grade_016_strict.md` (R1/R2 grading prompt)
+- `.agent/active/prompts/grade_017_round3.md` (R3/R5 grading prompt)
+- `.claude/tmp/multi-repo-sync/codex_016_strict_grade.md` (Codex R1)
+- `.claude/tmp/multi-repo-sync/codex_016_strict_grade_r2.md` (Codex R2)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r3.md` (Codex R3)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r5.md` (Codex R5)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r7.md` (Codex R7)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r8.md` (Codex R8 — final)
+
+Iteration converged at R8 (commit 11ad1d7) with the R6 self-referential
+"to be appended" TODO at line 51 of the draft resolved in-place. Per
+the lessons of R7 (which introduced a stale future-tense pointer while
+fixing the previous one) and R8 (which repeated the same anti-pattern
+one round downstream), **this CHANGELOG entry intentionally does not
+predict any future grading round**. The artifact paths above are the
+canonical evidence; any future re-grading writes into a new file and
+is recorded by amending or superseding this entry, not by leaving a
+forward TODO in the shipped release notes.
+
+### Deferred to 0.0.18 (next release)
+- wrapper-side prompt-size pre-check (≥ 5 KB × `high` effort warn /
+  strict-mode fail-close)
+- `harness-doctor --strict` integration of the hung-lane scan
+- Plus the cyber_tomo / agent_base etc. cross-project path leak
+  pattern table (audit-driven from the 0.0.15 history sanitization
+  Codex verdict).
+
+## [0.0.16] - 2026-05-21
+
+### Added — Codex CLI bail-out troubleshooting
+
+- **README §16.8** "Codex CLI が計画文 1 行だけ吐いて exit / 実装 0
+  ファイル": new troubleshooting entry documenting the Codex CLI
+  silent-no-op failure mode discovered during 2026-05-21 multi-lane
+  orchestration. Trigger conditions (prompt ≥ 5-7 KB × `high` effort
+  × self-driven multi sub-phase), detection commands (sentinel-write +
+  mtime + size + etime-based hang scan + `REV_HARNESS_DELEGATION_METRIC`
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+## [0.0.17] - 2026-05-21
+
+### Changed — §16.8 strict-grading R2/R3 closure + version-ref accuracy
+
+Iterative refinement of README §16.8 driven by Opus 4.7 xhigh × Codex
+gpt-5.5 xhigh strict 10-axis grading rounds:
+
+- **R2 (commit 0bf5cc6)**: closed the 3 must-fix items from R1 grading
+  (slice-designer xref backed by canonical source, sentinel-write
+  detection step, Lane A–E vocabulary defined, CHANGELOG audit
+  pointers added). Both graders → 93/100.
+- **R3 (commit 085ca21)**: closed the 1 shared nice-to-have (ps etime
+  awk regex now correctly excludes HH=00 sub-hour processes,
+  preventing false positives in the hang-detection fallback).
+  Verified with 5-input simulation (05:23, 00:05:23, 01:23:45,
+  12:34:56, 1-02:00:00 → no/no/yes/yes/yes). Both graders → ~97/100.
+- **R4 (commit ef3129d)**: added a real `REV_HARNESS_DELEGATION_METRIC`
+  JSON sample under detection step 2 (3-line comment block, schema:
+  `delegation_id` / `wrapper_role` / `exit_code` / `duration_ms` /
+  `dry_run`, dated 2026-05-21) so fresh adopters can recognize the
+  expected wrapper output without guessing. Promoted
+  `incident context (語彙定義)` from bold paragraph to `####` heading
+  to match sibling §16.8 subsections.
+
+### Fixed
+- §16.8 "既知 (まだ自動化していない)" labels referenced "(0.0.17 候補)"
+  but 0.0.17 IS this release — corrected to "(0.0.18 候補)" so the
+  forward-debt pointer accurately tracks what is deferred vs shipped.
+
+### Why this matters
+- Locks in the canonical Codex CLI bail-out diagnostic across two
+  independent strict gating passes (Opus + Codex both reach ≥ 95+ on
+  all 10 axes for the section).
+- Demonstrates the RevHarness "review-driven iteration" pattern in
+  practice: ship → strict grade → close gaps → re-grade until
+  convergence. Audit trail is the proof; each round's grading prompt
+  and verdict file is committed.
+
+### Audit trail (this release)
+- `.agent/active/prompts/grade_016_strict.md` (R1/R2 grading prompt)
+- `.agent/active/prompts/grade_017_round3.md` (R3/R5 grading prompt)
+- `.claude/tmp/multi-repo-sync/codex_016_strict_grade.md` (Codex R1)
+- `.claude/tmp/multi-repo-sync/codex_016_strict_grade_r2.md` (Codex R2)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r3.md` (Codex R3)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r5.md` (Codex R5)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r7.md` (Codex R7)
+- `.claude/tmp/multi-repo-sync/codex_017_grade_r8.md` (Codex R8 — final)
+
+Iteration converged at R8 (commit 11ad1d7) with the R6 self-referential
+"to be appended" TODO at line 51 of the draft resolved in-place. Per
+the lessons of R7 (which introduced a stale future-tense pointer while
+fixing the previous one) and R8 (which repeated the same anti-pattern
+one round downstream), **this CHANGELOG entry intentionally does not
+predict any future grading round**. The artifact paths above are the
+canonical evidence; any future re-grading writes into a new file and
+is recorded by amending or superseding this entry, not by leaving a
+forward TODO in the shipped release notes.
+
+### Deferred to 0.0.18 (next release)
+- wrapper-side prompt-size pre-check (≥ 5 KB × `high` effort warn /
+  strict-mode fail-close)
+- `harness-doctor --strict` integration of the hung-lane scan
+- Plus the cyber_tomo / agent_base etc. cross-project path leak
+  pattern table (audit-driven from the 0.0.15 history sanitization
+  Codex verdict).
+
+## [0.0.16] - 2026-05-21
+
+### Added — Codex CLI bail-out troubleshooting
+
+- **README §16.8** "Codex CLI が計画文 1 行だけ吐いて exit / 実装 0
+  ファイル": new troubleshooting entry documenting the Codex CLI
+  silent-no-op failure mode discovered during 2026-05-21 multi-lane
+  orchestration. Trigger conditions (prompt ≥ 5-7 KB × `high` effort
+  × self-driven multi sub-phase), detection commands (sentinel-write +
+  mtime + size + etime-based hang scan + `REV_HARNESS_DELEGATION_METRIC`
+
+exec
+/bin/bash -lc "git diff b2153aa0..7c700a0b -- README.md | sed -n '1,120p'" in $REPO_ROOT
+ succeeded in 0ms:
+diff --git a/README.md b/README.md
+index 0909e3f1..b6f7517e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,1309 +1,1052 @@
+-# RevHarness
++<!--
++  rev_scraping — README.md
++  v1.2.0 GA (2026-05-22)
++  Synthesized from 5 parallel Opus 4.7-high research passes
++  (feature inventory, competitive analysis, architecture, security model, quickstart).
++-->
+ 
+-> **Claude Code と Codex を repo-local policy・durable state・deterministic verification の上で協調させる、source-centric な AI 開発ハーネス。**
++# rev_scraping
+ 
+-`Revharness` (canonical display name) / `rev_harness` (canonical machine name) は、AI エージェント運用の速度を落とさずに **再現性・精度・安全性** を機械的に担保するための薄い基盤です。`agent_base` / `agent-base` は legacy alias として残しています。
++> **An AI-agent-native, stealth-first web scraping toolkit for production.**
++> Rust workspace · 13 crates · MCP-native (16 tools) · VPN-required by default ·
++> XChaCha20-Poly1305 cookie vault · Prompt-injection sanitizer with `<<<UNTRUSTED_CONTENT>>>` envelope · systemd-grade VPS deploy.
+ 
+----
++[![tests](https://img.shields.io/badge/workspace_tests-776%20PASS%20%2F%200%20fail-success)](#test-suite)
++[![python](https://img.shields.io/badge/hermes_python-20%20PASS-success)](#hermes-plugin)
++[![rust](https://img.shields.io/badge/rust-1.83%2B-orange)](https://www.rust-lang.org/)
++[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
++[![release](https://img.shields.io/badge/release-v1.2.0-blueviolet)](RELEASE_NOTES_v1.2.0.md)
++[![mcp](https://img.shields.io/badge/MCP-stdio_JSON--RPC_2.0-purple)](docs/MCP_REFERENCE.md)
++[![ci](https://img.shields.io/badge/CI-8_jobs-green)](.github/workflows/ci.yml)
+ 
+-## 目次
+-
+-1. [何のための基盤か](#1-何のための基盤か)
+-2. [一目で見る](#2-一目で見る-at-a-glance)
+-3. [アーキテクチャ — 3 層モデル](#3-アーキテクチャ--3-層モデル)
+-4. [Runtime Data Plane — 2 系統 db / project_id 分離 / call flow](#4-runtime-data-plane--2-系統-db--project_id-分離--call-flow)
+-5. [技術スタック / 言語マップ](#5-技術スタック--言語マップ)
+-6. [Quick Start](#6-quick-start)
+-7. [機能カタログ — Rust Core (harness-rust/)](#7-機能カタログ--rust-core-harness-rust)
+-8. [機能カタログ — Shell Scripts (scripts/)](#8-機能カタログ--shell-scripts-scripts-50)
+-9. [機能カタログ — Skills & Specialties](#9-機能カタログ--skills--specialties)
+-10. [Hooks — エディタ→キュー→Rust の 3 段アダプタ](#10-hooks--エディタキューrust-の-3-段アダプタ)
+-11. [Auto-orchestration — `auto_orchestrate.sh` + lib](#11-auto-orchestration--auto_orchestratesh--lib)
+-12. [Tests — 1,600+ deterministic checks](#12-tests--1600-deterministic-checks)
+-13. [Truth Surfaces — verification-truth-matrix を中心とする正本](#13-truth-surfaces--verification-truth-matrix-を中心とする正本)
+-14. [Roles — Orchestrator / Coder / Reviewer](#14-roles--orchestrator--coder--reviewer)
+-15. [Governance — Truth Read Order と Fail-Closed Boundaries](#15-governance--truth-read-order-と-fail-closed-boundaries)
+-16. [Operator Troubleshooting — 症状別レシピ](#16-operator-troubleshooting--症状別レシピ)
+-17. [Project Structure](#17-project-structure)
+-18. [Maturity & Status](#18-maturity--status)
+-19. [Customization & Contributing](#19-customization--contributing)
++🇯🇵 日本語版: [README.ja.md](README.ja.md)
+ 
+ ---
+ 
+-## 1. 何のための基盤か
+-
+-AI agent (Claude Code / Codex) を本番品質のコード生成に使うと、3 つの壁にあたります。
+-
+-| 壁 | 起きること | RevHarness のアプローチ |
+-|---|---|---|
+-| **再現性** | 同じ依頼に違う結果。LGTM が口約束化 | `docs/manual/verification-truth-matrix.md` を acceptance の正本にし、deterministic check artifact のみを LGTM/completion 根拠にする |
+-| **境界の崩壊** | エージェントが scope を超える / 別 role の権限を侵食する | `scripts/codex-wrapper.sh --role <coder\|high-coder\|reviewer\|research\|standard>` で sandbox / approval / effort / model 上書きを fail-closed に固定 |
+-| **コンテキスト爆発** | 大規模 repo で context が肥大化、無関係な部分を読み続ける | `semantic-mcp` の 2-step (`sem.context.top_k` → `sem.capsule`) で 220tok 上限の prompt capsule、`file_sha_rollup` + `INDEX_VERSION` で freshness 担保 |
+-
+-軽量 shell helper + 小さな JSON registry + Rust core で、変更 path から必要な check だけを選び、レビューに渡せる envelope を機械的に作ります。常駐型オーケストレーターではなく **repo に置ける薄いハーネス** として、新規プロジェクトは `src/` を product workspace に、既存プロジェクトには compatibility / overlay path として重ねられます。
++## Table of Contents
++
++- [30-second pitch](#30-second-pitch)
++- [Why rev_scraping?](#why-rev_scraping)
++- [Quickstart](#quickstart)
++- [16 MCP tools at a glance](#16-mcp-tools-at-a-glance)
++- [Architecture](#architecture)
++- [Security model](#security-model)
++- [Feature catalog](#feature-catalog)
++- [How it works (sequence flows)](#how-it-works-sequence-flows)
++- [Use cases](#use-cases)
++- [Competitive comparison](#competitive-comparison)
++- [Configuration](#configuration)
++- [FAQ / debugging](#faq--debugging)
++- [Limitations &amp; v1.2.1 backlog](#limitations--v121-backlog)
++- [Project process](#project-process)
++- [Compatibility & semver policy](docs/compat.md)
++- [License](#license)
+ 
+ ---
+ 
+-## 2. 一目で見る (at a glance)
++## 30-second pitch
+ 
+-```
+-Rust workspace     6 crates / ~44,200 LOC / 697 lib tests (1,116 with integration+bin+doc)
+-Shell scripts      50+ scripts across 11 categories / 35+ fail-closed
+-Skills             32 skills (100% provider parity .claude/skills ↔ .agents/skills; Cursor-visible via official Skills standard)
+-Canonical roles    3 (Orchestrator / Coder / Reviewer)
+-Specialty files    16 (orchestrator 6 / coder 6 / reviewer 4) — 6 projected to SKILL.md
+-Truth docs         18 manual docs + 3 role docs + matrix-vocabulary.json + cursor-rules-residual-risks.md
+-MCP tools          8 (sem.* server-side, stdio MCP)
+-Languages indexed  6 (Rust / TypeScript+JS / Python / Go / Shell / Markdown via tree-sitter)
+-Tests (total)      1,633+ (Rust 1,116 + shell unit 517 + integration smoke)
+-Deterministic gate verification-truth-matrix.md + 5 lint subcommands (envelope/specialty/execplan/...) + 9 shell test suites
++```bash
++git clone https://github.com/sasuketorii/rev_scraping.git
++cd rev_scraping && cargo build --release --bin stealth-mcp --bin rev-stealth
++./target/release/rev-stealth doctor --output-format json
+ ```
+ 
+----
++You now have:
+ 
+-## 3. アーキテクチャ — 3 層モデル
++- a **`stealth-mcp` binary** that speaks Model Context Protocol (`2024-11-05`) over stdio and exposes **16 strict-schema tools** (`spider`, `auth_login_*`, `vpn_rotate`, `recipe_*`, `session_show`, …);
++- a **`rev-stealth` CLI** for direct operator workflows (doctor / config / profile / hermes / auth / spider);
++- a **stealth Chromium driver** (chromiumoxide + obscura CDP shim) that fills `canAccessOpener`, drops WebSocket warnings to 0, and works on a headless VPS via auto-wrapped `xvfb-run`;
++- a **VPN-required gate** with continuous leak monitor (Surfshark + Gluetun, 3-instance HRW sticky pool);
++- a **5-layer prompt-injection sanitizer** (`stealth-sanitize`) that wraps every tool response in `<<<UNTRUSTED_CONTENT origin=… sanitize_id=NONCE>>>` and detects 20 canary classes (100% Critical / 100% High detection on the v1.2.0 golden corpus);
++- a **26-variant closed `ErrorEnvelope`** with retriable hints — so your typed agent does not need to grep stack traces;
++- a **systemd 5-unit pack** (`dist/systemd/`) + `systemd-creds`-encrypted secrets for one-command VPS deploy;
++- a **Python Hermes plugin** (`dist/hermes/rev-scraping-mcp/`) that spawns the MCP server with a whitelisted env (no `ANTHROPIC_API_KEY` leak to children).
+ 
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/active/prompts/v1_3_i5_review_round3.md | sed -n '1,160p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 I.5 (Round 3)
+
+R2 BLOCK addressed:
+
+The detector only compared tool names; docs/compat.md promised coverage of required-arg, enum, and output-field breaks too. Fixed:
+
+1. **Extended `scripts/mcp-schema-breaking.sh`** to compare live snapshot's `mcp_tools.schemas.<tool>.required` vs base. Tightened required-args (optional→required) flagged BREAKING; relaxed (required→optional) noted, not blocking.
+
+2. **Aligned `docs/compat.md`** to accurately split responsibility:
+   - `scripts/mcp-schema-breaking.sh` → tool name removes/renames + required-arg tightening (snapshot-based diff).
+   - `mcp-schema-lint` (`gen_reference --check`) → value-enum and output-field changes via the rendered docs/MCP_REFERENCE.md.
+   Together they cover the at-a-glance promise. Enum/output coverage in the snapshot itself is tracked for v1.4.
+
+## Files touched (delta)
+- `scripts/mcp-schema-breaking.sh` — diff logic rewrite (4 buckets: added/removed/tightened/relaxed).
+- `docs/compat.md` — MCP-tier cell rewritten to split responsibilities.
+
+## Gates PASS
+- `./scripts/mcp-schema-breaking.sh --check` → exit 0 (no base reachable, first PR introducing snapshot).
+- Snapshot JSON parses; schema `required` arrays present per tool.
+
+## Verify (3)
+1. Removed/renamed tool ⇒ BREAKING (preserved).
+2. NEW: arg moves optional→required ⇒ BREAKING ⇒ `mcp-schema-breaking` label.
+3. docs/compat.md no longer promises enum/output coverage from this gate — assigned to `mcp-schema-lint`.
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`.
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/active/prompts/v1_3_i4_review_round3.md | sed -n '1,140p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 I.4 (Round 3)
+
+R2 BLOCK addressed:
+
+1. **`### Conventions` violated declared vocabulary.** The preamble declared the allowed `### <Section>` set as keep-a-changelog standard (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, `Breaking Changes`). My added `### Conventions` was outside that set. Moved the label conventions OUT of `[Unreleased]` and into the preamble paragraph itself — no new `###` heading needed.
+
+2. **`1.0.0` lacked any `### <Section>`.** Wrapped the initial-release one-liner in `### Added` so it now matches the contract (every release has at least one `### <Section>` subsection).
+
+## Files touched (delta)
+- `CHANGELOG.rev_scraping.md`:
+  - Removed `### Conventions` section under `[Unreleased]`.
+  - Inlined the label vocabulary into the preamble paragraph (still discoverable, no new heading).
+  - Added `### Added` to the 1.0.0 release.
+
+## Gates PASS
+- All `##` headings now match exactly: `## [Unreleased]`, `## [1.2.0] - 2026-05-22`, `## [1.1.0] - 2026-04-30`, `## [1.0.0] - 2026-03-31`.
+- All `###` headings inside release sections are members of the declared vocabulary set.
+
+## Verify (3)
+1. `grep -nE '^### ' CHANGELOG.rev_scraping.md` returns only `Added`, `Security` — both members of the declared vocabulary.
+2. Every `##` release section has at least one `###` subsection (including 1.0.0).
+3. PR label conventions remain documented + parseable by release-please (now in the preamble paragraph, not behind a sub-heading).
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`.
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/active/prompts/v1_3_i6_review_round2.md | sed -n '1,160p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 I.6 (Round 2)
+
+R1 BLOCK addressed:
+
+1. **Substring presence replaced with proper attribute parsing.** Added `parse_deprecated_attrs(block) -> (Option<String>, Option<String>)` that:
+   - Strips outer `#[deprecated(` / `)]`.
+   - Tracks string-literal boundaries with `\\` escapes so `since`/`note` inside another value's string content do NOT count.
+   - Walks top-level `key = "value"` pairs at depth-0 with an explicit byte-level state machine.
+   - Returns `Some(value)` only when the key is an actual attribute argument with a non-empty literal.
+
+   Substring bug now regression-tested: `note = "deprecated since v1.0; …"` must NOT satisfy the `since` requirement.
+
+2. **Smoke test expanded** 1 case → 5 cases (bare / missing hint / missing since / well-formed accepted / substring-bug regression).
+
+## Files touched (delta)
+- `crates/stealth-cli/tests/deprecated_completeness.rs` — `parse_deprecated_attrs()` parser (~80 LOC), `audit_file()` rewritten, 5-case smoke test.
+
+## Gates PASS
+- `cargo test -p stealth-cli --test deprecated_completeness` → 2 passed / 0 failed.
+- `cargo test -p stealth-cli` → 258 passed.
+
+## Verify (3)
+1. Parser is string-literal aware. `#[deprecated(note = "deprecated since v1.0")]` → `(None, Some(...))` ⇒ `since` finding fires.
+2. Multi-line attribute (`since`/`note` on separate lines) is correctly coalesced.
+3. Bare `#[deprecated]` still flagged. Escape hatch `// I6-LINT: skip` functional. Tests dirs skipped.
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`.
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/active/prompts/v1_3_i2_review_round4.md | sed -n '1,160p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 I.2 (Round 4)
+
+R3 BLOCK (yamllint line-length warnings) addressed:
+
+1. Line 528 was 82 chars — shortened the `::group::` label to drop the SHA range from the heading. SHAs are still printed in the actual `cargo public-api` command output, just not in the fold title.
+2. Line 565 was 81 chars — split the comment across two lines and added a file pointer (`crates/stealth-cli/tests/deprecated_completeness.rs`) so a reader following the comment finds the test directly.
+
+Note on the broader yamllint context: the repo has no `.yamllint` config and many pre-existing lines in `.github/workflows/ci.yml` exceed 80 chars (e.g. lines 161, 204-205, 248-249, 425-426). I limited my changes to the two lines Codex specifically flagged in the Lane I block to avoid scope creep.
+
+## Files touched (delta)
+- `.github/workflows/ci.yml` lines 528 + 565 shortened.
+
+## Gates PASS
+- `awk 'length>80{print NR}' .github/workflows/ci.yml` — lines 528, 565 no longer flagged.
+- Same nightly pin (nightly-2024-10-13 + cargo-public-api 0.39.0) intact.
+
+## Verify (3)
+1. `awk 'length>80' .github/workflows/ci.yml` no longer prints 528 or 565.
+2. Other pre-existing long lines (161, 204-205, 248-249, 425-426) are intentionally untouched — they predate Lane I and out-of-scope.
+3. Nightly pin still in place; diff syntax (`BASE_SHA..HEAD_SHA`) preserved.
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`.
+
+exec
+/bin/bash -lc "git show 7c700a0b:release-please-config.json | rg -n \"CHANGELOG|CHANGELOG\\.rev|changelog-path|api-additive|api-breaking|mcp-schema-breaking\"" in $REPO_ROOT
+ succeeded in 0ms:
+13:      "changelog-path": "CHANGELOG.md",
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/active/prompts/v1_3_i4_review.md | sed -n '1,140p' && git show 7c700a0b:.agent/active/prompts/v1_3_i4_review_round2.md | sed -n '1,140p'" in $REPO_ROOT
+ succeeded in 0ms:
+# Review v1.3 I.4 — CHANGELOG.rev_scraping.md (keep-a-changelog)
+
+## Files touched
+- `CHANGELOG.rev_scraping.md` (new, ~80 lines)
+
+## Gates PASS
+- keep-a-changelog 1.1 vocabulary used (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, `Breaking Changes`).
+- `[Unreleased]` section present and populated with Lane I deliverables.
+- Historical 1.0 / 1.1 / 1.2 release sections documented (archive entries).
+
+## Verify (3)
+1. Scope note distinguishes this file from the RevHarness root `CHANGELOG.md` (which versions the orchestrator layer at 0.0.x).
+2. Label vocabulary section names the same labels the CI gates enforce (api-additive, api-breaking, mcp-schema-breaking, security) — releases stay machine-parseable for Lane H.7 release-please.
+3. Section headers follow the exact `## [<version>] - <YYYY-MM-DD>` pattern (no Unicode dashes, no extra whitespace) so release-please can parse them.
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`.
+# Review v1.3 I.4 (Round 2)
+
+R1 BLOCK addressed:
+
+1. **Non-conforming `##` headers** at lines 55, 65, 72 of `CHANGELOG.rev_scraping.md`:
+   - Historical 1.1.0 / 1.0.0 entries had `YYYY-MM (historical, archive-only)` suffix — now full `YYYY-MM-DD` dates (`2026-04-30` and `2026-03-31`) and no suffix.
+   - Orphan `## Label vocabulary (machine-parseable)` removed; the section moved INTO `[Unreleased]` as `### Conventions` so every `##` heading now follows the required `## [<version>] - <YYYY-MM-DD>` pattern.
+
+## Files touched (delta)
+- `CHANGELOG.rev_scraping.md` — three header fixes.
+
+## Gates PASS
+- All `## ` headings now match `^## \[<version>\] - \d{4}-\d{2}-\d{2}$` or are `## [Unreleased]`.
+- keep-a-changelog 1.1 vocabulary used inside each release.
+- Label-vocabulary section preserved under `### Conventions` inside `[Unreleased]`, so it stays release-please-parseable.
+
+## Verify (3)
+1. `grep -E '^## ' CHANGELOG.rev_scraping.md` returns only `## [Unreleased]`, `## [1.2.0] - 2026-05-22`, `## [1.1.0] - 2026-04-30`, `## [1.0.0] - 2026-03-31`.
+2. No orphan `##` section remains after the last release.
+3. Conventions / label vocabulary is reachable from the Unreleased section.
+
+Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`.
+
+exec
+/bin/bash -lc 'git show 7c700a0b:Cargo.toml | rg -n "stealth-cli|stealth-mcp|rev-stealth|workspace|members"' in $REPO_ROOT
+exec
+/bin/bash -lc 'git show 7c700a0b:.github/workflows/release-please.yml | rg -n "release-please|config-file|manifest|permissions|pull-requests|contents"' in $REPO_ROOT
+ succeeded in 0ms:
+1:[workspace]
+8:members = [
+14:    "crates/stealth-cli",
+19:    "crates/stealth-mcp",
+26:    # Lane H (v1.3): crates.io publish wrapper for `cargo install rev-stealth-cli`
+27:    "crates/rev-stealth-cli",
+30:[workspace.package]
+37:[workspace.dependencies]
+38:# Internal workspace crates (path-based so vendored `{ workspace = true }` refs resolve)
+43:stealth-cli = { path = "crates/stealth-cli" }
+47:stealth-mcp = { path = "crates/stealth-mcp" }
+107:# NOTE: `wreq` (Phase 0 RC) is intentionally NOT declared at workspace scope
+112:# the whole workspace. See README §14 and ExecPlan §J.
+130:# NOTE: `rmcp` is intentionally NOT declared at workspace scope as of v1.1.0
+131:# (P10 security hardening). `stealth-mcp` ships a hand-rolled JSON-RPC layer
+132:# pinned to the 2024-11-05 schema instead — see crates/stealth-mcp/src/lib.rs.
+133:# Re-add as a workspace dep only when an rmcp release matches our schema and
+141:[workspace.lints.rust]
+
+ succeeded in 0ms:
+1:name: release-please
+3:# Lane H.7 - release-please PR automation.
+13:permissions:
+14:  contents: read
+17:  release-please:
+18:    name: release-please
+20:    permissions:
+21:      contents: write
+22:      pull-requests: write
+24:      - uses: googleapis/release-please-action@v4
+26:          config-file: release-please-config.json
+27:          manifest-file: .release-please-manifest.json
+
+exec
+/bin/bash -lc "git show 7c700a0b:.github/workflows/ci.yml | rg -n \"pull_request.*labels|contains\\(|github.event.pull_request.labels|api-additive|api-breaking|mcp-schema-breaking|continue-on-error|if:.*api|label\" -C 2" in $REPO_ROOT
+ succeeded in 0ms:
+234-    runs-on: ubuntu-22.04
+235-    timeout-minutes: 45
+236:    continue-on-error: true
+237-    steps:
+238-      - uses: actions/checkout@v4
+--
+411-    runs-on: ubuntu-22.04
+412-    timeout-minutes: 45
+413:    continue-on-error: true
+414-    steps:
+415-      - uses: actions/checkout@v4
+--
+457-  # against `.agent/v1.3/cli-public-api.snapshot.json`. To merge a drifting
+458-  # PR, the contributor must regenerate the snapshot, commit the diff, and
+459:  # apply the `api-additive` (new flag/cmd/env) or `api-breaking` (removed,
+460:  # renamed, semantically changed) PR label.
+461-  cli-public-api-snapshot:
+462-    name: CLI public-API snapshot drift
+--
+477-
+478-  # I.2: cargo-public-api Rust API diff gate. Failures here flag pub-item
+479:  # changes in any workspace member. Reviewer requires `api-additive` or
+480:  # `api-breaking` label on PRs that mutate the diff. Job is non-blocking
+481:  # in v1.3 (continue-on-error) — it will be hardened to a hard gate in v1.4
+482-  # once the baseline is stable. The diff artifact stays attached to every PR.
+483-  cargo-public-api-diff:
+--
+485-    runs-on: ubuntu-22.04
+486-    timeout-minutes: 30
+487:    continue-on-error: true
+488-    steps:
+489-      - uses: actions/checkout@v4
+--
+527-                       stealth-agent-contracts stealth-parse stealth-mcp; do
+528-            echo "::group::cargo public-api diff -p $crate"
+529:            # Job-level `continue-on-error: true` already makes this advisory in
+530-            # v1.3; we deliberately do NOT mask the per-crate exit code so a
+531-            # genuine tool failure (missing crate, build break) surfaces.
+--
+536-  # I.5: MCP tool-schema breaking-change detector. Mirrors mcp-schema-lint
+537-  # but specifically asserts the canonical 16-tool list (Lane I.1 snapshot)
+538:  # has not been mutated. Drift requires `mcp-schema-breaking` PR label.
+539:  mcp-schema-breaking-detector:
+540-    name: MCP tool schema breaking-change
+541-    runs-on: ubuntu-22.04
+--
+558-          BASE_REF: ${{ github.event.pull_request.base.ref }}
+559-        run: git fetch --no-tags --depth=200 origin "$BASE_REF"
+560:      - name: mcp-schema-breaking diff vs base
+561-        env:
+562-          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+563:        run: ./scripts/mcp-schema-breaking.sh --check
+564-
+565-  # I.6: see crates/stealth-cli/tests/deprecated_completeness.rs (unit test).
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/v1.3/cli-public-api.snapshot.json | jq 'keys, .commands.spider.help | keys, .mcp_tools.schemas.spider'" in $REPO_ROOT
+ exited 5 in 0ms:
+[
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8
+]
+jq: error (at <stdin>:1586): Cannot index array with string "mcp_tools"
+
+exec
+/bin/bash -lc 'git show 7c700a0b:scripts/cli-public-api-snapshot.sh | rg -n "output|field|format|json|schema|EXIT|ENV|mcp|commands|flags|usage|help" -C 1' in $REPO_ROOT
+ succeeded in 0ms:
+3-#
+4:# Output: .agent/v1.3/cli-public-api.snapshot.json
+5-#
+--
+12-#   - every flag (long + short), default value, value-set when enum,
+13:#     env-var binding (captured across wrapped help lines)
+14-#   - every documented env var (REV_STEALTH_OBSCURA, REV_SCRAPING_*, etc.)
+15:#   - every documented exit code from --help bodies (0/1/3/7/10)
+16:#   - MCP tool surface (16 tools: names + required input-schema fields)
+17-#   - rev-stealth --version string
+--
+26-
+27:SNAPSHOT_PATH=".agent/v1.3/cli-public-api.snapshot.json"
+28-BIN="${REV_STEALTH_BIN:-./target/debug/rev-stealth}"
+--
+34-
+35:# All top-level subcommands declared in the workspace today. We use `__` as the
+36:# helpfile separator (never appears in clap subcommand names) so multi-hyphen
+37:# commands like `cf-evaluate` survive round-tripping.
+38-TOP_CMDS=(captcha browser vpn doctor spider relocate cf-evaluate auth measure config hermes)
+--
+40-tmpdir="$(mktemp -d)"
+41:trap 'rm -rf "$tmpdir"' EXIT
+42-
+43:"$BIN" --help > "$tmpdir/help__ROOT.txt" 2>&1 || true
+44-
+45-for cmd in "${TOP_CMDS[@]}"; do
+46:  "$BIN" "$cmd" --help > "$tmpdir/help__${cmd}.txt" 2>&1 || true
+47:  awk '/^Commands:/{f=1;next} /^Options:/{f=0} f' "$tmpdir/help__${cmd}.txt" \
+48-    | awk '{print $1}' \
+49:    | { grep -Ev '^(help)?$' || true; } \
+50-    | while read -r sub; do
+51-        [[ -n "$sub" ]] || continue
+52:        "$BIN" "$cmd" "$sub" --help \
+53:          > "$tmpdir/help__${cmd}__${sub}.txt" 2>&1 || true
+54-      done
+--
+59-python3 - "$tmpdir" "$SNAPSHOT_PATH" "$VERSION_LINE" <<'PY'
+60:import json, os, re, sys, subprocess
+61-from pathlib import Path
+--
+65-
+66:ENV_VARS = sorted([
+67-    "REV_STEALTH_OBSCURA",
+--
+79-
+80:EXIT_CODES = {
+81-    "0":  "success",
+--
+89-SHORT_RE = re.compile(r"(?<![-\w])-[a-zA-Z](?![-\w])")
+90:ENV_RE = re.compile(r"\[env:\s*([A-Z0-9_]+)=")
+91-DEFAULT_RE = re.compile(r"\[default:\s*([^\]]*)\]")
+--
+93-
+94:def parse_help(text):
+95:    """Extract usage, flags (with multi-line continuation), nested cmds."""
+96:    usage = ""
+97-    nested = []
+--
+104-        if s.startswith("Usage:"):
+105:            usage = s[len("Usage:"):].strip()
+106-        if s == "Options:":
+--
+108-        elif s == "Commands:":
+109:            sections["commands"] = idx
+110-
+111:    # Nested subcommands: scan the Commands: block.
+112:    if "commands" in sections:
+113:        start = sections["commands"] + 1
+114-        for line in raw_lines[start:]:
+--
+120-            tok = stripped.split(None, 1)[0]
+121:            if tok and tok != "help" and not tok.startswith("-"):
+122-                nested.append(tok)
+--
+128-    # [possible values:...] tokens are captured even when wrapped.
+129:    flags_by_name = {}
+130-    if "options" in sections:
+--
+162-                block = "\n".join(block_lines)
+163:                long_flags = sorted(set(FLAG_RE.findall(block_lines[0])))
+164-                # Short forms only from the first line (clap puts both forms
+--
+166-                short_forms = sorted(set(SHORT_RE.findall(block_lines[0])))
+167:                env_match = ENV_RE.search(block)
+168-                default_match = DEFAULT_RE.search(block)
+169-                possible_match = POSSIBLE_RE.search(block)
+170:                for f in long_flags:
+171-                    entry = {"flag": f}
+--
+181-                        )
+182:                    prev = flags_by_name.get(f)
+183-                    if not prev or len(entry) > len(prev):
+184:                        flags_by_name[f] = entry
+185-                i = j
+--
+189-    return {
+190:        "usage": usage,
+191:        "flags": sorted(flags_by_name.values(), key=lambda x: x["flag"]),
+192:        "subcommands": sorted(set(nested)),
+193-    }
+194-
+195:root_help = parse_help((tmp / "help__ROOT.txt").read_text())
+196-
+197:commands = {}
+198:for help_file in sorted(tmp.glob("help__*.txt")):
+199:    stem = help_file.stem.removeprefix("help__")
+200-    if stem == "ROOT":
+--
+205-        cmd, sub = stem, None
+206:    commands.setdefault(cmd, {"help": {}, "subcommands": {}})
+207:    parsed = parse_help(help_file.read_text())
+208-    if sub is None:
+209:        commands[cmd]["help"] = parsed
+210-    else:
+211:        commands[cmd]["subcommands"][sub] = parsed
+212-
+213-# MCP tool surface — parse tools.rs for `name: "<tool>"` AND each
+214:# tool's required-arg names. We extract the schema's "required" array as a
+215-# best-effort proxy for the public input contract.
+216:tools_src = Path("crates/stealth-mcp/src/tools.rs").read_text()
+217-tool_names = sorted(set(re.findall(r'name:\s*"([a-z_][a-z0-9_]*)"', tools_src)))
+--
+222-    """Extract the top-level `"required": [...]` array of the tool's
+223:    input_schema, bounded to *this* tool's block.
+224-
+225-    Strategy: locate `name: "<name>"`, then bound the window from the next
+226:    `input_schema: json!({` to the matching `})`. Inside that window, only the
+227-    *first* `"required": [...]` after `"properties":` decreases nesting depth
+228:    counts as the top-level required (nested object schemas may also use
+229-    `"required"`, e.g. `recipe_propose_endpoint.properties.endpoint.required`).
+230:    We approximate top-level by counting braces from the input_schema head
+231-    and returning the required array whose surrounding brace-depth is 1.
+--
+236-    tail = src[m.end():]
+237:    # Find this tool's input_schema literal.
+238:    js = re.search(r'input_schema:\s*json!\(\{', tail)
+239-    if not js:
+--
+254-        return []
+255:    schema = tail[start:end + 1]
+256:    # Walk through schema char-by-char; record every `"required": [...]` whose
+257-    # surrounding depth is exactly 1 (i.e. immediate child of the root object).
+--
+260-    candidates = []
+261:    while i < len(schema):
+262:        c = schema[i]
+263-        if c == '{':
+--
+266-            depth -= 1
+267:        elif c == '"' and schema[i:i+11] == '"required":' and depth == 1:
+268-            # Found top-level required. Capture its array literal.
+269:            arr = re.match(r'"required"\s*:\s*\[([^\]]*)\]', schema[i:])
+270-            if arr:
+--
+278-
+279:mcp_tool_schemas = {name: {"required": extract_required(tools_src, name)}
+280-                    for name in tool_names}
+--
+282-snapshot = {
+283:    "$schema_version": 2,
+284-    "binary_name": "rev-stealth",
+285-    "version_string": version_line,
+286:    "env_vars": ENV_VARS,
+287:    "exit_codes": EXIT_CODES,
+288:    "global": root_help,
+289:    "commands": commands,
+290:    "mcp_tools": {
+291-        "count": len(tool_names),
+292-        "names": tool_names,
+293:        "schemas": mcp_tool_schemas,
+294-    },
+--
+297-        "Drift means a public-surface change. Rebuild + commit alongside the change",
+298:        "and apply PR label api-additive / api-breaking / mcp-schema-breaking",
+299-        "per docs/compat.md.",
+--
+304-out.parent.mkdir(parents=True, exist_ok=True)
+305:serialized = json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
+306-out.write_text(serialized)
+307-print(f"[snapshot] wrote {snapshot_path} ({len(serialized)} bytes)")
+308:print(f"[snapshot] commands={len(commands)} mcp_tools={len(tool_names)}")
+309-PY
+--
+331-      echo "Rebuild with: ./scripts/cli-public-api-snapshot.sh" >&2
+332:      echo "Then commit + apply PR label api-additive | api-breaking | mcp-schema-breaking." >&2
+333-      exit 1
+
+exec
+/bin/bash -lc 'git show 7c700a0b:docs/compat.md | rg -n "snapshot|output|enum|freshness|v1.4|policy-only|reviewer|label|major|release-please|CHANGELOG" -C 1' in $REPO_ROOT
+ succeeded in 0ms:
+13-|---------|---------------------|------------|-------|
+14:| **MCP tool schema** (`tool_definitions()` in `stealth-mcp`) | **2 major versions** of backward compatibility from first appearance | `scripts/mcp-schema-breaking.sh --check` covers tool-name removals/renames and required-arg tightening (CI: `mcp-schema-breaking-detector`). The `mcp-schema-lint` CI job (`gen_reference --check`) is a freshness check — it only catches enum/output-field changes that the contributor *forgot to regenerate* in `docs/MCP_REFERENCE.md`; if the contributor regenerates the docs, an enum narrow / output rename will pass. Extending the snapshot diff to cover enums and output fields is tracked for **v1.4** (Lane I-followup). For v1.3, those narrows are policy-only and rely on the reviewer applying the `mcp-schema-breaking` label by hand. | Removing a tool, renaming a tool, tightening a required-arg list, narrowing a value enum, or changing a documented output field requires a **major** bump and a `mcp-schema-breaking` PR label. |
+15:| **CLI flags & exit codes** (`rev-stealth` binary) | **1 major version** of backward compatibility | `scripts/cli-public-api-snapshot.sh --check` (CI: `cli-public-api-snapshot`) | Any drift against the committed snapshot requires `api-additive` (new flag/cmd/env var) or `api-breaking` (removed, renamed, default-changed). |
+16:| **Internal Rust types** (every `pub` item in workspace crates that is not re-exported from `stealth-cli` or `stealth-mcp` as part of the public ABI) | **no guarantee** — may change between any two minor versions | `cargo-public-api-diff` (advisory in v1.3, hardened in v1.4) | Internal refactors do not bump the project version. If a refactor *does* surface in the snapshot or the cargo-public-api diff, the same `api-additive` (new pub item) / `api-breaking` (removed or renamed pub item) labels apply at the discretion of the reviewer. Crate-level `Cargo.toml` versions follow workspace lockstep until the crates are published independently (out-of-scope for v1.3). |
+17-
+--
+22-
+23:- Tool names (16 in v1.3 — see `.agent/v1.3/cli-public-api.snapshot.json`).
+24:- Each tool's required parameters, parameter types, and value enums.
+25:- Each tool's documented output fields and `ErrorKind` discriminants.
+26-- `_meta.sanitize` envelope shape.
+--
+38-### Internal types
+39:Anything that is `pub` in a workspace crate but is **not** in the snapshot
+40-above. These remain semver-flexible to let us refactor without dragging users
+--
+48-  no schema field change.
+49:- **Minor** (`v1.3.x → v1.4.0`): additive surface only. PRs must carry the
+50:  `api-additive` label.
+51-- **Major** (`v1.x → v2.0.0`): any removal or rename on the **MCP** or **CLI**
+52:  tier. PRs must carry the `api-breaking` or `mcp-schema-breaking` label, and
+53:  the CHANGELOG must include a `Breaking Changes` section with a migration
+54-  recipe per item. Removals or renames on the **internal Rust types** tier do
+55:  NOT trigger a project-major bump (per that tier's "no guarantee" rule); they
+56:  may still carry `api-additive` / `api-breaking` labels for reviewer
+57-  visibility but the version bump rule does not apply to them.
+58-
+59:## MCP 2-major guarantee in practice
+60-
+61-When `tool_X` first ships in v1.x, it remains callable through v3.x (two full
+62:major versions after the major in which the deprecation lands). To remove it
+63-cleanly:
+--
+68-   warning must be visible for the entirety of the v2.x and v3.x lines.
+69:3. v4.0 — remove the tool; CHANGELOG documents the replacement.
+70-
+--
+75-
+76:## CLI 1-major guarantee in practice
+77-
+78-When `--flag-x` first ships in v1.x, it remains accepted through v2.x (one
+79:full major version after the major in which the deprecation lands). To
+80-remove it:
+--
+83-2. v2.0 — emit a `[deprecated]` warning on use; add the replacement.
+84:3. v3.0 — remove the flag; CHANGELOG documents the replacement.
+85-
+--
+99-
+100:- `.agent/v1.3/cli-public-api.snapshot.json` — committed public surface.
+101:- `scripts/cli-public-api-snapshot.sh` — regenerator + drift checker.
+102-- `scripts/mcp-schema-breaking.sh` — MCP tool-list drift checker.
+103:- `CHANGELOG.rev_scraping.md` — project-level changelog (keep-a-changelog).
+104-- `docs/MCP_REFERENCE.md` — current MCP tool catalog.
+105:- `.github/workflows/ci.yml` — `cli-public-api-snapshot`, `cargo-public-api-diff`,
+106-  `mcp-schema-breaking-detector` jobs.
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/v1.3/cli-public-api.snapshot.json | jq '{root_keys:(keys|sort), spider_help_keys:(.commands.spider.help|keys|sort), spider_schema:.mcp_tools.schemas.spider, has_cli_output_fields:(has(\"output_fields\") or (.commands|tostring|contains(\"output\")))}'" in $REPO_ROOT
+ succeeded in 0ms:
+{
+  "root_keys": [
+    "$schema_version",
+    "_notes",
+    "binary_name",
+    "commands",
+    "env_vars",
+    "exit_codes",
+    "global",
+    "mcp_tools",
+    "version_string"
+  ],
+  "spider_help_keys": [
+    "flags",
+    "subcommands",
+    "usage"
+  ],
+  "spider_schema": {
+    "required": [
+      "url"
+    ]
+  },
+  "has_cli_output_fields": true
+}
+
+exec
+/bin/bash -lc "git show 7c700a0b:crates/stealth-mcp/src/tools.rs | rg -n 'name:|input_schema|output|properties|required|enum' | sed -n '1,160p'" in $REPO_ROOT
+ succeeded in 0ms:
+7://! call arguments, validate the minimum required fields, then translate them
+9://! schema validation of outputs are left to the CLI itself (see
+15://!     nested object properties (recipe_propose_endpoint.endpoint).
+20://!   * `enum` constraints applied where the CLI accepts a closed set
+23://! P4.2: outputSchemas added for every tool. Source of truth lives in
+24://! `docs/json-schemas/<tool>.output.json` and is embedded via
+36:    pub name: &'static str,
+38:    pub input_schema: Value,
+40:    /// Authored in `docs/json-schemas/<tool>.output.json` and parsed at
+42:    pub output_schema: Value,
+50:            "inputSchema": self.input_schema,
+51:            "outputSchema": self.output_schema,
+59:/// Parse a `docs/json-schemas/*.output.json` embedded via `include_str!`.
+63:fn parse_output_schema(raw: &'static str, tool: &'static str) -> Value {
+65:        .unwrap_or_else(|e| panic!("output schema for tool `{tool}` is malformed JSON: {e}"))
+71:const SPIDER_OUTPUT: &str = include_str!("../../../docs/json-schemas/spider.output.json");
+72:const RELOCATE_OUTPUT: &str = include_str!("../../../docs/json-schemas/relocate.output.json");
+73:const CF_EVALUATE_OUTPUT: &str = include_str!("../../../docs/json-schemas/cf_evaluate.output.json");
+74:const DOCTOR_OUTPUT: &str = include_str!("../../../docs/json-schemas/doctor.output.json");
+75:const VPN_ROTATE_OUTPUT: &str = include_str!("../../../docs/json-schemas/vpn_rotate.output.json");
+76:const RECIPE_LIST_OUTPUT: &str = include_str!("../../../docs/json-schemas/recipe_list.output.json");
+77:const RECIPE_SHOW_OUTPUT: &str = include_str!("../../../docs/json-schemas/recipe_show.output.json");
+79:    include_str!("../../../docs/json-schemas/recipe_remove.output.json");
+81:    include_str!("../../../docs/json-schemas/recipe_propose_endpoint.output.json");
+83:    include_str!("../../../docs/json-schemas/recipe_export.output.json");
+85:    include_str!("../../../docs/json-schemas/recipe_import.output.json");
+87:    include_str!("../../../docs/json-schemas/auth_login_start.output.json");
+89:    include_str!("../../../docs/json-schemas/auth_login_complete.output.json");
+90:const AUTH_LIST_OUTPUT: &str = include_str!("../../../docs/json-schemas/auth_list.output.json");
+91:const AUTH_STATUS_OUTPUT: &str = include_str!("../../../docs/json-schemas/auth_status.output.json");
+93:    include_str!("../../../docs/json-schemas/session_show.output.json");
+99:            name: "spider",
+101:                "Scrape a URL with stealth (obscura) + optional CF evaluation + adaptive relocate. AUP allowlist required.",
+102:            output_schema: parse_output_schema(SPIDER_OUTPUT, "spider"),
+103:            input_schema: json!({
+107:                "required": ["url"],
+108:                "properties": {
+122:                        "enum": ["iphone15pro","iphone15promax","ipadprom4","pixel9pro","pixel8a","galaxys24ultra"],
+158:            name: "relocate",
+160:            output_schema: parse_output_schema(RELOCATE_OUTPUT, "relocate"),
+161:            input_schema: json!({
+165:                "required": ["session_id", "stable_id"],
+166:                "properties": {
+197:            name: "cf_evaluate",
+199:            output_schema: parse_output_schema(CF_EVALUATE_OUTPUT, "cf_evaluate"),
+200:            input_schema: json!({
+204:                "required": ["url"],
+205:                "properties": {
+220:            name: "doctor",
+222:            output_schema: parse_output_schema(DOCTOR_OUTPUT, "doctor"),
+223:            input_schema: json!({
+227:                "properties": {
+243:            name: "recipe_list",
+245:            output_schema: parse_output_schema(RECIPE_LIST_OUTPUT, "recipe_list"),
+246:            input_schema: json!({
+250:                "properties": {}
+254:            name: "recipe_show",
+256:            output_schema: parse_output_schema(RECIPE_SHOW_OUTPUT, "recipe_show"),
+257:            input_schema: json!({
+261:                "required": ["domain"],
+262:                "properties": {
+272:            name: "recipe_remove",
+274:            output_schema: parse_output_schema(RECIPE_REMOVE_OUTPUT, "recipe_remove"),
+275:            input_schema: json!({
+279:                "required": ["domain"],
+280:                "properties": {
+296:            name: "recipe_propose_endpoint",
+298:            output_schema: parse_output_schema(
+302:            input_schema: json!({
+306:                "required": ["domain", "endpoint"],
+307:                "properties": {
+323:                        "required": ["purpose", "path"],
+324:                        "properties": {
+352:            name: "recipe_export",
+354:            output_schema: parse_output_schema(RECIPE_EXPORT_OUTPUT, "recipe_export"),
+355:            input_schema: json!({
+359:                "properties": {}
+363:            name: "recipe_import",
+365:            output_schema: parse_output_schema(RECIPE_IMPORT_OUTPUT, "recipe_import"),
+366:            input_schema: json!({
+370:                "required": ["payload"],
+371:                "properties": {
+381:            name: "auth_login_start",
+383:            output_schema: parse_output_schema(AUTH_LOGIN_START_OUTPUT, "auth_login_start"),
+384:            input_schema: json!({
+388:                "required": ["profile", "url"],
+389:                "properties": {
+414:            name: "auth_login_complete",
+416:            output_schema: parse_output_schema(AUTH_LOGIN_COMPLETE_OUTPUT, "auth_login_complete"),
+417:            input_schema: json!({
+421:                "required": ["session_token"],
+422:                "properties": {
+432:            name: "auth_list",
+434:            output_schema: parse_output_schema(AUTH_LIST_OUTPUT, "auth_list"),
+435:            input_schema: json!({
+439:                "properties": {}
+443:            name: "auth_status",
+445:            output_schema: parse_output_schema(AUTH_STATUS_OUTPUT, "auth_status"),
+446:            input_schema: json!({
+450:                "required": ["profile"],
+451:                "properties": {
+461:            name: "session_show",
+463:            output_schema: parse_output_schema(SESSION_SHOW_OUTPUT, "session_show"),
+464:            input_schema: json!({
+468:                "required": ["session_id"],
+469:                "properties": {
+481:            name: "vpn_rotate",
+483:            output_schema: parse_output_schema(VPN_ROTATE_OUTPUT, "vpn_rotate"),
+484:            input_schema: json!({
+488:                "properties": {
+498:                        "enum": ["lazy-on-fail", "every-n", "interval"],
+520:pub enum ToolValidation {
+616:            // Doctor uses --output-format instead of --format due to legacy
+685:            let t = d.input_schema.get("type").and_then(|v| v.as_str());
+742:    fn all_16_tools_have_additional_properties_false() {
+746:            let ap = d.input_schema.get("additionalProperties");
+757:    fn all_input_schemas_have_dollar_schema_draft07() {
+760:                .input_schema
+773:    fn spider_field_descriptions_present_for_all_properties() {
+780:            .input_schema
+781:            .get("properties")
+783:            .expect("spider.properties is object");
+805:            .input_schema
+806:            .get("properties")
+808:            .expect("auth_login_start.properties is object");
+810:        // The two required fields must carry examples so an agent's first call
+827:    fn enum_constraints_applied_on_known_closed_sets() {
+830:        // spider.mobile_preset must be an enum of 6 known device presets.
+833:            .input_schema
+834:            .pointer("/properties/mobile_preset/enum")
+836:            .expect("spider.mobile_preset.enum must exist");
+837:        assert_eq!(mp.len(), 6, "spider.mobile_preset enum must list 6 presets");
+839:        // vpn_rotate.strategy must be a 3-value enum.
+842:            .input_schema
+843:            .pointer("/properties/strategy/enum")
+845:            .expect("vpn_rotate.strategy.enum must exist");
+849:            "vpn_rotate.strategy enum must list 3 values"
+860:                .input_schema
+861:                .get("properties")
+863:                .unwrap_or_else(|| panic!("tool {} missing properties object", d.name));
+866:                // including object-valued wrapper properties such as
+867:                // recipe_propose_endpoint.endpoint. Object-valued properties
+880:                        .get("properties")
+882:                        .unwrap_or_else(|| panic!("{}.{field} object missing properties", d.name));
+911:            .input_schema
+912:            .pointer("/properties/endpoint/additionalProperties");
+921:    // P4.2: outputSchema invariants (per-tool + draft-07 + strict-mode).
+925:    fn all_16_tools_have_output_schema() {
+926:        // Every tool must expose a non-null, object-typed outputSchema, and
+927:        // tools/list must echo it via to_json() under the `outputSchema` key.
+932:                d.output_schema.is_object(),
+933:                "tool {} output_schema must be a JSON object",
+936:            let t = d.output_schema.get("type").and_then(|v| v.as_str());
+940:                "tool {} output_schema.type must be `object`",
+945:                .get("outputSchema")
+946:                .expect("tools/list must echo outputSchema");
+949:                "tools/list outputSchema for {} must be a non-empty object",
+956:    fn all_output_schemas_are_draft07() {
+959:                .output_schema
+962:                .unwrap_or_else(|| panic!("tool {} output_schema missing $schema", d.name));
+
+exec
+/bin/bash -lc 'git show 7c700a0b:crates/stealth-cli/Cargo.toml | rg -n "tempfile|dev-dependencies|test" -C 2' in $REPO_ROOT
+ succeeded in 0ms:
+55-thiserror = { workspace = true }
+56-
+57:[dev-dependencies]
+58:tempfile = "3"
+59-axum = "0.8"
+60-tower = "0.5"
+--
+67-stealth-auth = { workspace = true }
+68-# v1.1.0 (P13): JSON Schema validation for vpn_rotation_events output.
+69:# v1.1.0 (P17): snapshot tests for CLI --help and config-compat.
+70-jsonschema = { version = "0.17", default-features = false }
+71-insta = { version = "1", features = ["yaml"] }
+
+exec
+/bin/bash -lc "git show 7c700a0b:.agent/v1.3/cli-public-api.snapshot.json | jq '.mcp_tools.schemas | to_entries | map(select(.value.required|length>0)) | length as "'$with_req | {tool_schema_count:length, tools_with_required:$with_req, schema_values_sample: (to_entries[0:3])}'"'" in $REPO_ROOT
+ succeeded in 0ms:
+{
+  "tool_schema_count": 11,
+  "tools_with_required": 11,
+  "schema_values_sample": [
+    {
+      "key": 0,
+      "value": {
+        "key": "auth_login_complete",
+        "value": {
+          "required": [
+            "session_token"
+          ]
+        }
+      }
+    },
+    {
+      "key": 1,
+      "value": {
+        "key": "auth_login_start",
+        "value": {
+          "required": [
+            "profile",
+            "url"
+          ]
+        }
+      }
+    },
+    {
+      "key": 2,
+      "value": {
+        "key": "auth_status",
+        "value": {
+          "required": [
+            "profile"
+          ]
+        }
+      }
+    }
+  ]
+}
+
+exec
+/bin/bash -lc "git show 7c700a0b:Cargo.toml | sed -n '1,32p'" in $REPO_ROOT
+ succeeded in 0ms:
+[workspace]
+resolver = "2"
+exclude = [
+    "_refs",
+    "vendor/obscura/.git",
+    "vendor/obscura/target",
+]
+members = [
+    # Vendored from rev_stealth @ 6fc38fd
+    "crates/stealth-core",
+    "crates/mobile-fp",
+    "crates/vpn-rotate",
+    "crates/captcha-bypass",
+    "crates/stealth-cli",
+    # New for rev_scraping v1.0.0 (Phase 1 stubs)
+    "crates/obscura-bridge",
+    "crates/stealth-cf",
+    "crates/stealth-parse",
+    "crates/stealth-mcp",
+    "crates/stealth-sites",
+    "crates/stealth-auth",
+    # Lane C P1: shared cross-crate contract types
+    "crates/stealth-agent-contracts",
+    # Lane F P13: prompt-injection defense sanitizer
+    "crates/stealth-sanitize",
+    # Lane H (v1.3): crates.io publish wrapper for `cargo install rev-stealth-cli`
+    "crates/rev-stealth-cli",
+]
+
+[workspace.package]
+version = "1.2.0"
+edition = "2021"
+
+exec
+/bin/bash -lc "git show 7c700a0b:.github/workflows/ci.yml | sed -n '516,535p'" in $REPO_ROOT
+ succeeded in 0ms:
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`,
+          # NOT a bare ref. We materialize the range explicitly so the gate
+          # actually runs (a syntax error here would silently no-op the diff).
+          BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          for crate in stealth-core stealth-auth stealth-sanitize \
+                       stealth-agent-contracts stealth-parse stealth-mcp; do
+            echo "::group::cargo public-api diff -p $crate"
+            # Job-level `continue-on-error: true` already makes this advisory in
+            # v1.3; we deliberately do NOT mask the per-crate exit code so a
+            # genuine tool failure (missing crate, build break) surfaces.
+            cargo public-api --package "$crate" diff "$BASE_SHA..$HEAD_SHA"
+            echo "::endgroup::"
+          done
+
+
+exec
+/bin/bash -lc 'git show 7c700a0b:scripts/cli-public-api-snapshot.sh | rg -n "TOP_CMDS|ENV_VARS|EXIT_CODES|output_schema|output fields|output_fields|commands =|root_help" -C 2' in $REPO_ROOT
+exec
+/bin/bash -lc "git show 7c700a0b:scripts/mcp-schema-breaking.sh | rg -n \"label|github|mcp-schema-breaking|api-additive|exit_code|exit 1|exit \\"'$exit_code" -C 2' in $REPO_ROOT
+ succeeded in 0ms:
+10-#
+11-# Behavior:
+12:#   - removed-or-renamed tool ⇒ exit 1 ⇒ PR must carry `mcp-schema-breaking`.
+13:#   - added tool ⇒ exit 0 ⇒ PR carries `api-additive`.
+14-#   - unchanged ⇒ exit 0.
+15-#
+16-# Modes:
+17:#   ./scripts/mcp-schema-breaking.sh           # human-readable
+18:#   ./scripts/mcp-schema-breaking.sh --check   # exit-coded for CI
+19-#
+20-# CI usage: the workflow fetches the PR base ref, then invokes this script
+--
+48-elif resolved=$(resolve_base_snapshot "HEAD~1" 2>/dev/null); then
+49-  base_blob="$resolved"
+50:  echo "[mcp-schema-breaking] note: base ref $BASE_REF unreachable; using HEAD~1" >&2
+51-else
+52:  echo "[mcp-schema-breaking] note: no base snapshot reachable; skipping diff (first PR introducing the snapshot, or shallow checkout)." >&2
+53-  if [[ "${1:-}" == "--check" ]]; then
+54-    exit 0
+--
+107-
+108-mode="${1:-}"
+109:exit_code=0
+110-
+111-if [[ "$removed_count" -gt 0 ]]; then
+112:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: removed/renamed tool(s):" >&2
+113-  echo "$diff_report" | python3 -c "
+114-import json, sys
+--
+116-    print(f'    - {t}', file=sys.stderr)
+117-" >&2
+118:  exit_code=1
+119-fi
+120-
+121-if [[ "$tightened_count" -gt 0 ]]; then
+122:  echo "[mcp-schema-breaking] BREAKING vs $BASE_REF: tightened required-args" >&2
+123-  echo "    (an arg that was optional is now required — old callers will fail):" >&2
+124-  echo "$diff_report" | python3 -c "
+--
+127-    print(f'    - {tool}.{arg}', file=sys.stderr)
+128-" >&2
+129:  exit_code=1
+130-fi
+131-
+132:if [[ "$exit_code" -ne 0 ]]; then
+133-  echo "" >&2
+134:  echo "Action: apply PR label \`mcp-schema-breaking\` and bump the MCP" >&2
+135-  echo "        schema version per docs/compat.md (2-major guarantee)." >&2
+136-fi
+137-
+138-if [[ "$added_count" -gt 0 ]]; then
+139:  echo "[mcp-schema-breaking] additive vs $BASE_REF: new tool(s):"
+140-  echo "$diff_report" | python3 -c "
+141-import json, sys
+--
+143-    print(f'    + {t}')
+144-"
+145:  echo "Action: apply PR label \`api-additive\`."
+146-fi
+147-
+148-if [[ "$relaxed_count" -gt 0 ]]; then
+149:  echo "[mcp-schema-breaking] relaxed (non-breaking) required-args:"
+150-  echo "$diff_report" | python3 -c "
+151-import json, sys
+--
+158-      && "$tightened_count" -eq 0 && "$relaxed_count" -eq 0 ]]; then
+159-  live_count="$(python3 -c "import json; print(len(json.load(open('$SNAPSHOT_PATH'))['mcp_tools']['names']))")"
+160:  echo "[mcp-schema-breaking] MCP surface unchanged vs $BASE_REF ($live_count tools, identical required-args)."
+161-fi
+162-
+--
+170-
+171-if [[ "$mode" == "--check" ]]; then
+172:  exit $exit_code
+173-fi
+174-exit 0
+
+ succeeded in 0ms:
+36-# helpfile separator (never appears in clap subcommand names) so multi-hyphen
+37-# commands like `cf-evaluate` survive round-tripping.
+38:TOP_CMDS=(captcha browser vpn doctor spider relocate cf-evaluate auth measure config hermes)
+39-
+40-tmpdir="$(mktemp -d)"
+--
+43-"$BIN" --help > "$tmpdir/help__ROOT.txt" 2>&1 || true
+44-
+45:for cmd in "${TOP_CMDS[@]}"; do
+46-  "$BIN" "$cmd" --help > "$tmpdir/help__${cmd}.txt" 2>&1 || true
+47-  awk '/^Commands:/{f=1;next} /^Options:/{f=0} f' "$tmpdir/help__${cmd}.txt" \
+--
+64-tmp = Path(tmpdir)
+65-
+66:ENV_VARS = sorted([
+67-    "REV_STEALTH_OBSCURA",
+68-    "REV_SCRAPING_HOME",
+--
+78-])
+79-
+80:EXIT_CODES = {
+81-    "0":  "success",
+82-    "1":  "generic CLI / validation error",
+--
+193-    }
+194-
+195:root_help = parse_help((tmp / "help__ROOT.txt").read_text())
+196-
+197:commands = {}
+198-for help_file in sorted(tmp.glob("help__*.txt")):
+199-    stem = help_file.stem.removeprefix("help__")
+--
+284-    "binary_name": "rev-stealth",
+285-    "version_string": version_line,
+286:    "env_vars": ENV_VARS,
+287:    "exit_codes": EXIT_CODES,
+288:    "global": root_help,
+289-    "commands": commands,
+290-    "mcp_tools": {
+
+codex
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 7.6 | I.3/I.6 は強いが、I.2 は advisory かつ label gate なし、I.4 は `CHANGELOG.rev_scraping.md` と `release-please-config.json` の `CHANGELOG.md` が不整合、I.5 は enum/output field が policy-only。I.1 も output field inventory が弱い。 |
+| B | 8.0 | snapshot / MCP diff / deprecated lint の CI はある。ただし label 条件が機械 enforcement されず、snapshot 更新だけで通る面があり adversarial gate としては未完成。 |
+| C | 8.2 | 競合比では semver 可視化はかなり良いが、hard gate・全 workspace public API・schema 全面 diff まで揃っておらず「明確に勝つ」までは届かない。 |
+| D | 7.4 | Lane I 特化要件の「semver 違反が PR レベルで止まる」は部分達成。deprecation policy はテスト化済みだが、cargo public API と label/bump/changelog の連動が未機械化。 |
+| E | 7.7 | `schema_version=2` や nightly pin は保守意識あり。ただし regex/static list ベース、古い nightly pin、release-please/changelog 不整合、v1.4 先送り範囲が残る。 |
+| F | 7.5 | `deprecated_completeness` の smoke/edge tests は良い。一方で snapshot/MCP detector の fixture-based regression、label bypass、enum/output rename simulation が不足。 |
+| G | 8.4 | `docs/compat.md` は制限を正直に書いており handoff 可能。ただし docs が label enforcement を要求する一方、CI 実装は advisory/手動依存で、読者が誤解し得る。 |
+
+overall = 7.79
+
+verdict: FAIL
+
+deltas to reach 9.0:
+- `cargo-public-api-diff` を全 workspace member 対象の hard gate にし、PR label `api-additive` / `api-breaking` を実際に検査する。
+- `mcp-schema-breaking-detector` を label-aware にし、tool removal / required tightening / enum narrowing / output field rename を base-vs-head で検出する。
+- `release-please-config.json` の `changelog-path` を `CHANGELOG.rev_scraping.md` に合わせるか、成果物を `CHANGELOG.md` に統一し、CI で keep-a-changelog parse を検証する。
+- CLI snapshot に JSON/output fields と MCP output schemas/ErrorKind を入れ、script fixture tests で drift/breaking/additive ケースを固定する。
+tokens used
+104,749
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"f1685bc5-6c2f-4935-ae95-c22fc0b111a7","timestamp":"2026-05-22T21:03:26Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":219118,"tokens_in":104749,"tokens_out":0,"total_tokens":104749,"dry_run":false,"specialty_status":"none"}

@@ -8,8 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Atomic config writer trait with .bak backup + tempfile+rename semantics.
 pub trait ConfigWriter {
-    fn write_with_backup(&self, path: &Path, contents: &[u8])
-        -> Result<WriteReport, WriterError>;
+    fn write_with_backup(&self, path: &Path, contents: &[u8]) -> Result<WriteReport, WriterError>;
     fn list_backups(&self, path: &Path) -> Result<Vec<PathBuf>, WriterError>;
     fn gc_backups(&self, path: &Path, keep_n: usize) -> Result<usize, WriterError>;
 }
@@ -82,11 +81,7 @@ fn bak_prefix(path: &Path) -> Option<String> {
 }
 
 impl ConfigWriter for FsConfigWriter {
-    fn write_with_backup(
-        &self,
-        path: &Path,
-        contents: &[u8],
-    ) -> Result<WriteReport, WriterError> {
+    fn write_with_backup(&self, path: &Path, contents: &[u8]) -> Result<WriteReport, WriterError> {
         let parent = path
             .parent()
             .ok_or_else(|| WriterError::ParentDirMissing(path.to_path_buf()))?;
@@ -117,14 +112,12 @@ impl ConfigWriter for FsConfigWriter {
                 match opts.open(&bak) {
                     Ok(f) => break f,
                     Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                        counter = counter
-                            .checked_add(1)
-                            .ok_or_else(|| {
-                                WriterError::Io(io::Error::new(
-                                    io::ErrorKind::AlreadyExists,
-                                    "backup suffix counter exhausted",
-                                ))
-                            })?;
+                        counter = counter.checked_add(1).ok_or_else(|| {
+                            WriterError::Io(io::Error::new(
+                                io::ErrorKind::AlreadyExists,
+                                "backup suffix counter exhausted",
+                            ))
+                        })?;
                         bak = parent.join(format!("{name}.bak.{base_ms}_{counter}"));
                     }
                     Err(e) => return Err(WriterError::Io(e)),
@@ -184,8 +177,8 @@ impl ConfigWriter for FsConfigWriter {
         let parent = path
             .parent()
             .ok_or_else(|| WriterError::ParentDirMissing(path.to_path_buf()))?;
-        let prefix = bak_prefix(path)
-            .ok_or_else(|| WriterError::ParentDirMissing(path.to_path_buf()))?;
+        let prefix =
+            bak_prefix(path).ok_or_else(|| WriterError::ParentDirMissing(path.to_path_buf()))?;
 
         if !parent.exists() {
             return Ok(Vec::new());

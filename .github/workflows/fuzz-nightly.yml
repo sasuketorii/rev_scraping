@@ -33,9 +33,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - sanitize_full
-          - sanitize_l4_unicode
-          - mcp_jsonrpc_frame
+          - sanitize_envelope_parse  # L2 envelope parse (per K.5 spec)
+          - sanitize_l4_unicode      # L4 unicode normalize (per K.5 spec)
+          - mcp_jsonrpc_frame        # MCP JSON-RPC frame parser
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
