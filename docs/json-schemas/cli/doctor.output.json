@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rev-stealth.local/json-schemas/cli/doctor.output.json",
+  "title": "rev-stealth doctor --output-format json",
+  "description": "JSON payload emitted by `rev-stealth doctor --output-format json`. v1.3 Lane G.4 contract. Doctor uses NO shared envelope — it serializes `DoctorReport` (or `DeepReport` when --deep) directly. Reference emitter: `crates/stealth-cli/src/doctor.rs::emit_report` / `emit_deep_report`. Fail-closed: exit code 7 on any leak.",
+  "anyOf": [
+    { "$ref": "#/$defs/doctor_report" },
+    { "$ref": "#/$defs/deep_report" },
+    {
+      "title": "doctor --vps (top-level array of DeepCheck rows)",
+      "type": "array",
+      "items": { "$ref": "#/$defs/deep_check" },
+      "description": "P10.3: emitted as a single top-level array (NOT wrapped) so callers can pipe through jq / json.tool. When --deep and --vps are combined, deep rows are concatenated ahead of vps rows."
+    }
+  ],
+  "$comment": "anyOf (not oneOf) because DeepReport's fields are all optional, so a DoctorReport object will also structurally validate against deep_report. The CLI flag set (--deep / --vps) disambiguates at the call site; callers should select the variant matching the flags they passed.",
+  "$defs": {
+    "doctor_report": {
+      "title": "DoctorReport (base + --vps)",
+      "type": "object",
+      "required": ["kill_switch", "dns_lock", "ipv6_disabled", "webrtc_guard_present", "exit_ip_ok"],
+      "properties": {
+        "kill_switch": { "type": "boolean" },
+        "dns_lock": { "type": "boolean" },
+        "ipv6_disabled": { "type": "boolean" },
+        "webrtc_guard_present": { "type": "boolean" },
+        "exit_ip_ok": {
+          "type": "boolean",
+          "description": "True when probe succeeded OR was skipped via --skip-exit-ip; false on any probe failure / country mismatch / ASN-deny.",
+          "default": true
+        },
+        "exit_ip": {
+          "type": ["object", "null"],
+          "description": "Mirror of `vpn_rotate::leak_guard::IpInfo`.",
+          "required": ["ip"],
+          "properties": {
+            "ip": { "type": "string" },
+            "country": { "type": ["string", "null"], "description": "ISO-2 alpha country code." },
+            "asn": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Per-check failure detail (skip_serializing_if=Vec::is_empty in Rust serde — omitted when empty)."
+        }
+      },
+      "additionalProperties": true
+    },
+    "deep_report": {
+      "title": "DeepReport (--deep)",
+      "type": "object",
+      "description": "Emitted only with `--deep`. Mirror of `crates/stealth-cli/src/doctor.rs::DeepReport`.",
+      "properties": {
+        "obscura_binary": { "$ref": "#/$defs/deep_check" },
+        "vpn_pool_instances": { "$ref": "#/$defs/deep_check" },
+        "sites_recipes": { "$ref": "#/$defs/deep_check" },
+        "auth_profiles": { "$ref": "#/$defs/deep_check" },
+        "auth_key_source": { "$ref": "#/$defs/deep_check" }
+      },
+      "additionalProperties": true
+    },
+    "deep_check": {
+      "type": "object",
+      "required": ["name", "status", "detail"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["pass", "warn", "fail"] },
+        "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

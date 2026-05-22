@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rev-stealth.local/json-schemas/cli/browser.output.json",
+  "title": "rev-stealth browser --output-format json",
+  "description": "JSON payload emitted by `rev-stealth browser {launch|stealth-test} --output-format json`. v1.3 Lane G.4 contract. Note: both `launch` and `stealth-test` dispatch to the same `launch()` handler and emit operation = \"browser.launch\". Reference emitter: `crates/stealth-cli/src/browser_cmd.rs::emit_ok`/`emit_err`.",
+  "oneOf": [
+    {
+      "title": "OK envelope",
+      "type": "object",
+      "required": ["ok", "operation", "result"],
+      "properties": {
+        "ok": { "const": true },
+        "operation": { "const": "browser.launch" },
+        "result": {
+          "type": "object",
+          "required": ["profile_id", "browser_profile", "stealth_level", "url_requested", "url_final", "title", "user_agent"],
+          "properties": {
+            "profile_id": { "type": "string" },
+            "browser_profile": { "type": "string" },
+            "stealth_level": { "type": "string" },
+            "url_requested": { "type": "string" },
+            "url_final": { "type": ["string", "null"] },
+            "title": { "type": ["string", "null"] },
+            "user_agent": { "type": ["string", "null"] },
+            "fingerprint": {
+              "type": ["object", "null"],
+              "properties": {
+                "preset_id": { "type": ["string", "null"] },
+                "viewport": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+                "device_scale_factor": { "type": ["number", "null"] },
+                "device_memory": { "type": ["integer", "null"] },
+                "hardware_concurrency": { "type": ["integer", "null"] },
+                "max_touch_points": { "type": ["integer", "null"] },
+                "webgl_vendor": { "type": ["string", "null"] },
+                "webgl_renderer": { "type": ["string", "null"] }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "ERR envelope",
+      "type": "object",
+      "required": ["ok", "operation", "exit_code", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "operation": { "const": "browser.launch" },
+        "exit_code": { "type": "integer", "minimum": 0 },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

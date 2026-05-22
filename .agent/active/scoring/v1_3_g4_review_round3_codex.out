@@ -1,0 +1,6 @@
+METRIC: lane=G.4 round=3 verdict=LGTM subcmds_with_output_format=11/11 schemas=11/11 collisions=0 issues=0
+
+Round-2 auth success drift is addressed: schema now accepts the helper-owned flat `SuccessJson` shape.
+Envelope OK is restricted to `list/show/delete/status`; ERR covers the CLI-owned pre-helper failure paths.
+The new schema validation test covers flat login/refresh success with expiry and null expiry, plus login ERR.
+Verified: `cargo test -p rev-stealth --test cli_output_schema_validation` and `output_format_coverage` both pass.

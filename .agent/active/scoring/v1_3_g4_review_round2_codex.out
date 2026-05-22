@@ -1,0 +1,6 @@
+METRIC: lane=G.4 round=2 verdict=NEEDS_CHANGES subcmds_with_output_format=11/11 schemas=11/11 collisions=0 issues=1
+
+- BLOCK: `docs/json-schemas/cli/auth.output.json:10` requires OK auth outputs, including `auth.login` / `auth.refresh`, to be `{ok:true, operation, result}`.
+- Actual success path `crates/stealth-cli/src/commands/auth.rs:406` inherits stdout from `rev-auth`; `crates/stealth-auth/src/bin/rev_auth.rs:212` / `:382` prints raw `{ok, profile, domain, cookie_count, expires_at, saved_to}` with no `operation` or `result`.
+- The new schema test passed 19/19, but it covers `auth.refresh` ERR and `list/show/delete/status` OK only, so this success drift is missed.
+- Current checks also passed: `output_format_coverage` 4/4 and `cli_tests::` 8/8.

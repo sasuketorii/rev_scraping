@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rev-stealth.local/json-schemas/cli/measure.output.json",
+  "title": "rev-stealth measure --output-format json",
+  "description": "JSON payload emitted by `rev-stealth measure --output-format json`. v1.3 Lane G.4 contract. Wraps the local fingerprint measurement in the shared {ok, operation, result|exit_code+error} envelope. External SaaS probes are opt-in via --enable-external; egress probe requires --enable-egress-probe AND the vps-egress-probe Cargo feature. Reference emitter: `crates/stealth-cli/src/commands/measure.rs::emit_ok`/`emit_err` (operation = \"measure\").",
+  "oneOf": [
+    {
+      "title": "OK envelope",
+      "type": "object",
+      "required": ["ok", "operation", "result"],
+      "properties": {
+        "ok": { "const": true },
+        "operation": { "const": "measure" },
+        "result": {
+          "type": "object",
+          "required": ["url", "user_agent", "local", "external", "egress"],
+          "properties": {
+            "url": { "type": "string" },
+            "user_agent": { "type": "string" },
+            "local": {
+              "type": "object",
+              "required": ["scheme", "host", "sec_ch_ua_valid", "ja4_placeholder", "bot_score"],
+              "properties": {
+                "scheme": { "type": "string" },
+                "host": { "type": "string" },
+                "sec_ch_ua_valid": { "type": "boolean" },
+                "ja4_placeholder": { "type": "string" },
+                "bot_score": { "type": "integer", "minimum": 0, "maximum": 255 }
+              },
+              "additionalProperties": true
+            },
+            "external": {
+              "type": "object",
+              "required": ["enabled"],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "providers": { "type": "array", "items": { "type": "string" } },
+                "note": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "egress": { "description": "VPS egress probe result; shape governed by `commands::egress::run_probe`.", "type": ["object", "null"] }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "ERR envelope",
+      "type": "object",
+      "required": ["ok", "operation", "exit_code", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "operation": { "const": "measure" },
+        "exit_code": { "type": "integer", "minimum": 0 },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

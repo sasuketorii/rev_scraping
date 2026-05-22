@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rev-stealth.local/json-schemas/cli/config.output.json",
+  "title": "rev-stealth config --output-format json",
+  "description": "JSON payload emitted by `rev-stealth config {show|paths|validate|diff|get|init|set|edit|migrate|history|rollback|gc|profile} --output-format json`. v1.3 Lane G.4 contract. Each action emits its own untagged shape — there is NO shared {ok, operation, result} envelope here (config pre-dates G.4). Reference emitter: `crates/stealth-cli/src/commands/config_cli.rs::emit` (each `run_*` builds its own payload). Secret-looking env / TOML keys are pre-redacted to `<redacted>`.",
+  "$comment": "anyOf (not oneOf) because the per-action shapes structurally overlap (e.g. `validate`'s `{ok, reports, ...}` also matches the write-action fallback `{ok, ...}`). The CLI action name selects the variant at the call site; this schema accepts any of the documented branches.",
+  "anyOf": [
+    {
+      "title": "config show",
+      "type": "object",
+      "required": ["policy", "authorized", "sites", "env"],
+      "properties": {
+        "policy": { "description": "TOML-as-JSON for policy.toml (recursively redacted)." },
+        "authorized": { "description": "TOML-as-JSON for authorized.toml." },
+        "sites": { "description": "Map of site recipe filename → TOML-as-JSON." },
+        "env": { "type": "object", "description": "TRACKED_ENV subset (secret values redacted)." }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "config paths",
+      "type": "array",
+      "items": { "$ref": "#/$defs/path_entry" }
+    },
+    {
+      "title": "config validate",
+      "type": "object",
+      "required": ["ok", "reports", "read_errors"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "ok", "errors"],
+            "properties": {
+              "path": { "type": "string" },
+              "ok": { "type": "boolean" },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["path", "code", "message"],
+                  "properties": {
+                    "path": { "type": "string" },
+                    "code": { "type": "string" },
+                    "message": { "type": "string" },
+                    "hint": { "type": ["string", "null"] }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "read_errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "error"],
+            "properties": {
+              "path": { "type": "string" },
+              "error": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "config diff",
+      "type": "object",
+      "required": ["diff"],
+      "properties": { "diff": { "type": "string" } },
+      "additionalProperties": true
+    },
+    {
+      "title": "config get",
+      "type": "object",
+      "required": ["key", "value"],
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "description": "JSON value at the requested key (redacted if the key looks secret)." }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "config init / migrate (outcomes)",
+      "type": "object",
+      "required": ["outcomes"],
+      "properties": {
+        "outcomes": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "config write actions (set/edit/rollback/gc/history/profile *) — ok+error fallback",
+      "type": "object",
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "error": { "type": ["string", "null"] },
+        "backup": { "type": ["string", "null"] },
+        "changes": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
+  ],
+  "$defs": {
+    "path_entry": {
+      "type": "object",
+      "required": ["label", "path", "exists", "is_dir"],
+      "properties": {
+        "label": { "type": "string" },
+        "path": { "type": "string" },
+        "exists": { "type": "boolean" },
+        "is_dir": { "type": "boolean" },
+        "mode_octal": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rev-stealth.local/json-schemas/cli/auth.output.json",
+  "title": "rev-stealth auth --output-format json",
+  "description": "JSON payload emitted by `rev-stealth auth {login|list|show|delete|status|refresh} --output-format json`. v1.3 Lane G.4 contract.\n\nIMPORTANT — two distinct OK shapes coexist on this surface:\n\n1. `list` / `show` / `delete` / `status` success and ALL error paths flow through `crates/stealth-cli/src/commands/auth.rs::emit_ok`/`emit_err` and use the shared `{ok, operation, result|exit_code+error}` envelope.\n\n2. `login` / `refresh` SUCCESS is emitted by the external `rev-auth` helper binary (`crates/stealth-auth/src/bin/rev_auth.rs`), whose stdout is inherited by the CLI. That helper writes a FLAT `SuccessJson` shape with no envelope: `{ok, profile, domain, cookie_count, expires_at, saved_to}`. The CLI's `auth.login` / `auth.refresh` ENVELOPE is only used for *errors* (policy-load, AUP, VPN-guard, spawn-failure) before the helper is invoked.\n\nThis split is documented honestly rather than being papered over — collapsing the two surfaces onto one envelope requires changing `rev-auth` (out of scope for G.4, which is strict-additive).\n\nCookie *values* are NEVER serialized in either shape; only sha256 prefixes (envelope path) and counts/expires_at (flat path).",
+  "oneOf": [
+    {
+      "title": "Shared OK envelope (list / show / delete / status; never login / refresh success)",
+      "type": "object",
+      "required": ["ok", "operation", "result"],
+      "properties": {
+        "ok": { "const": true },
+        "operation": {
+          "type": "string",
+          "enum": ["auth.list", "auth.show", "auth.delete", "auth.status"]
+        },
+        "result": {
+          "description": "anyOf (not oneOf) because the payload shapes overlap structurally (e.g. delete_payload is a superset of show_or_login_payload's required fields). Live emission disambiguates via the parent `operation` enum.",
+          "anyOf": [
+            { "$ref": "#/$defs/list_payload" },
+            { "$ref": "#/$defs/show_or_login_payload" },
+            { "$ref": "#/$defs/delete_payload" },
+            { "$ref": "#/$defs/status_payload" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Shared ERR envelope (all six actions)",
+      "type": "object",
+      "required": ["ok", "operation", "exit_code", "error"],
+      "properties": {
+        "ok": { "const": false },
+        "operation": {
+          "type": "string",
+          "enum": ["auth.login", "auth.list", "auth.show", "auth.delete", "auth.status", "auth.refresh"]
+        },
+        "exit_code": { "type": "integer", "minimum": 0, "description": "0 ok / 1 user / 3 permanent / 4 auth-expired / aborted variants per crates/stealth-cli/src/commands/auth.rs::EXIT_*." },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "rev-auth login/refresh SUCCESS (flat SuccessJson; no envelope)",
+      "description": "Emitted by `crates/stealth-auth/src/bin/rev_auth.rs` line 212 (struct) / line 382 (println). The CLI's `auth.login` / `auth.refresh` success path inherits this stdout verbatim — see `crates/stealth-cli/src/commands/auth.rs::spawn_rev_auth_login` (line 406).",
+      "$ref": "#/$defs/rev_auth_success"
+    }
+  ],
+  "$defs": {
+    "list_payload": {
+      "title": "auth.list result",
+      "type": "object",
+      "required": ["profiles"],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/profile_meta" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "profile_meta": {
+      "type": "object",
+      "required": ["profile", "created_at", "last_used", "status", "cookie_values_returned"],
+      "properties": {
+        "profile": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "last_used": { "type": "string", "format": "date-time" },
+        "cookie_count": { "type": "integer", "minimum": 0 },
+        "cookie_name_sha256_prefixes": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "cookie_values_returned": { "const": false }
+      },
+      "additionalProperties": true
+    },
+    "show_or_login_payload": {
+      "title": "auth.show result (also: shape historically aliased for login/refresh envelope, but live login/refresh success uses rev_auth_success instead)",
+      "type": "object",
+      "required": ["profile"],
+      "properties": {
+        "profile": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": ["string", "null"], "format": "date-time" },
+        "last_used": { "type": ["string", "null"], "format": "date-time" },
+        "cookie_name_sha256_prefixes": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": ["string", "null"] },
+        "cookie_values_returned": { "const": false }
+      },
+      "additionalProperties": true
+    },
+    "delete_payload": {
+      "title": "auth.delete result",
+      "type": "object",
+      "required": ["profile", "deleted"],
+      "properties": {
+        "profile": { "type": "string" },
+        "deleted": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "status_payload": {
+      "title": "auth.status result",
+      "type": "object",
+      "required": ["profile", "status", "exit_code"],
+      "properties": {
+        "profile": { "type": "string" },
+        "status": { "type": "string" },
+        "warn_level": { "type": ["string", "null"] },
+        "exit_code": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "rev_auth_success": {
+      "title": "rev-auth helper SuccessJson (login / refresh success path)",
+      "description": "Flat success shape printed by `rev-auth login` and inherited by `rev-stealth auth login` / `rev-stealth auth refresh`. Mirror of `crates/stealth-auth/src/bin/rev_auth.rs::SuccessJson` (line 212). No `operation` / no `result` wrapper.",
+      "type": "object",
+      "required": ["ok", "profile", "domain", "cookie_count", "saved_to"],
+      "properties": {
+        "ok": { "const": true },
+        "profile": { "type": "string" },
+        "domain": { "type": "string", "description": "eTLD+1 of the authorized origin." },
+        "cookie_count": { "type": "integer", "minimum": 0 },
+        "expires_at": { "type": ["string", "null"], "format": "date-time", "description": "Latest cookie expiry (RFC 3339), or null when no cookie carries an expiry." },
+        "saved_to": { "type": "string", "description": "Encrypted cookie-jar path on disk." }
+      },
+      "additionalProperties": false
+    }
+  }
+}
