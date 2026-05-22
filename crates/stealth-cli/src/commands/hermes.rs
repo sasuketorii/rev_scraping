@@ -100,6 +100,9 @@ ENV:\n  \
 
 #[derive(Args, Debug, Clone)]
 pub struct InstallArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// Destination directory. Defaults to `$HOME/.hermes/plugins/rev-scraping-mcp`.
     #[arg(long)]
     pub prefix: Option<PathBuf>,
@@ -116,6 +119,9 @@ pub struct InstallArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct UninstallArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// Plugin directory to remove. Defaults to
     /// `$HOME/.hermes/plugins/rev-scraping-mcp`.
     #[arg(long)]
@@ -160,14 +166,44 @@ const PLUGIN_DIR_NAME: &str = "rev-scraping-mcp";
 
 pub async fn run(format: OutputFormat, args: HermesArgs) -> i32 {
     match args.action {
-        HermesAction::Install(a) => match install(&a) {
-            Ok(report) => emit_ok(format, "install", &report),
-            Err(e) => emit_err(format, "install", &e),
-        },
-        HermesAction::Uninstall(a) => match uninstall(&a) {
-            Ok(report) => emit_ok(format, "uninstall", &report),
-            Err(e) => emit_err(format, "uninstall", &e),
-        },
+        HermesAction::Install(a) => {
+            if a.dry_run_args.is_dry_run() {
+                return crate::commands::dry_run::emit_dry_run(
+                    format,
+                    "hermes.install",
+                    &[
+                        "resolve destination prefix",
+                        "resolve scaffold source directory",
+                        "verify source exists",
+                        "check destination empty (or --force)",
+                        "recursive copy scaffold to prefix",
+                    ],
+                    &a.dry_run_args,
+                );
+            }
+            match install(&a) {
+                Ok(report) => emit_ok(format, "install", &report),
+                Err(e) => emit_err(format, "install", &e),
+            }
+        }
+        HermesAction::Uninstall(a) => {
+            if a.dry_run_args.is_dry_run() {
+                return crate::commands::dry_run::emit_dry_run(
+                    format,
+                    "hermes.uninstall",
+                    &[
+                        "resolve destination prefix",
+                        "verify prefix is a valid rev-scraping-mcp install",
+                        "recursive remove plugin directory",
+                    ],
+                    &a.dry_run_args,
+                );
+            }
+            match uninstall(&a) {
+                Ok(report) => emit_ok(format, "uninstall", &report),
+                Err(e) => emit_err(format, "uninstall", &e),
+            }
+        }
         HermesAction::Verify(a) => match verify(&a) {
             Ok(report) => emit_ok(format, "verify", &report),
             Err(e) => emit_err(format, "verify", &e),
@@ -476,6 +512,7 @@ mod tests {
         let dest_root = TempDir::new().unwrap();
         let dest = dest_root.path().join("plugin");
         let args = InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
             source: Some(scaffold.path().to_path_buf()),
             force: false,
@@ -496,6 +533,7 @@ mod tests {
         fs::create_dir_all(&dest).unwrap();
         fs::write(dest.join("pre-existing.txt"), "x").unwrap();
         let args = InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
             source: Some(scaffold.path().to_path_buf()),
             force: false,
@@ -515,6 +553,7 @@ mod tests {
         fs::create_dir_all(&dest).unwrap();
         fs::write(dest.join("stale.txt"), "old").unwrap();
         let args = InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
             source: Some(scaffold.path().to_path_buf()),
             force: true,
@@ -529,6 +568,7 @@ mod tests {
         let dest_root = TempDir::new().unwrap();
         let missing = dest_root.path().join("nope");
         let args = InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest_root.path().join("plugin")),
             source: Some(missing.clone()),
             force: false,
@@ -546,12 +586,14 @@ mod tests {
         let dest_root = TempDir::new().unwrap();
         let dest = dest_root.path().join("plugin");
         install(&InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
             source: Some(scaffold.path().to_path_buf()),
             force: false,
         })
         .unwrap();
         let report = uninstall(&UninstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
         })
         .expect("uninstall ok");
@@ -566,6 +608,7 @@ mod tests {
         fs::create_dir_all(&dest).unwrap();
         fs::write(dest.join("random.txt"), "x").unwrap();
         let err = uninstall(&UninstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
         })
         .unwrap_err();
@@ -580,6 +623,7 @@ mod tests {
         let dest_root = TempDir::new().unwrap();
         let dest = dest_root.path().join("nope");
         let err = uninstall(&UninstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
         })
         .unwrap_err();
@@ -595,6 +639,7 @@ mod tests {
         let dest_root = TempDir::new().unwrap();
         let dest = dest_root.path().join("plugin");
         install(&InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
             source: Some(scaffold.path().to_path_buf()),
             force: false,
@@ -615,6 +660,7 @@ mod tests {
         let dest_root = TempDir::new().unwrap();
         let dest = dest_root.path().join("plugin");
         install(&InstallArgs {
+            dry_run_args: Default::default(),
             prefix: Some(dest.clone()),
             source: Some(scaffold.path().to_path_buf()),
             force: false,

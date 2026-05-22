@@ -385,6 +385,9 @@ REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
         /// `\`, `.`, whitespace, control chars). Path-traversal is
         /// rejected.
         name: String,
+        /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+        #[command(flatten)]
+        dry_run_args: crate::commands::dry_run::DryRunArgs,
     },
     /// Print the shell-export line needed to activate the profile.
     /// We never mutate the operator's environment from inside the
@@ -406,6 +409,9 @@ REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
     Switch {
         /// Profile name (must already exist).
         name: String,
+        /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+        #[command(flatten)]
+        dry_run_args: crate::commands::dry_run::DryRunArgs,
     },
     /// Best-effort overwrite-then-delete (`shred-like`) for the profile
     /// directory. Refuses if the profile is currently active per
@@ -432,6 +438,9 @@ REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
         /// 2 with an error so an operator typo cannot wipe a profile.
         #[arg(long, default_value_t = false)]
         yes: bool,
+        /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+        #[command(flatten)]
+        dry_run_args: crate::commands::dry_run::DryRunArgs,
     },
 }
 
@@ -446,6 +455,9 @@ pub enum WriteTarget {
 
 #[derive(Args, Debug, Clone)]
 pub struct SetArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// Dotted key, e.g. `policy.require_vpn` or `require_vpn`. A leading
     /// `policy.` / `authorized.` segment is treated as a layer hint and
     /// stripped before traversing the TOML document.
@@ -461,6 +473,9 @@ pub struct SetArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct EditArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// Which file to open. Defaults to `policy`.
     #[arg(long, value_enum, default_value_t = WriteTarget::Policy)]
     pub target: WriteTarget,
@@ -469,13 +484,22 @@ pub struct EditArgs {
     pub editor: Option<String>,
 }
 
-#[derive(Args, Debug, Clone)]
+#[derive(Args, Debug, Clone, Default)]
 pub struct MigrateArgs {
-    /// Dry-run: print the migration plan without writing. (v1→v1 is a no-op
-    /// either way; the flag is here so the future v2 migration path has a
-    /// stable name.)
-    #[arg(long, default_value_t = false)]
-    pub dry_run: bool,
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    /// `--dry-run` keeps the original P6.3 semantics: print the migration
+    /// plan without writing (v1→v1 is a no-op either way; future v2+
+    /// migrations honour this surface).
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
+}
+
+impl MigrateArgs {
+    /// Backwards-compat shim: the P6.3 surface exposed `mig_args.dry_run`.
+    /// v1.3 Lane G.5 routes the flag through the shared `DryRunArgs` block.
+    pub fn dry_run(&self) -> bool {
+        self.dry_run_args.dry_run
+    }
 }
 
 /// Which file(s) `config init` should materialize. `All` is the default
@@ -498,6 +522,9 @@ pub struct HistoryArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct RollbackArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// The exact backup filename to restore (e.g.
     /// `policy.toml.bak.1700000000000`). Resolved relative to the
     /// target file's parent directory. Path traversal is rejected.
@@ -509,6 +536,9 @@ pub struct RollbackArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct GcArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// Number of newest backups to keep. Defaults to 5.
     #[arg(long, default_value_t = 5)]
     pub keep: usize,
@@ -519,6 +549,9 @@ pub struct GcArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct InitArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     /// Limit init to a single file. Default `all`.
     #[arg(long, value_enum, default_value_t = InitTarget::All)]
     pub target: InitTarget,
@@ -1081,7 +1114,31 @@ pub enum InitStatus {
     Error,
 }
 
+/// v1.3 Lane G.5: bridge `ConfigFormat` → `OutputFormat` for the shared
+/// dry-run emitter. `ConfigFormat::Yaml` collapses to `OutputFormat::Json`
+/// for the dry-run envelope, because the envelope is a stable JSON shape
+/// (yaml callers can pipe through `yq`).
+fn dry_run_format_bridge(format: ConfigFormat) -> crate::OutputFormat {
+    match format {
+        ConfigFormat::Json | ConfigFormat::Yaml => crate::OutputFormat::Json,
+        ConfigFormat::Text => crate::OutputFormat::Human,
+    }
+}
+
 fn run_init(locs: &ConfigLocations, args: InitArgs, format: ConfigFormat) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            dry_run_format_bridge(format),
+            "config.init",
+            &[
+                "resolve REV_SCRAPING_HOME base directory",
+                "compute init target set (policy / authorized / sites)",
+                "(skipped) ConfigWriter::write each target with 0600 / 0700",
+                "(skipped) backup existing targets via .bak.<epoch>",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let mut outcomes: Vec<InitOutcome> = Vec::new();
     let want_policy = matches!(args.target, InitTarget::All | InitTarget::Policy);
     let want_authorized = matches!(args.target, InitTarget::All | InitTarget::Authorized);
@@ -1377,6 +1434,21 @@ fn validate_doc_for_target(text: &str, target: WriteTarget) -> ValidationReport 
 }
 
 fn run_set(locs: &ConfigLocations, args: SetArgs, format: ConfigFormat) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            dry_run_format_bridge(format),
+            "config.set",
+            &[
+                "resolve target file (policy.toml / authorized.toml)",
+                "load current TOML document",
+                "infer value type (bool / int / string)",
+                "apply set on dotted key (in-memory only)",
+                "(skipped) strict validation of candidate document",
+                "(skipped) ConfigWriter atomic write + .bak.<epoch> backup",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let path = target_path(locs, args.target);
     // Reviewer round-2 finding: a read error on an existing file MUST
     // fail closed. Silently coercing to "" would let `set` overwrite the
@@ -1502,6 +1574,21 @@ fn emit_set_error(format: ConfigFormat, key: &str, message: &str) {
 }
 
 fn run_edit(locs: &ConfigLocations, args: EditArgs, format: ConfigFormat) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            dry_run_format_bridge(format),
+            "config.edit",
+            &[
+                "resolve target file (policy.toml / authorized.toml)",
+                "resolve $EDITOR (fallback vi)",
+                "(skipped) copy current file to tempfile",
+                "(skipped) spawn editor on tempfile",
+                "(skipped) strict validation of candidate document",
+                "(skipped) ConfigWriter atomic write + .bak.<epoch> backup",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let path = target_path(locs, args.target);
     // Reviewer round-2 finding: read failures (permission, invalid UTF-8,
     // etc.) on an existing file MUST fail closed, not coerce to "" which
@@ -1799,6 +1886,24 @@ fn read_schema_version(path: &Path) -> SchemaVersionRead {
 }
 
 fn run_migrate(locs: &ConfigLocations, args: MigrateArgs, format: ConfigFormat) -> i32 {
+    // v1.3 Lane G.5: emit the shared dry-run envelope when --dry-run is set,
+    // so every mutate command in the matrix has uniform envelope shape.
+    // The legacy {outcomes:[...]} surface is preserved for the real (non
+    // dry-run) path; tests on the legacy surface invoke run_migrate with
+    // dry_run=false directly so they remain unaffected.
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            dry_run_format_bridge(format),
+            "config.migrate",
+            &[
+                "resolve policy.toml + authorized.toml paths",
+                "read schema_version from each file",
+                "compute (from → to) migration per target",
+                "(skipped) ConfigWriter atomic write + .bak.<epoch> backup",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let mut outcomes: Vec<MigrateOutcome> = Vec::new();
     for (label, path) in [("policy", &locs.policy), ("authorized", &locs.authorized)] {
         if !path.exists() {
@@ -1859,7 +1964,7 @@ fn run_migrate(locs: &ConfigLocations, args: MigrateArgs, format: ConfigFormat) 
                 Some(format!("schema_version {n} out of u32 range")),
             ),
         };
-        if args.dry_run {
+        if args.dry_run() {
             outcomes.push(MigrateOutcome {
                 target: label,
                 path: path.display().to_string(),
@@ -2029,6 +2134,19 @@ fn resolve_bak(path: &Path, bak_name: &str) -> Result<PathBuf, String> {
 }
 
 fn run_rollback(locs: &ConfigLocations, args: RollbackArgs, format: ConfigFormat) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            dry_run_format_bridge(format),
+            "config.rollback",
+            &[
+                "resolve target file (policy.toml / authorized.toml)",
+                "validate backup name (path-traversal rejection)",
+                "(skipped) read backup contents",
+                "(skipped) ConfigWriter::write_with_backup (atomic restore + fresh .bak.<epoch>)",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let path = target_path_for(locs, args.target);
     let label = write_target_label(args.target);
     let bak = match resolve_bak(path, &args.bak_name) {
@@ -2116,6 +2234,19 @@ fn run_rollback(locs: &ConfigLocations, args: RollbackArgs, format: ConfigFormat
 }
 
 fn run_gc(locs: &ConfigLocations, args: GcArgs, format: ConfigFormat) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            dry_run_format_bridge(format),
+            "config.gc",
+            &[
+                "resolve target file's parent directory",
+                "list .bak.<epoch> backups in newest→oldest order",
+                "compute keep / delete buckets per --keep",
+                "(skipped) unlink older backups",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let path = target_path_for(locs, args.target);
     let label = write_target_label(args.target);
     let writer = FsConfigWriter;
@@ -2255,9 +2386,57 @@ fn profile_dir(name: &str) -> PathBuf {
 fn run_profile(locs: &ConfigLocations, action: ProfileAction, format: ConfigFormat) -> i32 {
     match action {
         ProfileAction::List => run_profile_list(format),
-        ProfileAction::Create { name } => run_profile_create(&name, format),
-        ProfileAction::Switch { name } => run_profile_switch(&name, format),
-        ProfileAction::Delete { name, yes } => run_profile_delete(locs, &name, yes, format),
+        ProfileAction::Create { name, dry_run_args } => {
+            if dry_run_args.is_dry_run() {
+                return crate::commands::dry_run::emit_dry_run(
+                    dry_run_format_bridge(format),
+                    "config.profile.create",
+                    &[
+                        "validate profile name (path-traversal rejection)",
+                        "resolve profiles root",
+                        "(skipped) mkdir profile dir + sites/",
+                        "(skipped) ConfigWriter::write policy.toml + authorized.toml",
+                    ],
+                    &dry_run_args,
+                );
+            }
+            run_profile_create(&name, format)
+        }
+        ProfileAction::Switch { name, dry_run_args } => {
+            if dry_run_args.is_dry_run() {
+                return crate::commands::dry_run::emit_dry_run(
+                    dry_run_format_bridge(format),
+                    "config.profile.switch",
+                    &[
+                        "validate profile name (path-traversal rejection)",
+                        "verify profile directory exists",
+                        "emit shell-export line (no env mutation in-process)",
+                    ],
+                    &dry_run_args,
+                );
+            }
+            run_profile_switch(&name, format)
+        }
+        ProfileAction::Delete {
+            name,
+            yes,
+            dry_run_args,
+        } => {
+            if dry_run_args.is_dry_run() {
+                return crate::commands::dry_run::emit_dry_run(
+                    dry_run_format_bridge(format),
+                    "config.profile.delete",
+                    &[
+                        "validate profile name (path-traversal rejection)",
+                        "verify profile is not currently active per REV_SCRAPING_HOME",
+                        "verify --yes was passed (no-op otherwise)",
+                        "(skipped) shred-like overwrite-then-unlink of profile dir",
+                    ],
+                    &dry_run_args,
+                );
+            }
+            run_profile_delete(locs, &name, yes, format)
+        }
     }
 }
 
@@ -2763,6 +2942,7 @@ mod tests {
 
     fn init_args(target: InitTarget, force: bool, non_interactive: bool) -> InitArgs {
         InitArgs {
+            dry_run_args: Default::default(),
             target,
             force,
             non_interactive,
@@ -2957,6 +3137,7 @@ mod tests {
 
     fn set_args(key: &str, value: &str, target: WriteTarget) -> SetArgs {
         SetArgs {
+            dry_run_args: Default::default(),
             key: key.into(),
             value: value.into(),
             target,
@@ -3063,6 +3244,7 @@ mod tests {
         let code = run_edit(
             &locs,
             EditArgs {
+            dry_run_args: Default::default(),
                 target: WriteTarget::Policy,
                 editor: Some(editor_path.display().to_string()),
             },
@@ -3117,7 +3299,7 @@ mod tests {
         let (_dir, locs) = fresh_home();
         seed_valid_policy(&locs);
         let original = std::fs::read(&locs.policy).unwrap();
-        let code = run_migrate(&locs, MigrateArgs { dry_run: false }, ConfigFormat::Json);
+        let code = run_migrate(&locs, MigrateArgs::default(), ConfigFormat::Json);
         assert_eq!(code, 0, "v1→v1 migrate must exit 0");
         let after = std::fs::read(&locs.policy).unwrap();
         assert_eq!(
@@ -3139,7 +3321,7 @@ mod tests {
         // reproduce the outcome generation here via the same helper).
         // Drive run_migrate end-to-end and pin the exit code; the JSON
         // schema itself is covered by serde + the `Serialize` derive.
-        let code = run_migrate(&locs, MigrateArgs { dry_run: true }, ConfigFormat::Json);
+        let code = run_migrate(&locs, MigrateArgs { dry_run_args: crate::commands::dry_run::DryRunArgs { dry_run: true, explain: false, idempotency_key: None } }, ConfigFormat::Json);
         assert_eq!(code, 0);
         // Both files present → both surfaced. Direct invariant check via
         // schema_version reader.
@@ -3162,7 +3344,7 @@ mod tests {
         let (_dir, locs) = fresh_home();
         std::fs::write(&locs.policy, "schema_version = \"two\"\n").unwrap();
         std::fs::write(&locs.authorized, "this is not toml [[[ \n").unwrap();
-        let code = run_migrate(&locs, MigrateArgs { dry_run: false }, ConfigFormat::Json);
+        let code = run_migrate(&locs, MigrateArgs::default(), ConfigFormat::Json);
         assert_eq!(code, 1, "malformed schema_version must exit 1, not 0");
         // And both files MUST remain byte-identical: we never write on
         // the error path.
@@ -3171,7 +3353,7 @@ mod tests {
         // Missing schema_version field must also error (not assume v1).
         let (_dir2, locs2) = fresh_home();
         std::fs::write(&locs2.policy, "require_vpn = true\n").unwrap();
-        let code2 = run_migrate(&locs2, MigrateArgs { dry_run: false }, ConfigFormat::Json);
+        let code2 = run_migrate(&locs2, MigrateArgs::default(), ConfigFormat::Json);
         assert_eq!(
             code2, 1,
             "missing schema_version must exit 1 (no silent v1 default)"
@@ -3210,6 +3392,7 @@ mod tests {
         let code = run_edit(
             &locs,
             EditArgs {
+            dry_run_args: Default::default(),
                 target: WriteTarget::Policy,
                 // Force a non-zero editor exit so we hit the abort branch.
                 editor: Some("false".into()),
@@ -3253,6 +3436,7 @@ mod tests {
         let code = run_edit(
             &locs,
             EditArgs {
+            dry_run_args: Default::default(),
                 target: WriteTarget::Policy,
                 editor: Some(editor_path.display().to_string()),
             },
@@ -3385,6 +3569,7 @@ mod tests {
         let code = run_rollback(
             &locs,
             RollbackArgs {
+            dry_run_args: Default::default(),
                 bak_name: oldest_name.clone(),
                 target: WriteTarget::Policy,
             },
@@ -3411,6 +3596,7 @@ mod tests {
         let code = run_rollback(
             &locs,
             RollbackArgs {
+            dry_run_args: Default::default(),
                 bak_name: v0_name.clone(),
                 target: WriteTarget::Policy,
             },
@@ -3440,6 +3626,7 @@ mod tests {
         let code = run_rollback(
             &locs,
             RollbackArgs {
+            dry_run_args: Default::default(),
                 bak_name: "../etc/passwd".into(),
                 target: WriteTarget::Policy,
             },
@@ -3643,6 +3830,7 @@ mod tests {
         let code = run_gc(
             &locs,
             GcArgs {
+            dry_run_args: Default::default(),
                 keep: 2,
                 target: WriteTarget::Policy,
             },

@@ -17,6 +17,8 @@ pub mod hermes;
 pub mod measure;
 // v1.3 (G.4): shared `--output-format` per-subcommand override.
 pub mod output_format;
+// v1.3 (G.5): shared `--dry-run` / `--explain` / `--idempotency-key` for mutate subcommands.
+pub mod dry_run;
 pub mod recipe_runtime;
 pub mod relocate;
 pub mod spider;

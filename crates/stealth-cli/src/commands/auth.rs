@@ -158,6 +158,9 @@ REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN-required guard."
 
 #[derive(Args, Debug, Clone)]
 pub struct LoginArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     #[arg(long)]
     pub profile: String,
     #[arg(long)]
@@ -203,6 +206,9 @@ pub struct ShowArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct DeleteArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     #[arg(long)]
     pub profile: String,
     /// Skip the interactive confirmation prompt.
@@ -218,6 +224,9 @@ pub struct StatusArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct RefreshArgs {
+    /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+    #[command(flatten)]
+    pub dry_run_args: crate::commands::dry_run::DryRunArgs,
     #[arg(long)]
     pub profile: String,
     #[arg(long)]
@@ -262,6 +271,21 @@ pub async fn run(format: OutputFormat, args: AuthArgs) -> i32 {
 }
 
 async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            format,
+            "auth.login",
+            &[
+                "resolve domain from --url",
+                "enforce AUP allowlist",
+                "load layered policy + apply env overrides",
+                "run VPN startup probe (no rotation)",
+                "spawn rev-auth helper to capture session",
+                "seal cookie blob and persist to AuthStore",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
         Ok(d) => d,
         Err(msg) => {
@@ -309,6 +333,21 @@ async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
 }
 
 async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            format,
+            "auth.refresh",
+            &[
+                "resolve domain from --url",
+                "enforce AUP allowlist",
+                "load layered policy + apply env overrides",
+                "run VPN startup probe (no rotation)",
+                "spawn rev-auth helper to re-capture session",
+                "overwrite sealed cookie blob in AuthStore",
+            ],
+            &args.dry_run_args,
+        );
+    }
     let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
         Ok(d) => d,
         Err(msg) => {
@@ -483,6 +522,18 @@ fn run_show(format: OutputFormat, args: ShowArgs) -> i32 {
 }
 
 fn run_delete(format: OutputFormat, args: DeleteArgs, confirm: &mut dyn Confirm) -> i32 {
+    if args.dry_run_args.is_dry_run() {
+        return crate::commands::dry_run::emit_dry_run(
+            format,
+            "auth.delete",
+            &[
+                "open AuthStore (read-only)",
+                "verify profile exists",
+                "shred-on-delete: overwrite then unlink sealed blob",
+            ],
+            &args.dry_run_args,
+        );
+    }
     if !args.force && !confirm.confirm(&format!("Delete auth profile {:?}? [y/N]: ", args.profile))
     {
         emit_err(format, "auth.delete", EXIT_ABORTED, "user declined");
@@ -959,6 +1010,7 @@ mod tests {
         let code = run_delete(
             OutputFormat::Json,
             DeleteArgs {
+                dry_run_args: Default::default(),
                 profile: "nonexistent_profile_for_test".to_string(),
                 force: false,
             },

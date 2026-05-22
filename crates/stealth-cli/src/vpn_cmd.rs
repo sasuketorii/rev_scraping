@@ -47,6 +47,9 @@ REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard policy-wide."
         /// Reason hint; recorded in the audit log for forensics.
         #[arg(long, default_value = "manual")]
         reason: String,
+        /// v1.3 Lane G.5: `--dry-run` / `--explain` / `--idempotency-key`.
+        #[command(flatten)]
+        dry_run_args: crate::commands::dry_run::DryRunArgs,
     },
     /// Show the current public IP and the VPN container state.
     #[command(
@@ -80,7 +83,27 @@ pub(crate) async fn run(format: OutputFormat, action: VpnAction) -> ExitCode {
             strategy,
             region,
             reason,
-        } => rotate(format, &provider, &strategy, region.as_deref(), &reason).await,
+            dry_run_args,
+        } => {
+            if dry_run_args.is_dry_run() {
+                // v1.3 Lane G.5: side-effect-free plan emission. No bollard
+                // call, no leak probe, no audit-log write.
+                let _ = crate::commands::dry_run::emit_dry_run(
+                    format,
+                    "vpn.rotate",
+                    &[
+                        "validate strategy slug",
+                        "build RotationRequest envelope",
+                        "(skipped) call vpn_rotate::rotate",
+                        "(skipped) post-rotation leak probe",
+                        "(skipped) audit-log write",
+                    ],
+                    &dry_run_args,
+                );
+                return ExitCode::Ok;
+            }
+            rotate(format, &provider, &strategy, region.as_deref(), &reason).await
+        }
         VpnAction::Status { provider } => status(format, &provider).await,
     }
 }
