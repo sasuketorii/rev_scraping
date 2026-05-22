@@ -64,3 +64,5 @@ harness-rust/target
 **/target/
 __pycache__/
 *.pyc
+*.rlib
+librust_out*
