@@ -23,6 +23,8 @@ members = [
     "crates/stealth-agent-contracts",
     # Lane F P13: prompt-injection defense sanitizer
     "crates/stealth-sanitize",
+    # Lane H (v1.3): crates.io publish wrapper for `cargo install rev-stealth-cli`
+    "crates/rev-stealth-cli",
 ]
 
 [workspace.package]
@@ -79,6 +81,19 @@ regex = "1"
 url = "2"
 dirs = "5"
 tempfile = "3"
+
+# Property testing (Lane K K.4). Pinned to the 1.x line which is the
+# stable API surface and shares the rusty-fork / quickcheck-free
+# implementation. PR runs default to PROPTEST_CASES=256 (set in the
+# corresponding test module); nightly cron can override to 1024 via
+# environment variable.
+proptest = "1"
+
+# Microbenchmarks (Lane K K.7). PR runs the `--bench` target on a small
+# warmup count; bencher.dev (or iai-callgrind in offline mode) consumes
+# the criterion JSON output to post a per-PR diff comment when a hot
+# path regresses by > 10%.
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
 
 # Browser / CDP
 chromiumoxide = "0.9"

@@ -1,0 +1,2648 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 9.4 | J.1-J.7 は実質充足。mdBook build/test、16 tool cookbook、26 ErrorKind、migration、landscape まで揃っている。i18n helper と live Pages は operator-approved descope / 設定待ちなので小幅減点。 |
+| B | 9.3 | mdBook、rustdoc、jsonschema、landscape sync で外部検証可能。CI/workflow 化もあるが、Pages 有効化は手動前提。 |
+| C | 9.2 | Agent docs として Crawl4AI/Playwright MCP 系より具体的で、tool/error/migration が揃う。完全な多言語 toggle 未達で満点ではない。 |
+| D | 9.1 | Lane J 特化条件の「Claude Code 5分導入」と「26 ErrorKind 個別解説」は達成。tutorial/05 の ErrorEnvelope 例だけ ErrorKind ページほど厳密でないため軽微減点。 |
+| E | 8.8 | mdBook + JSON Schema は保守しやすい。best-effort rustdoc と v1.4 送りの i18n helper が将来負債として残る。 |
+| F | 9.4 | mdBook build/test PASS、16 success Response の Draft-07 schema validation PASS、review round evidence あり。live Pages 確認は未完。 |
+| G | 9.3 | 次担当が読める網羅性は高い。landscape は authoritative copy と book copy が byte-identical。小さな tutorial 表記ズレのみ残る。 |
+
+overall = 9.23 (weighted)
+
+verdict: PASS (≥9.0)
+
+deltas to reach 9.0 if FAIL: none
+2026-05-22T20:37:01.899593Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+2026-05-22T20:37:02.184191Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5167-dd4c-7d02-a1ea-8e9c9d99cf05
+--------
+user
+# v1.3 Lane J scoring (Codex)
+
+ExecPlan: .agent/active/v1_3_uplift_execplan_rev1.md (Lane J).
+Rubric: .agent/active/v1_3_quality_bar.md, axes A-G with weights {A:2.0, B:1.5, C:1.5, D:2.0, E:1.0, F:1.0, G:1.0}; Lane J D-axis特化 = "tutorial/05-claude-code.md 5分で動く" + "26 ErrorKind 全て個別解説".
+Lane review rounds: .agent/active/reviews/v1_3_j_lane_review_round{1,2,3}.out.
+
+Final state:
+- mdbook build + mdbook test PASS.
+- 7 tutorial pages with runnable code + smoke tests.
+- 16 tool cookbook pages; all 16 success Response examples validate against docs/json-schemas/*.output.json (Draft-07, verified with jsonschema).
+- 26 ErrorKind pages (1:1 with enum); snake_case wire `kind` + retryable field per all_error_kind_docs().
+- 2 migration pages (Crawl4AI, Playwright MCP) side-by-side; schema-accurate args.
+- docs/landscape.md authoritative + docs/book/src/en/landscape.md byte-identical; 8 competitors incl. Puppeteer + Scrapling; ≥1 losing-cell-per-row invariant; Q3-2026 timestamp + quarterly checklist.
+- .github/workflows/docs.yml mdBook + rustdoc(--document-private-items, best-effort) → GH Pages; one-time Settings→Pages enable documented inline.
+
+Operator-approved descopes: mdbook-i18n-helpers PO i18n → v1.4 Lane O (EN+JA parallel trees + visible toggle in v1.3); gen_reference fragment-gen descoped; warn(missing_docs) on stealth-sanitize deferred (Lane K).
+
+Score each axis 0-10 with 1-3 line rationale. Return:
+| 軸 | スコア | 根拠 |
+overall = X.XX (weighted)
+verdict: PASS (≥9.0) | FAIL (<9.0)
+deltas to reach 9.0 if FAIL: bullets.
+Text only.
+
+2026-05-22T20:37:03.053617Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+2026-05-22T20:37:03.136929Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+codex
+参照された ExecPlan、rubric、Lane J の3ラウンドレビューを確認して、提示された final state と照合したうえで採点します。
+exec
+/bin/bash -lc "sed -n '1,240p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
+ succeeded in 0ms:
+# v1.3 Quality Bar — Dual 9/10 Convergence Protocol
+
+**Mandate (user, 2026-05-23)**: Opus 4.7-xhigh と Codex gpt-5.5-xhigh の **両方が 10 点中 9 点以上を出すまで** 各 Lane を反復する。
+
+## 評価プロトコル
+
+Lane の coder driver が LGTM (binary) で sub-phase 完走した後、**追加で graded review** を実施:
+
+1. Lane driver の完走報告を `.agent/active/reviews/v1_3_<lane>_final.md` として保存
+2. **Opus 4.7-xhigh scoring agent** を独立 dispatch — Lane 成果物を 7 軸で採点
+3. **Codex gpt-5.5-xhigh scoring** を canonical wrapper 経由で同じ rubric で採点
+4. **両方が ≥ 9.0** で合格、Lane 完了
+5. どちらか < 9.0 → 採点者の指摘を集約 → fix driver dispatch → 再採点
+6. 最大 3 ラウンドの scoring (3 回 fix で 9/10 取れなければ narrow stop で operator escalate)
+
+## Scoring rubric (7 軸 × 10 点満点)
+
+Lane 共通の評価軸。各軸 0-10 で採点、平均が overall score。
+
+### 軸 A: Acceptance criteria 充足度 (重み 2.0)
+- ExecPlan に書かれた各 sub-phase の acceptance criteria を機械的に検証
+- 全 criteria PASS → 10、半分 PASS → 5、未着手 → 0
+
+### 軸 B: 外部 verifiable / CI gate / adversarial test の 3 原則 (重み 1.5)
+- Plan A §0.2 由来。「gameable な 9/10」排除原則
+- 3 原則 ≥ 2 で 10、1 で 5、0 で 0
+
+### 軸 C: 競合比較で勝つか (重み 1.5)
+- ripgrep / fd / gh / wrangler / Crawl4AI / Browserless と並べたとき同等以上か
+- Lane G なら CLI UX、Lane H なら配布、Lane I なら semver discipline、Lane J なら docs、Lane K なら quality infra
+- 「明確に勝つ」→ 10、「同等」→ 7、「劣後」→ 3
+
+### 軸 D: AI エージェント開発者体験 (重み 2.0)
+- Claude Code / Cursor / Hermes ユーザが evaluate して reject しないか
+- JSON output / error envelope / idempotency / discoverability などが体験良く揃ってるか
+- 「最初に試すべき」レベル → 10、「使える」→ 7、「習熟前提」→ 4
+
+### 軸 E: 1 年後の負債回避 (重み 1.0)
+- 採用技術が 1 年後も maintain されているか
+- 設定ファイルや schema の breaking change リスク
+- CI / dependency が腐る速度
+- 安心 → 10、要注意点あり → 6、明確な負債 → 3
+
+### 軸 F: テスト + evidence の質 (重み 1.0)
+- 機械検証可能な test (proptest / fuzz / golden / integration) の量と質
+- 単なる happy-path test は 5、edge case + adversarial で 10
+- evidence (artifacts, logs, screenshots) の保存有無
+
+### 軸 G: ドキュメント完全性 (重み 1.0)
+- Lane 成果物が次の人 (operator / contributor / reviewer) が読んで理解可能か
+- ADR / RELEASE_NOTES 反映 / README / mdBook 整合性
+- 「次の人にハンドオフ可能」→ 10、「自分しか分からない」→ 3
+
+## 計算式
+
+```
+overall = (A*2.0 + B*1.5 + C*1.5 + D*2.0 + E*1.0 + F*1.0 + G*1.0) / 10.0
+合格: Opus overall ≥ 9.0 AND Codex overall ≥ 9.0
+```
+
+両者の score 差が 1.5 を超えた場合、disagreement reason を文書化、tie-break は operator。
+
+## Lane 別の追加軸 (rubric 上書き、上記 7 軸の D を再解釈)
+
+| Lane | D の特化 |
+|------|---------|
+| G — CLI UX 黒帯化 | 「ripgrep ファンが好む」+ 「Claude Code から `--output-format json` で安全に pipe できる」|
+| H — 配布距離ゼロ | 「`brew install rev-stealth` を 60 秒で実行できる」+「SBOM/cosign で supply-chain 監査可能」|
+| I — API stability | 「semver 違反が PR レベルで止まる」+「deprecation policy が機械可読」|
+| J — Agent-First docs | 「`docs/.../tutorial/05-claude-code.md` 通りで 5 分で動く」+「26 ErrorKind 全て個別解説」|
+| K — Quality moat | 「coverage 80%+ / fuzz nightly / cross-platform 4 matrix / SBOM/sigstore」|
+
+## Scoring agent への prompt 雛形
+
+```
+あなたは <Opus 4.7-xhigh | Codex gpt-5.5-xhigh> の v1.3 Lane <X> scoring 担当。
+
+Lane 成果物: <driver report path>
+Rubric: .agent/active/v1_3_quality_bar.md の 7 軸 (A-G)
+ExecPlan 参照: .agent/active/v1_3_uplift_execplan_rev1.md Lane <X>
+ベースライン: v1.2.0 (commit b2153aa0)
+
+各軸を 0-10 で採点、根拠を 1-3 行で記述。
+最後に overall score (重み付き平均) を出して、< 9.0 なら具体的な「9 にするための差分」を箇条書き。
+
+形式:
+| 軸 | スコア | 根拠 |
+|---|---|---|
+| A | X.X | ... |
+...
+overall = X.XX
+
+verdict: PASS (≥ 9.0) | FAIL (< 9.0)
+deltas to reach 9.0: <none | bullet list>
+```
+
+## Scoring loop ターミネーション
+
+- max 3 fix round per lane
+- 3 round で両者 9/10 未達 → narrow stop + operator escalation (v1.3.0 として ship するか、v1.3.0-rc1 で出して soak するか判断)
+- 両者 ≥ 9.0 で初回合格は理想だが現実的には 1-2 fix round 想定
+
+## Evidence 保存
+
+- Scoring prompts: `.agent/active/scoring/v1_3_<lane>_score_round{1,2,3}_<opus|codex>.md`
+- Scoring responses: `.agent/active/scoring/v1_3_<lane>_score_round{1,2,3}_<opus|codex>.out`
+- Final convergence record: `.agent/active/scoring/v1_3_<lane>_convergence.md` (両者の最終 score + delta history)
+
+## Operator visibility
+
+各 lane の Pass/Fail と差分は `.agent/active/v1_3_progress.md` (ダッシュボード markdown) に集約、operator は 1 ファイル見れば全 lane 進捗を把握可能。
+
+ succeeded in 0ms:
+# v1.3 Uplift ExecPlan — "Black-Belt CLI" Release
+
+**Status**: GO (user approved synthesis)
+**Baseline**: v1.2.0 (commit b2153aa0, 776 PASS / 0 fail / 38 ignored)
+**Target**: 2026 Q3, ~5-7 calendar weeks (solo @ ~25 h/week)
+**Synthesis sources**:
+- `v1_3_plan_a_opus_raw.md` (Opus 4.7-xhigh, 54.5 dev-day realistic)
+- `v1_3_plan_b_codex_raw.md` (Codex gpt-5.5-xhigh, 50-139 dev-day)
+- User pivot 2026-05-22: "CLI ツールとして権威 / AI エージェント開発者向け / CLI UX 黒帯化"
+
+## Positioning
+
+> v1.3 ships the **de-facto CLI for AI agents that scrape**. The reference
+> users are Claude Code / Cursor / Hermes operators who need to spawn an MCP
+> server and a CLI in one motion. Everything in v1.3 is judged against:
+> *"would a sophisticated AI agent developer pick this CLI over Crawl4AI /
+> Playwright MCP without hesitation?"*
+
+Stealth tier-2 (TLS/H2/H3 fingerprinting) and Crypto tier-2 (TPM2/FIDO2/audit chain)
+are explicit v1.4+ scope. Both add no immediate value for the v1.3 target user.
+
+## Lane G — CLI UX Black-Belt (the headline)
+
+The new lane neither Plan A nor Plan B proposed, anchored to the user's pivot.
+Targets: every comparison axis ripgrep / fd / gh / wrangler win on.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| G.1 | CLI public surface inventory + naming consistency review (`rev-stealth <noun> <verb>` shape) | 0.6 | `.agent/v1.3/cli-surface.json` machine-readable; review note in PR |
+| G.2 | All sub-command `--help` upgraded to dictionary quality (description + 1-3 examples + exit codes + env vars consumed) | 1.0 | `cargo test --test help_dictionary_quality` PASS; CI lint blocks regressions |
+| G.3 | Shell completion auto-gen for bash / zsh / fish / nushell + CI completion-drift gate | 0.7 | `target/completions/*` committed; CI fails on stale |
+| G.4 | `--output-format {json\|yaml\|text}` on every sub-command + per-command JSON schema in `docs/json-schemas/cli/` | 0.8 | Each command's JSON output validates against schema; integration test |
+| G.5 | `--dry-run` and `--explain` on every mutating sub-command | 0.7 | mutating commands enumerated; integration test ensures no FS / network side effect under --dry-run |
+| G.6 | Idempotent-commit semantics: same input + same `--idempotency-key` returns identical output, no duplicate write | 0.8 | proptest 50-iter; `rev-stealth auth login --idempotency-key X` twice = 1 audit entry |
+| G.7 | Unified error output template: `{kind, message, hint, retry_after_ms?, doc_url}` everywhere (matches ErrorEnvelope) | 0.6 | regression test: every error path emits all required fields; doc-url resolves |
+| G.8 | man page (mdoc/roff) auto-generated; `man rev-stealth` + `man rev-stealth-spider` available after `make install` | 0.5 | `man rev-stealth-spider \| col -bx \| grep -c '\.SH'` ≥ 6 (NAME/SYNOPSIS/DESCRIPTION/OPTIONS/EXAMPLES/EXIT STATUS) |
+
+**Lane G total: 5.7 dev-day**
+
+## Lane H — Distribution to zero-distance
+
+Take from Plan A axis 2 sub-phases 2.1-2.6 + 2.16; drop IaC (2.7-2.8) and observability
+(2.9-2.11) to v1.4.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| H.1 | Homebrew tap `sasuketorii/homebrew-rev-stealth` + formula | 0.5 | `brew tap sasuketorii/rev-stealth && brew install rev-stealth` works on macOS arm64 + x86_64 |
+| H.2 | `cargo-deb` setup → Debian 12 / Ubuntu 22.04+24.04 build matrix | 0.7 | `.deb` artifact on GH release; `dpkg -i` installs to /usr/local/bin |
+| H.3 | `cargo-generate-rpm` → RHEL 9 / Fedora 41 | 0.5 | `.rpm` artifact; `rpm -i` installs |
+| H.4 | Distroless multi-arch OCI image (amd64+arm64), Chromium separated | 0.9 | `docker pull ghcr.io/sasuketorii/rev-stealth:v1.3.0`; `trivy image --severity HIGH,CRITICAL --exit-code 1` PASS |
+| H.5 | `cargo install rev-stealth` via crates.io publish (workspace member publish-permission check) | 0.6 | `cargo install --locked rev-stealth` works fresh; LICENSE / README on crates.io |
+| H.6 | `curl \| sh` installer + sigstore cosign signing + SLSA L3 build provenance attestation via `actions/attest-build-provenance` | 0.7 | `cosign verify-blob --certificate-identity=...` PASS; SLSA L3 verifier passes |
+| H.7 | `release-please` automation (tag → matrix build → SBOM → cosign → GH release) | 0.8 | one-tag release: deb+rpm+brew+OCI+cargo all populated in single workflow run |
+
+**Lane H total: 4.7 dev-day**
+
+## Lane I — API stability & semver
+
+Plan A 2.14-2.15 + Lane I from my pre-pivot draft.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| I.1 | CLI public surface machine-readable snapshot (every flag, every env var, every output field) | 0.4 | `.agent/v1.3/cli-public-api.snapshot.json` committed |
+| I.2 | `cargo-public-api` PR gate (workspace member crates) | 0.4 | PR adds new pub item → CI requires label `api-additive` or `api-breaking` |
+| I.3 | `docs/compat.md` semver policy: MCP schema = 2-major guarantee / CLI flag = 1-major / internal types = no guarantee | 0.4 | document committed; linked from README |
+| I.4 | `CHANGELOG.md` keep-a-changelog format + automation hook from `release-please` | 0.3 | machine-parseable; CI verifies on every PR |
+| I.5 | MCP tool schema breaking-change detector (extend `mcp-schema-lint`) | 0.5 | schema change in `tools.rs` → fail unless `mcp-schema-breaking` label |
+| I.6 | `#[deprecated(...)]` lint customization: forces `since`, `note`, and `replace_with` populated | 0.4 | clippy custom lint denies missing fields |
+
+**Lane I total: 2.4 dev-day**
+
+## Lane J — Agent-First documentation
+
+Plan A axis 5 (subset), reframed for AI-agent-dev audience.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| J.1 | `mdbook` scaffold (`docs/book/`) + `mdbook-i18n-helpers` + GH Pages deploy on tag push | 0.5 | https://sasuketorii.github.io/rev_scraping/ live, EN+JA toggle |
+| J.2 | Quickstart 7-step tutorial (local → recipe → profile → VPN → Claude Code → Hermes → VPS) | 1.0 | `mdbook test` PASS; each step has runnable code block (stub OK for VPN/Hermes) |
+| J.3 | 16 MCP tool × cookbook: real JSON-RPC request + response + failure example per tool | 1.0 | 16 sub-pages under `docs/book/src/tools/`; each shows happy path + 1 error variant |
+| J.4 | Migration guide: Crawl4AI MCP → rev_scraping; Playwright MCP → rev_scraping | 0.6 | 2 sub-pages with side-by-side examples |
+| J.5 | `rustdoc --document-private-items` GH Pages auto-publish + `#![warn(missing_docs)]` (warning only first, gate later) | 0.5 | https://sasuketorii.github.io/rev_scraping/api/ live |
+| J.6 | 26 ErrorKind individual troubleshooting pages (reproduction code + fix + related Issues) | 0.8 | 26 sub-pages; each has 3 sections |
+| J.7 | `docs/landscape.md` competitive matrix with Q3-2026 timestamp (Playwright / Puppeteer / Crawl4AI / Browserless / Scrapling / Bright Data / obscura) — refresh quarterly | 0.4 | committed; rev_scraping has at least 1 "losing" cell per row (humble baseline) |
+
+**Lane J total: 4.8 dev-day**
+
+## Lane K — Quality moat
+
+Plan A axis 4 essentials + Plan B J essentials, no overreach.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| K.1 | `cargo-llvm-cov` CI job; soft gate at 80% line / 70% branch for v1.3, hardened to 85% / 75% in v1.4 | 0.5 | CI artifact; PR comment with delta |
+| K.2 | `cargo-deny` + `cargo-audit` + `cargo-msrv verify` three-point CI gate | 0.5 | `deny.toml` extended (license allowlist, banned-crates, advisory deny); failures block merge |
+| K.3 | `#![forbid(unsafe_code)]` on every crate root; `obscura-bridge` exempted with `#![deny(unsafe_op_in_unsafe_fn)]` + SAFETY doc lint | 0.4 | grep verification CI step; SAFETY doc check on every unsafe block |
+| K.4 | proptest expansion: stealth-auth (envelope roundtrip + AAD mismatch) + stealth-agent-contracts (UUID v4 + IdempotencyKey + RateLimiter) + vpn-rotate (rotation invariants) | 0.8 | each crate has ≥1 prop test; 256 iter standard / 1024 iter nightly |
+| K.5 | `cargo-fuzz` 3 targets: `sanitize::layer4_unicode::normalize`, `sanitize::layer2_envelope::parse`, MCP JSON-RPC frame parser | 0.7 | targets build; nightly GH cron 1h/day; crash artifacts pinned as seed |
+| K.6 | Cross-platform CI matrix: Linux x86_64 + Linux aarch64 (QEMU) + macOS x86_64 + macOS arm64 | 0.6 | `cargo test --release` PASS on all 4 |
+| K.7 | criterion benchmarks on 5 hot paths (sanitize walk / canary scan / AAD encrypt-decrypt / MCP dispatch / recipe load) + per-PR diff via `bencher.dev` | 0.6 | regression > 10% triggers PR comment + label |
+| K.8 | SBOM (CycloneDX) + sigstore cosign sign-blob + SLSA L3 attestation (deduplicate with H.6 — both share infra) | 0.3 (shared) | `.spdx.json` + `.cdx.json` attached to GH release |
+
+**Lane K total: 4.4 dev-day**
+
+## Critical-path & schedule
+
+| Lane | Internal critical path | dev-day |
+|------|-----------------------|---------|
+| G    | G.1 → G.2 → G.7       | 2.2 |
+| H    | H.2 → H.7             | 1.5 |
+| I    | I.1 → I.2 → I.5       | 1.3 |
+| J    | J.1 → J.2 → J.3       | 2.5 |
+| K    | K.4 → K.5             | 1.5 |
+
+**Global critical path: Lane J (J.1 → J.2 → J.3) ≈ 2.5d**
+
+Sub-phase total: **35**. dev-day total: **22.0** (sum) — Opus realistic-equivalent
+**~28 dev-day** when adding integration / review overhead. Solo at 25 h / week = **5-6 weeks**.
+
+**Lane dependencies** (mostly independent):
+- H.6 ↔ K.8 share SBOM/cosign infra (do once, reference twice)
+- I.5 ↔ K.6 share `cargo-public-api` (define once)
+- G.4 ↔ J.3 ↔ I.5: JSON output schema is the cross-cut spec; G.4 produces schema, J.3 documents, I.5 gates breaking changes
+
+Recommended execution: dispatch all 5 lanes in parallel (one driver per lane,
+same Opus-coder × Codex-reviewer loop as v1.2.0). Mid-week sync to resolve the
+3 cross-cut points above.
+
+## Acceptance summary for v1.3.0 cut
+
+A reviewer who picks up rev_scraping at v1.3.0 must be able to:
+
+1. **Install in < 60 s**: `brew install rev-stealth` OR `cargo install rev-stealth` OR `curl ... | sh`
+2. **Discover via help**: `rev-stealth --help` shows dictionary-quality output with examples
+3. **Pipe to jq**: every command supports `--output-format json` with a published schema
+4. **Diff before commit**: `rev-stealth config set --dry-run` shows what would change
+5. **Safe to retry**: same `--idempotency-key` produces identical output
+6. **Read the man page**: `man rev-stealth`
+7. **Integrate with Claude Code in 5 min** following `docs/book/.../tutorial/05-claude-code.md`
+8. **Trust the supply chain**: SBOM + cosign-verified release artifact
+9. **Confidence in semver**: `docs/compat.md` + `cargo-public-api` snapshot
+10. **Read in their language**: EN + JA mdBook live on GH Pages
+
+## v1.4+ backlog (explicit)
+
+- **Lane L — Stealth tier-2**: boring-sys + JA4/JA3 + H2 SETTINGS + HTTP/3 + CreepJS bench + Cloudflare/DataDome fixture (Plan A axis 3 / 11.5-25 dev-day)
+- **Lane M — Crypto tier-2**: TPM2 sealed KEK + FIDO2 hmac-secret + HMAC-chain audit + external cryptographer review (Plan A axis 1 / 10-14 dev-day; review lead time +2-4 weeks)
+- **Lane N — IaC + observability**: Ansible role + Terraform module + Prometheus exporter + Grafana dashboard + OTel (Plan A 2.7-2.11 / 4.6 dev-day)
+- **Lane O — i18n + Playground**: zh-Hans + ko translation + WASM sanitize playground + video walkthrough (Plan A 5.8-5.11 / 2.5 dev-day)
+- **Lane P — Mutation testing + Chaos**: cargo-mutants on security crates + chaos test for VPN tunnel drop / Chromium SIGKILL (Plan A 4.13/4.17 / 1.6 dev-day)
+
+## Risks & mitigations
+
+| Risk | Lane | Mitigation |
+|------|------|------------|
+| `crates.io` publish requires legal name on author field — author check | H.5 | Verify Cargo.toml authors field before publish |
+| Homebrew tap audit requirements (no curl-pipe-bash inside formula) | H.1 | Formula uses GitHub release URL directly |
+| Distroless image breaks if Chromium needs glibc deps | H.4 | Chromium runs in separate image; rev-stealth binary is static (musl) |
+| `mdbook` GH Pages requires Pages enabled in repo settings | J.1 | One-time manual step; documented in workflow file |
+| `cargo-public-api` snapshot churn over normal refactors | I.2 | Use `--simplified` flag; auto-bless on label `api-additive-ok` |
+| QEMU aarch64 CI 5-10x slower | K.6 | aarch64 runs nightly-only; per-PR is x86_64 + macOS |
+| Solo developer 5-6 week sprint fatigue | all | Lane G+I+J can ship as v1.3.0-beta first (4 weeks), Lane H+K as v1.3.0 GA (+2 weeks) |
+
+## Reviewer assignment
+
+| Lane | Reviewer | Why |
+|------|----------|-----|
+| G | Codex (gpt-5.5-high) + ripgrep/fd/gh CLI style reference | Codex understands clap semantics; cross-reference de-facto Rust CLI conventions |
+| H | Codex + Homebrew formula audit checklist | Mechanical: each artifact builds + signs + installs |
+| I | Codex with semver semantic guide | `cargo-public-api` diffs are mechanical |
+| J | Codex (structure) + Opus (narrative voice) for tutorial copy | Codex for code-block correctness, Opus for readability |
+| K | Codex for proptest / fuzz target design | proptest strategies and fuzz harnesses are well-suited to Codex review |
+
+All reviewer invocations use `./scripts/codex-wrapper.sh --role reviewer --stdin`
+(canonical wrapper, raw `codex exec` prohibited per RevHarness §16.8/§16.9).
+Slice ≤ 2 KB, max 3 review rounds per slice.
+
+## Evidence trail
+
+- `.agent/active/prompts/v1_3_g[1-8]_review[_round{2,3}].md` (Lane G)
+- `.agent/active/prompts/v1_3_h[1-7]_review*.md` (Lane H)
+- `.agent/active/prompts/v1_3_i[1-6]_review*.md` (Lane I)
+- `.agent/active/prompts/v1_3_j[1-7]_review*.md` (Lane J)
+- `.agent/active/prompts/v1_3_k[1-8]_review*.md` (Lane K)
+- Reviewer responses: `.agent/active/reviews/v1_3_*.out`
+- `REV_HARNESS_DELEGATION_METRIC` line emitted per round (CI ingests for telemetry)
+
+## v1.3.0 release-cut criteria
+
+- Workspace test: 776 → projected **~870 PASS** (sanitize prop + new lane tests)
+- Python (Hermes): 20 PASS (unchanged in v1.3, may rise with J.3 cookbook tests)
+- Critical CI gates green: cargo test / clippy / fmt / mcp-schema-lint /
+  config-cli-smoke / hermes-contract / systemd-analyze / **new**: completion-drift /
+  cargo-public-api / cargo-deny / cargo-llvm-cov / criterion-bench
+- Tag `v1.3.0` after 24-72 h soak with `rev-stealth-doctor.timer` clean run
+- Update RELEASE_NOTES_v1.3.0.md (CLI-authority framing) + README badge bump
+- Push to GitHub + announce on r/rust + Hacker News (optional)
+
+---
+
+## Decision log
+
+| Decision | Why | Source |
+|----------|-----|--------|
+| Defer stealth tier-2 to v1.4 | User pivot: CLI authority for AI dev priority over fingerprint arms race | User 2026-05-22 |
+| Defer crypto tier-2 to v1.4 | External cryptographer review lead time (2-4w) makes v1.3 cut unpredictable | Plan A §1.6, accepted |
+| Defer IaC to v1.4 | Ansible/Terraform serves SRE, not AI dev audience | User pivot reframing |
+| Defer observability to v1.4 | Prometheus exporter useful but not load-bearing for "CLI authority" | Same |
+| Adopt Lane G (CLI UX black-belt) | Neither Plan A nor Plan B explicitly covered this; user pivot mandated | User 2026-05-22 |
+| Keep critical path < 3 calendar weeks per lane | Solo developer sustainability | Plan A §6.4 + Codex Section 8 |
+| `release-please` over manual release.yml | Reduces release fatigue, ships SBOM/cosign in one workflow | Plan A 2.16 |
+
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/reviews/v1_3_j_lane_review_round2.out" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/reviews/v1_3_j_lane_review_round1.out" in $REPO_ROOT
+ succeeded in 0ms:
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+J.1: CHANGES
+- Scaffold and SUMMARY EN+JA links are OK, but tag Pages deploy is blocked because `.github/workflows/docs.yml` fails in the rustdoc step; see J.5.
+
+J.2: LGTM
+
+J.3: CHANGES
+- Several happy-path JSON-RPC examples do not match `crates/stealth-mcp/src/tools.rs` schemas, e.g. `auth_login_start` uses `site` but requires `profile` + `url`; `relocate` uses `element_id` but requires `stable_id`.
+- Error examples use non-wire `kind` values like `Aup`/`RateLimit`; `ErrorKind` serializes as snake_case.
+
+J.4: LGTM
+
+J.5: CHANGES
+- `crates/stealth-agent-contracts/src/lib.rs` still has `#![deny(missing_docs)]`, overriding the staged `#![warn(missing_docs)]`.
+- `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps --document-private-items` fails on broken intra-doc links in `obscura-bridge`, `vpn-rotate`, and `stealth-mcp`; fallback cargo doc also fails.
+
+J.6: CHANGES
+- All error pages document PascalCase `kind` values and include `doc_url` while omitting required `retryable`; this does not match `ErrorEnvelope { kind, message, retryable, hint, retry_after_ms }`.
+
+J.7: CHANGES
+- `docs/book/src/en/landscape.md` diverges from `docs/landscape.md` and omits the quarterly checklist / current matrix rows.
+- `docs/landscape.md` asserts a losing-cell-per-row invariant, but rows like idempotency, JSON schema, SBOM, 26 errors, and semver are rev_scraping-only wins.
+2026-05-22T20:12:08.979239Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5151-1594-7640-b01c-b2fd5f05268c
+--------
+user
+# Lane J combined reviewer (Codex)
+
+v1.3 ExecPlan: .agent/active/v1_3_uplift_execplan_rev1.md (Lane J).
+Quality bar: .agent/active/v1_3_quality_bar.md.
+
+Acceptance (condensed):
+- J.1: docs/book/ mdbook builds; SUMMARY.md links EN+JA trees; .github/workflows/docs.yml deploys to GH Pages on tag.
+- J.2: 7 tutorial pages docs/book/src/en/tutorial/{01..07}-*.md, each runnable + smoke test.
+- J.3: 16 cookbook pages docs/book/src/en/tools/*.md (matches 16 tools in crates/stealth-mcp/src/tools.rs); each: happy-path JSON-RPC + 1 ErrorEnvelope + outputSchema link.
+- J.4: docs/book/src/en/migration/{from-crawl4ai,from-playwright}.md side-by-side.
+- J.5: docs.yml runs `cargo doc`; #![warn(missing_docs)] applied to crates/stealth-agent-contracts/src/lib.rs only with staged-rollout note.
+- J.6: 26 pages docs/book/src/en/errors/<Variant>.md (matches 26 variants in crates/stealth-agent-contracts/src/error.rs); each has shape+repro+fix+root-causes.
+- J.7: docs/landscape.md Q3-2026 timestamp + quarterly checklist + ≥1 losing cell per row.
+
+Local verification:
+- mdbook build  → PASS
+- mdbook test   → PASS
+
+Scope adjustments (operator-approved):
+- J.3 gen_reference extension descoped (curated content for 16 small pages preferred over library API churn).
+- J.5 warn(missing_docs) on stealth-sanitize deferred (unstaged Lane K changes in tree).
+- J.1 mdbook-i18n-helpers PO i18n deferred to v1.4 Lane O.
+
+Return per sub-phase verdict (LGTM/CHANGES) with ≤3 bullet deltas if CHANGES. Text-only.
+
+2026-05-22T20:12:09.812634Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:12:10.120156Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:12:10.148037Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+Using `staff-code-reviewer` plus `review-workflow` because this is an acceptance review for a RevHarness lane. I’ll read the lane plan and quality bar, then verify the concrete files and checks behind J.1-J.7.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/review-workflow/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/skills/review-workflow/SKILL.md: No such file or directory
+
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc 'git status --short' in $REPO_ROOT
+ succeeded in 0ms:
+ M .github/workflows/ci.yml
+ M .github/workflows/release.yml
+ M .github/workflows/security.yml
+ M Cargo.lock
+ M Cargo.toml
+ M README.md
+ M crates/stealth-agent-contracts/src/lib.rs
+ M crates/stealth-cf/src/lib.rs
+ M crates/stealth-parse/src/lib.rs
+ M crates/stealth-sanitize/Cargo.toml
+ M crates/stealth-sanitize/src/layer2_envelope.rs
+ M crates/stealth-sanitize/src/layer3_canary.rs
+ M crates/stealth-sanitize/src/layer4_unicode.rs
+ M crates/stealth-sanitize/src/layer5_clamp.rs
+ M crates/stealth-sanitize/src/lib.rs
+ M crates/stealth-sanitize/tests/golden_corpus.rs
+?? .agent/active/prompts/v1_3_g1_review.md
+?? .agent/active/prompts/v1_3_g1_review_round2.md
+?? .agent/active/prompts/v1_3_h_plumbing_review.md
+?? .agent/active/prompts/v1_3_i1_review.md
+?? .agent/active/prompts/v1_3_i2_review.md
+?? .agent/active/prompts/v1_3_i3_review.md
+?? .agent/active/prompts/v1_3_i4_review.md
+?? .agent/active/prompts/v1_3_i5_review.md
+?? .agent/active/prompts/v1_3_i6_review.md
+?? .agent/active/prompts/v1_3_j1_review.md
+?? .agent/active/prompts/v1_3_j2_review.md
+?? .agent/active/prompts/v1_3_j3_review.md
+?? .agent/active/prompts/v1_3_j4_review.md
+?? .agent/active/prompts/v1_3_j5_review.md
+?? .agent/active/prompts/v1_3_j6_review.md
+?? .agent/active/prompts/v1_3_j7_review.md
+?? .agent/active/prompts/v1_3_j_lane_review.md
+?? .agent/v1.3/
+?? .dockerignore
+?? .github/workflows/bench.yml
+?? .github/workflows/coverage.yml
+?? .github/workflows/cross-platform-nightly.yml
+?? .github/workflows/docs.yml
+?? .github/workflows/fuzz-nightly.yml
+?? .github/workflows/sbom.yml
+?? .release-please-manifest.json
+?? .trivyignore
+?? CHANGELOG.rev_scraping.md
+?? Dockerfile.distroless
+?? Formula/
+?? crates/rev-stealth-cli/
+?? crates/stealth-cli/tests/deprecated_completeness.rs
+?? crates/stealth-sanitize/benches/
+?? crates/stealth-sanitize/fuzz/
+?? crates/stealth-sanitize/tests/proptest_invariants.rs
+?? docs/book/
+?? docs/compat.md
+?? docs/landscape.md
+?? install.sh
+?? release-please-config.json
+?? scripts/cli-public-api-snapshot.sh
+?? scripts/cli_surface_inventory.py
+?? scripts/mcp-schema-breaking.sh
+?? trivy.yaml
+
+codex
+The repo has a broad dirty tree, including unrelated Lane K-looking changes. I’m keeping this review scoped to Lane J docs/workflow surfaces and will avoid treating unrelated modified files as part of the verdict unless they affect J.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,240p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
+ succeeded in 0ms:
+# v1.3 Quality Bar — Dual 9/10 Convergence Protocol
+
+**Mandate (user, 2026-05-23)**: Opus 4.7-xhigh と Codex gpt-5.5-xhigh の **両方が 10 点中 9 点以上を出すまで** 各 Lane を反復する。
+
+## 評価プロトコル
+
+Lane の coder driver が LGTM (binary) で sub-phase 完走した後、**追加で graded review** を実施:
+
+1. Lane driver の完走報告を `.agent/active/reviews/v1_3_<lane>_final.md` として保存
+2. **Opus 4.7-xhigh scoring agent** を独立 dispatch — Lane 成果物を 7 軸で採点
+3. **Codex gpt-5.5-xhigh scoring** を canonical wrapper 経由で同じ rubric で採点
+4. **両方が ≥ 9.0** で合格、Lane 完了
+5. どちらか < 9.0 → 採点者の指摘を集約 → fix driver dispatch → 再採点
+6. 最大 3 ラウンドの scoring (3 回 fix で 9/10 取れなければ narrow stop で operator escalate)
+
+## Scoring rubric (7 軸 × 10 点満点)
+
+Lane 共通の評価軸。各軸 0-10 で採点、平均が overall score。
+
+### 軸 A: Acceptance criteria 充足度 (重み 2.0)
+- ExecPlan に書かれた各 sub-phase の acceptance criteria を機械的に検証
+- 全 criteria PASS → 10、半分 PASS → 5、未着手 → 0
+
+### 軸 B: 外部 verifiable / CI gate / adversarial test の 3 原則 (重み 1.5)
+- Plan A §0.2 由来。「gameable な 9/10」排除原則
+- 3 原則 ≥ 2 で 10、1 で 5、0 で 0
+
+### 軸 C: 競合比較で勝つか (重み 1.5)
+- ripgrep / fd / gh / wrangler / Crawl4AI / Browserless と並べたとき同等以上か
+- Lane G なら CLI UX、Lane H なら配布、Lane I なら semver discipline、Lane J なら docs、Lane K なら quality infra
+- 「明確に勝つ」→ 10、「同等」→ 7、「劣後」→ 3
+
+### 軸 D: AI エージェント開発者体験 (重み 2.0)
+- Claude Code / Cursor / Hermes ユーザが evaluate して reject しないか
+- JSON output / error envelope / idempotency / discoverability などが体験良く揃ってるか
+- 「最初に試すべき」レベル → 10、「使える」→ 7、「習熟前提」→ 4
+
+### 軸 E: 1 年後の負債回避 (重み 1.0)
+- 採用技術が 1 年後も maintain されているか
+- 設定ファイルや schema の breaking change リスク
+- CI / dependency が腐る速度
+- 安心 → 10、要注意点あり → 6、明確な負債 → 3
+
+### 軸 F: テスト + evidence の質 (重み 1.0)
+- 機械検証可能な test (proptest / fuzz / golden / integration) の量と質
+- 単なる happy-path test は 5、edge case + adversarial で 10
+- evidence (artifacts, logs, screenshots) の保存有無
+
+### 軸 G: ドキュメント完全性 (重み 1.0)
+- Lane 成果物が次の人 (operator / contributor / reviewer) が読んで理解可能か
+- ADR / RELEASE_NOTES 反映 / README / mdBook 整合性
+- 「次の人にハンドオフ可能」→ 10、「自分しか分からない」→ 3
+
+## 計算式
+
+```
+overall = (A*2.0 + B*1.5 + C*1.5 + D*2.0 + E*1.0 + F*1.0 + G*1.0) / 10.0
+合格: Opus overall ≥ 9.0 AND Codex overall ≥ 9.0
+```
+
+両者の score 差が 1.5 を超えた場合、disagreement reason を文書化、tie-break は operator。
+
+## Lane 別の追加軸 (rubric 上書き、上記 7 軸の D を再解釈)
+
+| Lane | D の特化 |
+|------|---------|
+| G — CLI UX 黒帯化 | 「ripgrep ファンが好む」+ 「Claude Code から `--output-format json` で安全に pipe できる」|
+| H — 配布距離ゼロ | 「`brew install rev-stealth` を 60 秒で実行できる」+「SBOM/cosign で supply-chain 監査可能」|
+| I — API stability | 「semver 違反が PR レベルで止まる」+「deprecation policy が機械可読」|
+| J — Agent-First docs | 「`docs/.../tutorial/05-claude-code.md` 通りで 5 分で動く」+「26 ErrorKind 全て個別解説」|
+| K — Quality moat | 「coverage 80%+ / fuzz nightly / cross-platform 4 matrix / SBOM/sigstore」|
+
+## Scoring agent への prompt 雛形
+
+```
+あなたは <Opus 4.7-xhigh | Codex gpt-5.5-xhigh> の v1.3 Lane <X> scoring 担当。
+
+Lane 成果物: <driver report path>
+Rubric: .agent/active/v1_3_quality_bar.md の 7 軸 (A-G)
+ExecPlan 参照: .agent/active/v1_3_uplift_execplan_rev1.md Lane <X>
+ベースライン: v1.2.0 (commit b2153aa0)
+
+各軸を 0-10 で採点、根拠を 1-3 行で記述。
+最後に overall score (重み付き平均) を出して、< 9.0 なら具体的な「9 にするための差分」を箇条書き。
+
+形式:
+| 軸 | スコア | 根拠 |
+|---|---|---|
+| A | X.X | ... |
+...
+overall = X.XX
+
+verdict: PASS (≥ 9.0) | FAIL (< 9.0)
+deltas to reach 9.0: <none | bullet list>
+```
+
+## Scoring loop ターミネーション
+
+ succeeded in 0ms:
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+Overall: CHANGES
+
+J.1: CHANGES
+- `https://sasuketorii.github.io/rev_scraping/` currently returns GitHub Pages 404, so the “live” acceptance is not met.
+- `docs/book/book.toml` explicitly defers `mdbook-i18n-helpers` to v1.4; current EN/JA is parallel sidebar sections, not the requested i18n-helper toggle.
+
+J.2: LGTM
+
+J.3: CHANGES
+- The 16 tool pages still lack concrete success JSON-RPC response examples; they show requests plus generic “response matches outputSchema” prose.
+- `auth_login_complete` and `doctor` failure examples set `retryable:false` for `auth_session_expired` / `vpn_leak`, but both are retryable in `all_error_kind_docs()` and their error pages.
+
+J.4: CHANGES
+- `docs/book/src/en/migration/from-playwright.md` uses invalid `vpn_rotate` args: `country` and `idempotency_key`; current schema accepts `region`/`reason` with `additionalProperties:false`.
+
+J.5: CHANGES
+- `https://sasuketorii.github.io/rev_scraping/api/` currently returns 404.
+- `.github/workflows/docs.yml` runs `cargo doc --workspace --no-deps || true`, not `--document-private-items`.
+
+J.6: LGTM
+
+J.7: CHANGES
+- The matrix omits required competitors `Puppeteer` and `Scrapling`; Scrapling appears only in prose.
+
+Verification: `mdbook build` PASS; `mdbook test` PASS.
+2026-05-22T20:20:56.181298Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5159-20f6-7553-8103-a9506e23e7b1
+--------
+user
+# Lane J round-2 reviewer (Codex)
+
+Round 1 returned CHANGES for J.1/J.3/J.5/J.6/J.7. All findings addressed:
+
+J.1: docs.yml rustdoc step relaxed (best-effort, `|| true`); mdbook build/test still PASS locally.
+J.3: 16 tool pages regenerated with accurate inputSchema args (e.g. relocate: session_id+stable_id; auth_login_start: profile+url); error blocks now use snake_case wire kind (`aup`, `not_found`, `rate_limit`, …) and snake_case `retryable` field. Source: crates/stealth-mcp/src/tools.rs lines 99-515.
+J.5: removed redundant `#![warn(missing_docs)]` line; the crate already had `#![deny(missing_docs)]` at line 20. Rollout note rewritten to reflect current state (stealth-agent-contracts is the first crate at deny-bar; stealth-sanitize next once Lane K settles).
+J.6: 26 error pages regenerated with correct ErrorEnvelope shape: `kind` is snake_case wire_name, `retryable` field present, `retry_after_ms` only on retryable variants, `doc_url` documented as MCP-layer-injected.
+J.7: matrix rewritten with bold cells per row marking ≥ 1 rev_scraping loss/tie per row; docs/landscape.md authoritative + docs/book/src/en/landscape.md is a byte-identical sync (cp at generation time). Quarterly checklist present in both.
+
+Local verification:
+- cd docs/book && mdbook build → PASS
+- cd docs/book && mdbook test  → PASS (after marking `rust,ignore` on the ErrorEnvelope code block)
+
+Re-verify against .agent/active/v1_3_uplift_execplan_rev1.md Lane J acceptance.
+Return per-sub-phase verdict (LGTM | CHANGES) with ≤2 bullets if CHANGES.
+Text-only response.
+
+2026-05-22T20:20:56.998055Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:20:57.205655Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:20:57.252640Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+I’ll use `staff-code-reviewer` for the review posture and the Phase 2 `review-workflow` only as far as it defines acceptance/evidence expectations. I’m going to read the Lane J acceptance text first, then inspect the touched docs/code and rerun the relevant checks.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
+
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc "rg -n \"Lane J|J\\.1|J\\.3|J\\.5|J\\.6|J\\.7|landscape|ErrorEnvelope|stealth-agent-contracts|docs.yml\" .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
+ succeeded in 0ms:
+35:| G.7 | Unified error output template: `{kind, message, hint, retry_after_ms?, doc_url}` everywhere (matches ErrorEnvelope) | 0.6 | regression test: every error path emits all required fields; doc-url resolves |
+72:## Lane J — Agent-First documentation
+78:| J.1 | `mdbook` scaffold (`docs/book/`) + `mdbook-i18n-helpers` + GH Pages deploy on tag push | 0.5 | https://sasuketorii.github.io/rev_scraping/ live, EN+JA toggle |
+80:| J.3 | 16 MCP tool × cookbook: real JSON-RPC request + response + failure example per tool | 1.0 | 16 sub-pages under `docs/book/src/tools/`; each shows happy path + 1 error variant |
+82:| J.5 | `rustdoc --document-private-items` GH Pages auto-publish + `#![warn(missing_docs)]` (warning only first, gate later) | 0.5 | https://sasuketorii.github.io/rev_scraping/api/ live |
+83:| J.6 | 26 ErrorKind individual troubleshooting pages (reproduction code + fix + related Issues) | 0.8 | 26 sub-pages; each has 3 sections |
+84:| J.7 | `docs/landscape.md` competitive matrix with Q3-2026 timestamp (Playwright / Puppeteer / Crawl4AI / Browserless / Scrapling / Bright Data / obscura) — refresh quarterly | 0.4 | committed; rev_scraping has at least 1 "losing" cell per row (humble baseline) |
+86:**Lane J total: 4.8 dev-day**
+97:| K.4 | proptest expansion: stealth-auth (envelope roundtrip + AAD mismatch) + stealth-agent-contracts (UUID v4 + IdempotencyKey + RateLimiter) + vpn-rotate (rotation invariants) | 0.8 | each crate has ≥1 prop test; 256 iter standard / 1024 iter nightly |
+112:| J    | J.1 → J.2 → J.3       | 2.5 |
+115:**Global critical path: Lane J (J.1 → J.2 → J.3) ≈ 2.5d**
+123:- G.4 ↔ J.3 ↔ I.5: JSON output schema is the cross-cut spec; G.4 produces schema, J.3 documents, I.5 gates breaking changes
+159:| `mdbook` GH Pages requires Pages enabled in repo settings | J.1 | One-time manual step; documented in workflow file |
+183:- `.agent/active/prompts/v1_3_j[1-7]_review*.md` (Lane J)
+191:- Python (Hermes): 20 PASS (unchanged in v1.3, may rise with J.3 cookbook tests)
+
+codex
+The skill path listed in the session metadata is stale on disk, so I’ll fall back to the project’s review invariants already provided in `AGENTS.md` and keep the review focused on blocking findings against Lane J acceptance.
+exec
+/bin/bash -lc "sed -n '68,88p' .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
+ succeeded in 0ms:
+| I.6 | `#[deprecated(...)]` lint customization: forces `since`, `note`, and `replace_with` populated | 0.4 | clippy custom lint denies missing fields |
+
+**Lane I total: 2.4 dev-day**
+
+## Lane J — Agent-First documentation
+
+Plan A axis 5 (subset), reframed for AI-agent-dev audience.
+
+| ID | Sub-phase | dev-day | Acceptance |
+|----|-----------|---------|------------|
+| J.1 | `mdbook` scaffold (`docs/book/`) + `mdbook-i18n-helpers` + GH Pages deploy on tag push | 0.5 | https://sasuketorii.github.io/rev_scraping/ live, EN+JA toggle |
+| J.2 | Quickstart 7-step tutorial (local → recipe → profile → VPN → Claude Code → Hermes → VPS) | 1.0 | `mdbook test` PASS; each step has runnable code block (stub OK for VPN/Hermes) |
+| J.3 | 16 MCP tool × cookbook: real JSON-RPC request + response + failure example per tool | 1.0 | 16 sub-pages under `docs/book/src/tools/`; each shows happy path + 1 error variant |
+| J.4 | Migration guide: Crawl4AI MCP → rev_scraping; Playwright MCP → rev_scraping | 0.6 | 2 sub-pages with side-by-side examples |
+| J.5 | `rustdoc --document-private-items` GH Pages auto-publish + `#![warn(missing_docs)]` (warning only first, gate later) | 0.5 | https://sasuketorii.github.io/rev_scraping/api/ live |
+| J.6 | 26 ErrorKind individual troubleshooting pages (reproduction code + fix + related Issues) | 0.8 | 26 sub-pages; each has 3 sections |
+| J.7 | `docs/landscape.md` competitive matrix with Q3-2026 timestamp (Playwright / Puppeteer / Crawl4AI / Browserless / Scrapling / Bright Data / obscura) — refresh quarterly | 0.4 | committed; rev_scraping has at least 1 "losing" cell per row (humble baseline) |
+
+**Lane J total: 4.8 dev-day**
+
+## Lane K — Quality moat
+
+exec
+/bin/bash -lc "find /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime -maxdepth 3 -name SKILL.md | rg 'staff|review-workflow'" in $REPO_ROOT
+ exited 1 in 0ms:
+exec
+/bin/bash -lc 'git status --short' in $REPO_ROOT
+ succeeded in 0ms:
+A  .agent/v1.3/cli-public-api.snapshot.json
+ M .github/workflows/ci.yml
+ M .github/workflows/release.yml
+ M .github/workflows/security.yml
+ M Cargo.lock
+ M Cargo.toml
+ M README.md
+ M crates/stealth-agent-contracts/src/lib.rs
+ M crates/stealth-cf/src/lib.rs
+ M crates/stealth-parse/src/lib.rs
+ M crates/stealth-sanitize/Cargo.toml
+ M crates/stealth-sanitize/src/layer2_envelope.rs
+ M crates/stealth-sanitize/src/layer3_canary.rs
+ M crates/stealth-sanitize/src/layer4_unicode.rs
+ M crates/stealth-sanitize/src/layer5_clamp.rs
+ M crates/stealth-sanitize/src/lib.rs
+ M crates/stealth-sanitize/tests/golden_corpus.rs
+?? .agent/active/prompts/v1_3_g1_review.md
+?? .agent/active/prompts/v1_3_g1_review_round2.md
+?? .agent/active/prompts/v1_3_g1_review_round3.md
+?? .agent/active/prompts/v1_3_h_plumbing_review.md
+?? .agent/active/prompts/v1_3_h_plumbing_review_round2.md
+?? .agent/active/prompts/v1_3_i1_review.md
+?? .agent/active/prompts/v1_3_i1_review_round2.md
+?? .agent/active/prompts/v1_3_i2_review.md
+?? .agent/active/prompts/v1_3_i3_review.md
+?? .agent/active/prompts/v1_3_i4_review.md
+?? .agent/active/prompts/v1_3_i5_review.md
+?? .agent/active/prompts/v1_3_i6_review.md
+?? .agent/active/prompts/v1_3_j1_review.md
+?? .agent/active/prompts/v1_3_j2_review.md
+?? .agent/active/prompts/v1_3_j3_review.md
+?? .agent/active/prompts/v1_3_j4_review.md
+?? .agent/active/prompts/v1_3_j5_review.md
+?? .agent/active/prompts/v1_3_j6_review.md
+?? .agent/active/prompts/v1_3_j7_review.md
+?? .agent/active/prompts/v1_3_j_lane_review.md
+?? .agent/active/prompts/v1_3_j_lane_review_round2.md
+?? .agent/v1.3/cli-naming-lint.json
+?? .agent/v1.3/cli-surface-review.md
+?? .agent/v1.3/cli-surface.json
+?? .dockerignore
+?? .github/workflows/bench.yml
+?? .github/workflows/coverage.yml
+?? .github/workflows/cross-platform-nightly.yml
+?? .github/workflows/docs.yml
+?? .github/workflows/fuzz-nightly.yml
+?? .github/workflows/release-please.yml
+?? .github/workflows/sbom.yml
+?? .release-please-manifest.json
+?? .trivyignore
+?? CHANGELOG.rev_scraping.md
+?? Dockerfile.distroless
+?? Formula/
+?? crates/rev-stealth-cli/
+?? crates/stealth-cli/tests/deprecated_completeness.rs
+?? crates/stealth-sanitize/benches/
+?? crates/stealth-sanitize/fuzz/
+?? crates/stealth-sanitize/tests/proptest_invariants.rs
+?? docs/book/
+?? docs/compat.md
+?? docs/landscape.md
+?? install.sh
+?? release-please-config.json
+?? scripts/cli-public-api-snapshot.sh
+?? scripts/cli_surface_inventory.py
+?? scripts/mcp-schema-breaking.sh
+?? trivy.yaml
+
+codex
+Lane J’s acceptance is mostly documentation shape plus generated examples. I’m checking both the repo wiring and the generated pages for stale schema names, wrong error envelope fields, and the landscape sync claim.
+exec
+/bin/bash -lc "sed -n '1,260p' .github/workflows/docs.yml" in $REPO_ROOT
+ succeeded in 0ms:
+name: Docs (mdBook + rustdoc) → GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install mdBook
+        run: |
+          set -euo pipefail
+          MDBOOK_VERSION=v0.5.3
+          curl -fsSL \
+            "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C /usr/local/bin
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build mdBook
+        working-directory: docs/book
+        run: mdbook build
+
+      - name: Build rustdoc (best-effort; warnings non-blocking in v1.3)
+        # Lane J.5 staged rollout: rustdoc is published as auxiliary reference,
+        # not a release gate. Intra-doc-link warnings in vendored or in-flight
+        # crates do not block the mdBook deploy. Tighten to `-D warnings` in
+        # v1.4 once every workspace crate has reached the
+        # `#![deny(missing_docs)]` bar (currently only stealth-agent-contracts).
+        run: cargo doc --workspace --no-deps || true
+
+      - name: Assemble Pages payload
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R target/book/* _site/
+
+exec
+/bin/bash -lc "sed -n '1,260p' .agent/active/reviews/v1_3_j_lane_review_round3.out" in $REPO_ROOT
+ succeeded in 0ms:
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+J.1: CHANGES
+- ExecPlan requires `mdbook-i18n-helpers` + EN/JA toggle, but `docs/book/book.toml:7-9` explicitly defers `mdbook-i18n-helpers` to v1.4 and ships parallel trees instead.
+
+J.2: LGTM
+
+J.3: CHANGES
+- Success `Response` bodies still do not match published `outputSchema`: local JSON Schema validation fails for 15/16 tool pages.
+- Example: `recipe_import.md:36` documents `{"imported":1,"skipped":0,"rejected":0}`, but `recipe_import.output.json` requires `imported`, `rejected` as an array, and `total`, with no `skipped`.
+
+J.4: LGTM
+
+J.5: LGTM
+
+J.6: LGTM
+
+J.7: LGTM
+
+Verification rerun: `mdbook build` PASS, `mdbook test` PASS, `cargo doc --workspace --no-deps --document-private-items` PASS with rustdoc warnings.
+2026-05-22T20:29:10.970242Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5160-adbb-7021-bb80-33e3ccc79295
+--------
+user
+# Lane J round-3 reviewer (Codex)
+
+Round-2 CHANGES addressed:
+
+J.1/J.5 GH Pages 404: documented as expected pre-deploy (one-time Settings→Pages
+manual step). Workflow header now carries the deploy precondition. ExecPlan
+"Risks & mitigations" row J.1 already covers this. Live-URL acceptance is
+gated on the repo-settings step, not on workflow content.
+J.3 success examples: all 16 tool pages now show concrete success-response
+JSON-RPC envelopes (Response section), with abridged `text` body matching
+the published outputSchema. Retryable flags now match all_error_kind_docs():
+auth_session_expired:true, vpn_leak:true (etc.).
+J.4 from-playwright.md: vpn_rotate args fixed to region/reason; explanatory
+note added that additionalProperties:false rejects country/idempotency_key.
+J.5 docs.yml: rustdoc step restored to `cargo doc --workspace --no-deps
+--document-private-items` (with fallback to `|| true` so warnings don't
+block deploy — per Lane J.5 staged-rollout policy).
+J.7 landscape.md: Puppeteer + Scrapling columns added (now 8 competitors);
+both copies (docs/landscape.md + docs/book/src/en/landscape.md) re-synced;
+losing-cell-per-row invariant re-verified.
+Also fixed tutorial/04-vpn.md (--region not --country) and tutorial/06-hermes.md
+(region/reason; idempotency_key documented as Hermes-level).
+
+Local verification:
+- cd docs/book && mdbook build → PASS
+- cd docs/book && mdbook test  → PASS
+
+Re-verify against .agent/active/v1_3_uplift_execplan_rev1.md Lane J.
+Return per-sub-phase verdict (LGTM | CHANGES) with ≤2 bullets if CHANGES.
+Text-only.
+
+2026-05-22T20:29:11.768866Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:29:11.977021Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T20:29:12.083395Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+I’ll use the `staff-code-reviewer` skill for this pass and verify Lane J against the exec plan and the files the round-2 notes mention.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+codex
+The first listed path alias I tried was wrong for this checkout; I’m opening the project-local skill copy now.
+exec
+/bin/bash -lc "sed -n '1,220p' $REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ succeeded in 0ms:
+---
+name: "staff-code-reviewer"
+description: "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+source_specialty_file: "docs/roles/reviewer/specialties/staff-code-reviewer.md"
+source_manifest_hash: "eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44"
+canonical_role: "reviewer"
+generated_by: agent-core specialty project
+---
+
+# staff-code-reviewer
+
+This skill is a SELECTION HINT (lens), not a workflow owner. It is a Reviewer lens. Primary invocation is `scripts/codex-wrapper.sh --role reviewer --specialty staff-code-reviewer`. This skill auto-trigger is a discovery hint; primary invocation is the wrapper flag.
+
+## Summary
+
+Find merge-blocking bugs, release risks, regressions, and missing tests with evidence-first review.
+
+Lens type: Reviewer lens
+Canonical source: `docs/roles/reviewer/specialties/staff-code-reviewer.md`
+
+## How to invoke
+
+Reviewer wrapper flag:
+- Primary invocation: `scripts/codex-wrapper.sh --role reviewer --specialty staff-code-reviewer`.
+- The orchestrator selects this specialty before review and records `docs/roles/reviewer/specialties/staff-code-reviewer.md` as the canonical source.
+
+Specialty manifest hash: `eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44`
+
+exec
+/bin/bash -lc "sed -n '1,260p' docs/roles/reviewer/specialties/staff-code-reviewer.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Specialty: Staff Code Reviewer
+
+```json
+{
+  "schema_version": 1,
+  "slug": "staff-code-reviewer",
+  "canonical_role": "reviewer",
+  "allowed_runtime_roles": ["reviewer"],
+  "required_output_sections": ["Findings", "Block Reason", "Residual Risk", "Missing Context", "Verdict"],
+  "matrix_fields_allowed": ["task_class", "schema_profile", "change_surface", "in_scope", "out_of_scope", "required_checks", "evidence_destination", "completion_boundary", "worker_outcome", "review_request_target", "reviewer_verdict", "task_id", "slice_id", "prior_slice_id"],
+  "thin_skill_projection": {
+    "enabled": true,
+    "description_seed": "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+  },
+  "summary_oneline": "Find merge-blocking bugs, release risks, regressions, and missing tests with evidence-first review.",
+  "deprecated_aliases_forbidden": true
+}
+```
+
+## Purpose
+
+This specialty reviews submitted code or diffs for problems that should block PR progress, require pre-release fixes, or require explicit risk acceptance. It prioritizes correctness, security, performance, operational behavior, and meaningful test coverage over style preference. It is a Reviewer narrowing and cannot edit code.
+
+## Canonical Role Authority
+
+This specialty is a narrowing of the `reviewer` canonical role per `docs/roles/reviewer.md`. It does NOT redefine role boundaries or replace canonical authority.
+
+## Allowed Actions
+
+- Read code, diffs, tests, logs, requirements, existing patterns, and handoff evidence.
+- Report bugs, edge cases, regressions, security issues, performance risks, design risks, and missing tests.
+- Suggest concrete fixes and verification steps.
+- Order findings by severity with file, line, symbol, command, or artifact evidence.
+- Issue a matrix-valid verdict only when required evidence and gates are present.
+
+## Forbidden
+
+- Do not edit code.
+- Do not lead with style preferences.
+- Do not issue LGTM unless the Revharness reviewer contract is satisfied.
+- Do not convert review-comment count into `remaining issues: N`.
+- Do not downgrade fail-closed conditions into soft suggestions.
+
+## Required Output Sections
+
+The handoff envelope emitted by this specialty MUST contain these `##` headings in order:
+
+1. Findings
+2. Block Reason
+3. Residual Risk
+4. Missing Context
+5. Verdict
+
+(These names match `required_output_sections` in the manifest above.)
+
+## Findings
+
+Lead with concrete defects, ordered by severity, and include file, line, symbol, command, or artifact evidence. A finding must explain the user-visible, operational, security, or maintainability risk clearly enough for the author to fix it.
+
+## Block Reason
+
+If the verdict blocks progress, name the exact gate, invariant, missing evidence, or regression that blocks it. If nothing blocks progress, state that no blocking reason was found within the reviewed scope.
+
+## Residual Risk
+
+Record risks that remain after the reviewed diff and checks, including out-of-scope areas and assumptions that could invalidate the verdict. Do not convert risk notes into an exact remaining-issues count unless the matrix conditions for exact counts are satisfied.
+
+## Missing Context
+
+List any missing diff, test output, artifact, requirement, or lineage evidence that limits review confidence. If missing context is severe enough to make the request invalid, reflect that in the verdict instead of treating it as a soft note.
+
+## Verdict
+
+Return a matrix-valid reviewer verdict and next-status implication for the request target. `LGTM` is allowed only when the required contract, deterministic checks, and artifact traceability are current for the reviewed scope.
+
+## Common Handoff Block
+
+This specialty uses the canonical handoff envelope per `docs/manual/matrix-vocabulary.json`. Field `handoff_state` (NOT `status`) is the lifecycle field per `_policy.domain_local.handoff_state`.
+
+```yaml
+handoff:
+  role: "reviewer"
+  task_class: "..."
+  schema_profile: "..."
+  handoff_state: "ready_for_next | needs_fix | needs_more_context | blocked"
+  ...
+  specialty_id: "staff-code-reviewer"
+  canonical_role: "reviewer"
+  manifest_hash: "<sha256 from agent-core specialty lint output>"
+```
+
+(See `docs/prompts/_archive/role-operating-templates-v0.md` for the historical full common-handoff-block example.)
+
+codex
+I’m going to anchor the review on the Lane J section of the exec plan first, then sample the generated docs and workflow files against each claimed round-2 fix.
+exec
+/bin/bash -lc "rg -n \"Lane J|J\\.|docs\\.yml|landscape|from-playwright|vpn_rotate|success|GitHub Pages|Pages\" .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
+ succeeded in 0ms:
+72:## Lane J — Agent-First documentation
+78:| J.1 | `mdbook` scaffold (`docs/book/`) + `mdbook-i18n-helpers` + GH Pages deploy on tag push | 0.5 | https://sasuketorii.github.io/rev_scraping/ live, EN+JA toggle |
+79:| J.2 | Quickstart 7-step tutorial (local → recipe → profile → VPN → Claude Code → Hermes → VPS) | 1.0 | `mdbook test` PASS; each step has runnable code block (stub OK for VPN/Hermes) |
+80:| J.3 | 16 MCP tool × cookbook: real JSON-RPC request + response + failure example per tool | 1.0 | 16 sub-pages under `docs/book/src/tools/`; each shows happy path + 1 error variant |
+81:| J.4 | Migration guide: Crawl4AI MCP → rev_scraping; Playwright MCP → rev_scraping | 0.6 | 2 sub-pages with side-by-side examples |
+82:| J.5 | `rustdoc --document-private-items` GH Pages auto-publish + `#![warn(missing_docs)]` (warning only first, gate later) | 0.5 | https://sasuketorii.github.io/rev_scraping/api/ live |
+83:| J.6 | 26 ErrorKind individual troubleshooting pages (reproduction code + fix + related Issues) | 0.8 | 26 sub-pages; each has 3 sections |
+84:| J.7 | `docs/landscape.md` competitive matrix with Q3-2026 timestamp (Playwright / Puppeteer / Crawl4AI / Browserless / Scrapling / Bright Data / obscura) — refresh quarterly | 0.4 | committed; rev_scraping has at least 1 "losing" cell per row (humble baseline) |
+86:**Lane J total: 4.8 dev-day**
+112:| J    | J.1 → J.2 → J.3       | 2.5 |
+115:**Global critical path: Lane J (J.1 → J.2 → J.3) ≈ 2.5d**
+123:- G.4 ↔ J.3 ↔ I.5: JSON output schema is the cross-cut spec; G.4 produces schema, J.3 documents, I.5 gates breaking changes
+142:10. **Read in their language**: EN + JA mdBook live on GH Pages
+159:| `mdbook` GH Pages requires Pages enabled in repo settings | J.1 | One-time manual step; documented in workflow file |
+183:- `.agent/active/prompts/v1_3_j[1-7]_review*.md` (Lane J)
+191:- Python (Hermes): 20 PASS (unchanged in v1.3, may rise with J.3 cookbook tests)
+
+exec
+/bin/bash -lc "rg --files docs .github | rg '(docs\\.yml|landscape\\.md|from-playwright\\.md|04-vpn\\.md|06-hermes\\.md|tools/.+\\.md)"'$'"'" in $REPO_ROOT
+ succeeded in 0ms:
+.github/workflows/docs.yml
+docs/book/src/en/migration/from-playwright.md
+docs/landscape.md
+docs/book/src/en/landscape.md
+docs/book/src/en/tools/cf_evaluate.md
+docs/book/src/en/tools/auth_list.md
+docs/book/src/en/tools/README.md
+docs/book/src/en/tools/relocate.md
+docs/book/src/en/tools/recipe_remove.md
+docs/book/src/en/tools/auth_login_start.md
+docs/book/src/en/tools/recipe_list.md
+docs/book/src/en/tools/recipe_show.md
+docs/book/src/en/tools/recipe_export.md
+docs/book/src/en/tools/doctor.md
+docs/book/src/en/tools/spider.md
+docs/book/src/en/tools/recipe_propose_endpoint.md
+docs/book/src/en/tools/vpn_rotate.md
+docs/book/src/en/tools/session_show.md
+docs/book/src/en/tools/recipe_import.md
+docs/book/src/en/tools/auth_status.md
+docs/book/src/en/tools/auth_login_complete.md
+docs/book/src/en/tutorial/04-vpn.md
+docs/book/src/en/tutorial/06-hermes.md
+
+
+codex
+round3 は J.1 と J.3 の残課題が最終的に解消されたかが要点なので、今は実ファイル側の schema 検証痕跡と workflow/landscape の最終状態だけ追加で見ています。
+exec
+/bin/bash -lc 'tail -n 120 .agent/active/reviews/v1_3_j_lane_review_round3.out' in $REPO_ROOT
+ succeeded in 0ms:
+/bin/bash -lc 'cargo doc --workspace --no-deps --document-private-items' in $REPO_ROOT
+ succeeded in 4104ms:
+ Documenting stealth-auth v1.2.0 ($REPO_ROOT/crates/stealth-auth)
+ Documenting stealth-sites v1.2.0 ($REPO_ROOT/crates/stealth-sites)
+ Documenting obscura-bridge v1.2.0 ($REPO_ROOT/crates/obscura-bridge)
+ Documenting stealth-sanitize v1.2.0 ($REPO_ROOT/crates/stealth-sanitize)
+ Documenting vpn-rotate v1.2.0 ($REPO_ROOT/crates/vpn-rotate)
+ Documenting stealth-agent-contracts v1.2.0 ($REPO_ROOT/crates/stealth-agent-contracts)
+ Documenting captcha-bypass v1.2.0 ($REPO_ROOT/crates/captcha-bypass)
+ Documenting stealth-core v1.2.0 ($REPO_ROOT/crates/stealth-core)
+ Documenting stealth-parse v1.2.0 ($REPO_ROOT/crates/stealth-parse)
+ Documenting stealth-cf v1.2.0 ($REPO_ROOT/crates/stealth-cf)
+ Documenting stealth-cli v1.2.0 ($REPO_ROOT/crates/stealth-cli)
+ Documenting stealth-mcp v1.2.0 ($REPO_ROOT/crates/stealth-mcp)
+ Documenting mobile-fp v1.2.0 ($REPO_ROOT/crates/mobile-fp)
+ Documenting rev-stealth-cli v1.2.0 ($REPO_ROOT/crates/rev-stealth-cli)
+warning: unresolved link to `stealth_sites::discovery`
+  --> crates/obscura-bridge/src/network_capture.rs:13:8
+   |
+13 | //! ([`stealth_sites::discovery`]) consumes.
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ no item named `stealth_sites` in scope
+   |
+   = note: `#[warn(rustdoc::broken_intra_doc_links)]` on by default
+
+warning: unresolved link to `stealth_sites::discovery::registrable_domain`
+   --> crates/obscura-bridge/src/network_capture.rs:101:7
+    |
+101 | /// [`stealth_sites::discovery::registrable_domain`] for the canonical
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no item named `stealth_sites` in scope
+
+warning: unresolved link to `sanitize_error_envelope`
+  --> crates/stealth-mcp/src/server.rs:33:44
+   |
+33 | /// P13.4: the envelope is sanitized via [`sanitize_error_envelope`] using
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^ no item named `sanitize_error_envelope` in scope
+   |
+   = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+   = note: `#[warn(rustdoc::broken_intra_doc_links)]` on by default
+
+warning: unresolved link to `leak_guard::probe_all`
+  --> crates/vpn-rotate/src/leak_monitor.rs:40:20
+   |
+40 | //! callers wrap [`leak_guard::probe_all`] via [`DockerProbe`]; tests use
+   |                    ^^^^^^^^^^^^^^^^^^^^^ no item named `leak_guard` in scope
+   |
+   = note: `#[warn(rustdoc::broken_intra_doc_links)]` on by default
+
+warning: unresolved link to `MockProbe`
+  --> crates/vpn-rotate/src/leak_monitor.rs:41:7
+   |
+41 | //! [`MockProbe`] which is scriptable per tick. This is the same shim
+   |       ^^^^^^^^^ no item named `MockProbe` in scope
+   |
+   = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+
+warning: unresolved link to `shutdown`
+   --> crates/vpn-rotate/src/leak_monitor.rs:131:52
+    |
+131 | /// [`LeakMonitor::spawn_with`] and drop or call [`shutdown`] to stop.
+    |                                                    ^^^^^^^^ no item named `shutdown` in scope
+    |
+    = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+
+warning: unresolved link to `spawn_with`
+   --> crates/vpn-rotate/src/leak_monitor.rs:154:39
+    |
+154 |     /// `docker` feature; tests use [`spawn_with`].
+    |                                       ^^^^^^^^^^ no item named `spawn_with` in scope
+    |
+    = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+
+warning: `vpn-rotate` (lib doc) generated 4 warnings
+warning: `stealth-mcp` (lib doc) generated 1 warning
+warning: `obscura-bridge` (lib doc) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.09s
+   Generated $REPO_ROOT/target/doc/captcha_bypass/index.html and 16 other files
+
+exec
+/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+import json, re
+from jsonschema import Draft7Validator
+ok=[]; bad=[]
+for md in sorted(Path('docs/book/src/en/tools').glob('*.md')):
+    if md.name=='README.md': continue
+    tool=md.stem
+    m=re.search(r'\\*\\*Response\\*\\*.*?"'```json'"\\n(.*?)\\n"'```'"', md.read_text(), re.S)
+    env=json.loads(m.group(1)); body=json.loads(env['result']['content'][0]['text'])
+    schema=json.loads(Path(f'docs/json-schemas/{tool}.output.json').read_text())
+    errs=list(Draft7Validator(schema).iter_errors(body))
+    (bad if errs else ok).append(tool)
+print('ok:', ', '.join(ok))
+print('bad:', ', '.join(bad))
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+ok: recipe_remove
+bad: auth_list, auth_login_complete, auth_login_start, auth_status, cf_evaluate, doctor, recipe_export, recipe_import, recipe_list, recipe_propose_endpoint, recipe_show, relocate, session_show, spider, vpn_rotate
+
+codex
+J.1: CHANGES
+- ExecPlan requires `mdbook-i18n-helpers` + EN/JA toggle, but `docs/book/book.toml:7-9` explicitly defers `mdbook-i18n-helpers` to v1.4 and ships parallel trees instead.
+
+J.2: LGTM
+
+J.3: CHANGES
+- Success `Response` bodies still do not match published `outputSchema`: local JSON Schema validation fails for 15/16 tool pages.
+- Example: `recipe_import.md:36` documents `{"imported":1,"skipped":0,"rejected":0}`, but `recipe_import.output.json` requires `imported`, `rejected` as an array, and `total`, with no `skipped`.
+
+J.4: LGTM
+
+J.5: LGTM
+
+J.6: LGTM
+
+J.7: LGTM
+
+Verification rerun: `mdbook build` PASS, `mdbook test` PASS, `cargo doc --workspace --no-deps --document-private-items` PASS with rustdoc warnings.
+tokens used
+90,762
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"fbd1e175-a01c-42ce-bc4f-b4279f8b2ba4","timestamp":"2026-05-22T20:29:10Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":282755,"tokens_in":90762,"tokens_out":0,"total_tokens":90762,"dry_run":false,"specialty_status":"none"}
+
+exec
+/bin/bash -lc "find docs/book/src/en/tools -maxdepth 1 -type f -name '*.md' | wc -l" in $REPO_ROOT
+ succeeded in 0ms:
+      17
+
+exec
+/bin/bash -lc "find docs/book/src/en/errors -maxdepth 1 -type f -name '*.md' | wc -l" in $REPO_ROOT
+ succeeded in 0ms:
+      27
+
+exec
+/bin/bash -lc "rg -n \"Puppeteer|Scrapling|Q3-2026|quarter|Quarter|quarterly|敗|loss|losing|Claude Code|ErrorKind|retryable|kind\" docs/landscape.md docs/book/src/en/tutorial/05-claude-code.md docs/book/src/en/errors -g '*.md'" in $REPO_ROOT
+ succeeded in 0ms:
+docs/book/src/en/tutorial/05-claude-code.md:1:# Step 5 — Claude Code integration (5 minutes)
+docs/book/src/en/tutorial/05-claude-code.md:19:In a fresh Claude Code session:
+docs/book/src/en/tutorial/05-claude-code.md:29:Paste this into a Claude Code session:
+docs/book/src/en/tutorial/05-claude-code.md:46:  "kind": "RateLimit",
+docs/book/src/en/tutorial/05-claude-code.md:54:Claude can read `kind` and `doc_url`, follow the URL, and pick a fix
+docs/landscape.md:3:**Refresh cadence**: quarterly. Next due: **Q4 2026**.
+docs/landscape.md:12:| Axis | rev_scraping (v1.3) | Playwright MCP | Puppeteer | Crawl4AI | Browserless | Scrapling | Bright Data | obscura-bridge |
+docs/landscape.md:30:> Cells in **bold** mark either a rev_scraping loss / tie (read: a reason a
+docs/landscape.md:38:- **vs Bright Data / obscura-bridge / Scrapling**: no TLS-fingerprint
+docs/landscape.md:40:- **vs Playwright MCP / Puppeteer**: no generic "click any button" surface
+docs/landscape.md:44:- **vs Puppeteer**: smaller ecosystem of community recipes / examples.
+docs/landscape.md:55:## Quarterly refresh checklist (operator runbook)
+docs/landscape.md:58:2. Update version markers (e.g. Playwright MCP 0.0.x → ?, Puppeteer
+docs/landscape.md:59:   major bumps, Scrapling minor bumps, Crawl4AI breaking changes).
+docs/landscape.md:61:4. Re-confirm the **≥ 1 losing or tying cell per row** invariant — if any
+docs/book/src/en/errors/NotFound.md:3:> **Wire `kind`** (snake_case): `not_found`
+docs/book/src/en/errors/NotFound.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/NotFound.md:16:  "kind": "not_found",
+docs/book/src/en/errors/NotFound.md:18:  "retryable": false,
+docs/book/src/en/errors/BrowserNotFound.md:3:> **Wire `kind`** (snake_case): `browser_not_found`
+docs/book/src/en/errors/BrowserNotFound.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/BrowserNotFound.md:16:  "kind": "browser_not_found",
+docs/book/src/en/errors/BrowserNotFound.md:18:  "retryable": false,
+docs/book/src/en/errors/CookieDecryptFailed.md:3:> **Wire `kind`** (snake_case): `cookie_decrypt_failed`
+docs/book/src/en/errors/CookieDecryptFailed.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/CookieDecryptFailed.md:16:  "kind": "cookie_decrypt_failed",
+docs/book/src/en/errors/CookieDecryptFailed.md:18:  "retryable": false,
+docs/book/src/en/errors/CdpInjectionFailed.md:3:> **Wire `kind`** (snake_case): `cdp_injection_failed`
+docs/book/src/en/errors/CdpInjectionFailed.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/CdpInjectionFailed.md:16:  "kind": "cdp_injection_failed",
+docs/book/src/en/errors/CdpInjectionFailed.md:18:  "retryable": true,
+docs/book/src/en/errors/RateLimit.md:3:> **Wire `kind`** (snake_case): `rate_limit`
+docs/book/src/en/errors/RateLimit.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/RateLimit.md:16:  "kind": "rate_limit",
+docs/book/src/en/errors/RateLimit.md:18:  "retryable": true,
+docs/book/src/en/errors/AuthSessionExpired.md:3:> **Wire `kind`** (snake_case): `auth_session_expired`
+docs/book/src/en/errors/AuthSessionExpired.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/AuthSessionExpired.md:16:  "kind": "auth_session_expired",
+docs/book/src/en/errors/AuthSessionExpired.md:18:  "retryable": true,
+docs/book/src/en/errors/Timeout.md:3:> **Wire `kind`** (snake_case): `timeout`
+docs/book/src/en/errors/Timeout.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Timeout.md:16:  "kind": "timeout",
+docs/book/src/en/errors/Timeout.md:18:  "retryable": true,
+docs/book/src/en/errors/AuthSessionPending.md:3:> **Wire `kind`** (snake_case): `auth_session_pending`
+docs/book/src/en/errors/AuthSessionPending.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/AuthSessionPending.md:16:  "kind": "auth_session_pending",
+docs/book/src/en/errors/AuthSessionPending.md:18:  "retryable": true,
+docs/book/src/en/errors/Internal.md:3:> **Wire `kind`** (snake_case): `internal`
+docs/book/src/en/errors/Internal.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Internal.md:16:  "kind": "internal",
+docs/book/src/en/errors/Internal.md:18:  "retryable": false,
+docs/book/src/en/errors/Network.md:3:> **Wire `kind`** (snake_case): `network`
+docs/book/src/en/errors/Network.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Network.md:16:  "kind": "network",
+docs/book/src/en/errors/Network.md:18:  "retryable": true,
+docs/book/src/en/errors/Aborted.md:3:> **Wire `kind`** (snake_case): `aborted`
+docs/book/src/en/errors/Aborted.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Aborted.md:16:  "kind": "aborted",
+docs/book/src/en/errors/Aborted.md:18:  "retryable": true,
+docs/book/src/en/errors/Aborted.md:30:# happens if the caller cancels mid-call (e.g. Claude Code timeout)
+docs/book/src/en/errors/Aborted.md:43:- Claude Code / Hermes hit its own timeout.
+docs/book/src/en/errors/Auth.md:3:> **Wire `kind`** (snake_case): `auth`
+docs/book/src/en/errors/Auth.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Auth.md:16:  "kind": "auth",
+docs/book/src/en/errors/Auth.md:18:  "retryable": false,
+docs/book/src/en/errors/RecipeInvalid.md:3:> **Wire `kind`** (snake_case): `recipe_invalid`
+docs/book/src/en/errors/RecipeInvalid.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/RecipeInvalid.md:16:  "kind": "recipe_invalid",
+docs/book/src/en/errors/RecipeInvalid.md:18:  "retryable": false,
+docs/book/src/en/errors/RecipeNotFound.md:3:> **Wire `kind`** (snake_case): `recipe_not_found`
+docs/book/src/en/errors/RecipeNotFound.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/RecipeNotFound.md:16:  "kind": "recipe_not_found",
+docs/book/src/en/errors/RecipeNotFound.md:18:  "retryable": false,
+docs/book/src/en/errors/VpnLeak.md:3:> **Wire `kind`** (snake_case): `vpn_leak`
+docs/book/src/en/errors/VpnLeak.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/VpnLeak.md:16:  "kind": "vpn_leak",
+docs/book/src/en/errors/VpnLeak.md:18:  "retryable": true,
+docs/book/src/en/errors/VpnLeak.md:30:rev-stealth doctor --output-format json | jq '.checks[] | select(.kind=="vpn_leak")'
+docs/book/src/en/errors/CdpDisconnected.md:3:> **Wire `kind`** (snake_case): `cdp_disconnected`
+docs/book/src/en/errors/CdpDisconnected.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/CdpDisconnected.md:16:  "kind": "cdp_disconnected",
+docs/book/src/en/errors/CdpDisconnected.md:18:  "retryable": true,
+docs/book/src/en/errors/Captcha.md:3:> **Wire `kind`** (snake_case): `captcha`
+docs/book/src/en/errors/Captcha.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Captcha.md:16:  "kind": "captcha",
+docs/book/src/en/errors/Captcha.md:18:  "retryable": false,
+docs/book/src/en/errors/README.md:8:    pub kind: ErrorKind,       // snake_case on the wire
+docs/book/src/en/errors/README.md:10:    pub retryable: bool,
+docs/book/src/en/errors/README.md:16:On the wire `kind` is the snake_case `wire_name` from the table below.
+docs/book/src/en/errors/README.md:20:| Variant | wire `kind` | When emitted | Retryable? |
+docs/book/src/en/errors/VpnCountryMismatch.md:3:> **Wire `kind`** (snake_case): `vpn_country_mismatch`
+docs/book/src/en/errors/VpnCountryMismatch.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/VpnCountryMismatch.md:16:  "kind": "vpn_country_mismatch",
+docs/book/src/en/errors/VpnCountryMismatch.md:18:  "retryable": true,
+docs/book/src/en/errors/CdpProtocol.md:3:> **Wire `kind`** (snake_case): `cdp_protocol`
+docs/book/src/en/errors/CdpProtocol.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/CdpProtocol.md:16:  "kind": "cdp_protocol",
+docs/book/src/en/errors/CdpProtocol.md:18:  "retryable": true,
+docs/book/src/en/errors/AuthSessionNotFound.md:3:> **Wire `kind`** (snake_case): `auth_session_not_found`
+docs/book/src/en/errors/AuthSessionNotFound.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/AuthSessionNotFound.md:16:  "kind": "auth_session_not_found",
+docs/book/src/en/errors/AuthSessionNotFound.md:18:  "retryable": false,
+docs/book/src/en/errors/BrowserCrashed.md:3:> **Wire `kind`** (snake_case): `browser_crashed`
+docs/book/src/en/errors/BrowserCrashed.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/BrowserCrashed.md:16:  "kind": "browser_crashed",
+docs/book/src/en/errors/BrowserCrashed.md:18:  "retryable": true,
+docs/book/src/en/errors/Ssrf.md:3:> **Wire `kind`** (snake_case): `ssrf`
+docs/book/src/en/errors/Ssrf.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Ssrf.md:16:  "kind": "ssrf",
+docs/book/src/en/errors/Ssrf.md:18:  "retryable": false,
+docs/book/src/en/errors/VpnAllInstancesFailed.md:3:> **Wire `kind`** (snake_case): `vpn_all_instances_failed`
+docs/book/src/en/errors/VpnAllInstancesFailed.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/VpnAllInstancesFailed.md:16:  "kind": "vpn_all_instances_failed",
+docs/book/src/en/errors/VpnAllInstancesFailed.md:18:  "retryable": true,
+docs/book/src/en/errors/Validation.md:3:> **Wire `kind`** (snake_case): `validation`
+docs/book/src/en/errors/Validation.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Validation.md:16:  "kind": "validation",
+docs/book/src/en/errors/Validation.md:18:  "retryable": false,
+docs/book/src/en/errors/VpnNotConfigured.md:3:> **Wire `kind`** (snake_case): `vpn_not_configured`
+docs/book/src/en/errors/VpnNotConfigured.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/VpnNotConfigured.md:16:  "kind": "vpn_not_configured",
+docs/book/src/en/errors/VpnNotConfigured.md:18:  "retryable": false,
+docs/book/src/en/errors/Aup.md:3:> **Wire `kind`** (snake_case): `aup`
+docs/book/src/en/errors/Aup.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/Aup.md:16:  "kind": "aup",
+docs/book/src/en/errors/Aup.md:18:  "retryable": false,
+
+exec
+/bin/bash -lc 'cmp -s docs/landscape.md docs/book/src/en/landscape.md; echo $?' in $REPO_ROOT
+ succeeded in 0ms:
+0
+
+exec
+/bin/bash -lc "sed -n '1,220p' .github/workflows/docs.yml" in $REPO_ROOT
+ succeeded in 0ms:
+name: Docs (mdBook + rustdoc) → GitHub Pages
+
+# One-time manual step before this workflow can deploy successfully:
+#   Settings → Pages → Source: "GitHub Actions" (not "Deploy from a branch").
+# See `.agent/active/v1_3_uplift_execplan_rev1.md` (Risks & mitigations,
+# row J.1). Until Pages is enabled in repo settings, the deploy job will
+# fail and https://sasuketorii.github.io/rev_scraping/ returns 404. The
+# build job still produces the artifact and can be downloaded locally.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install mdBook
+        run: |
+          set -euo pipefail
+          MDBOOK_VERSION=v0.5.3
+          curl -fsSL \
+            "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C /usr/local/bin
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build mdBook
+        working-directory: docs/book
+        run: mdbook build
+
+      - name: Build rustdoc with --document-private-items (best-effort)
+        # Lane J.5 spec calls for `rustdoc --document-private-items`. We
+        # publish it as auxiliary reference, NOT as a release gate: intra-doc
+        # link warnings in vendored / in-flight crates would otherwise block
+        # the mdBook deploy. Tighten to `-D warnings` in v1.4 once every
+        # workspace crate has reached the `#![deny(missing_docs)]` bar
+        # (currently only stealth-agent-contracts).
+        run: |
+          cargo doc --workspace --no-deps --document-private-items \
+            || cargo doc --workspace --no-deps \
+            || true
+
+      - name: Assemble Pages payload
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R target/book/* _site/
+          mkdir -p _site/api
+          if [ -d target/doc ]; then
+            cp -R target/doc/* _site/api/
+          fi
+          # Landing page redirect for /api/
+          if [ ! -f _site/api/index.html ]; then
+            echo '<meta http-equiv="refresh" content="0;url=./rev_stealth_cli/index.html">' > _site/api/index.html
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+exec
+/bin/bash -lc "sed -n '1,120p' docs/book/src/en/tools/recipe_import.md" in $REPO_ROOT
+ succeeded in 0ms:
+# `recipe_import`
+
+> Import recipes from a base64-encoded JSON array. Secret-rejected and path-traversal guarded.
+
+**Canonical schema**: [`docs/json-schemas/recipe_import.output.json`](https://github.com/sasuketorii/rev_scraping/blob/main/docs/json-schemas/recipe_import.output.json)
+**Source**: [`crates/stealth-mcp/src/tools.rs`](https://github.com/sasuketorii/rev_scraping/blob/main/crates/stealth-mcp/src/tools.rs)
+
+## Input arguments
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `payload` | string | yes | Base64-encoded JSON array of SiteRecipe entries. |
+
+`inputSchema` has `additionalProperties: false` — unknown keys are rejected.
+
+## Happy path
+
+**Request**:
+
+```sh
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"recipe_import","arguments":{"payload":"W3sieyJkb21haW4iOiJleGFtcGxlLmNvbSJ9XQ=="}}}' \
+  | rev-stealth mcp
+```
+
+**Response** (success envelope, abridged — see `outputSchema` link above
+for the full field list):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "isError": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"imported\":0,\"rejected\":[],\"total\":0}"
+      }
+    ]
+  }
+}
+```
+
+The `text` field is a stringified JSON object that conforms to
+`docs/json-schemas/recipe_import.output.json`.
+
+## Failure example — `Validation` (wire `kind: "validation"`)
+
+If a recipe in the payload fails schema validation, the response is an `ErrorEnvelope`. The MCP layer
+serialises `kind` as the snake_case `wire_name` (not the PascalCase Rust
+variant), and `retryable: false` reflects whether retrying
+without changing inputs is plausibly safe (see
+`crates/stealth-agent-contracts/src/error.rs`, `all_error_kind_docs()`).
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "isError": true,
+    "content": [{
+      "type": "text",
+      "text": "{\"kind\":\"validation\",\"message\":\"...\",\"retryable\":false,\"hint\":\"...\",\"doc_url\":\"https://sasuketorii.github.io/rev_scraping/en/errors/Validation.html\"}"
+    }]
+  }
+}
+```
+
+Follow the [`Validation` troubleshooting page](../errors/Validation.md)
+for the fix recipe.
+
+## See also
+
+- [Error reference](../errors/README.md) — all 26 `ErrorKind` variants
+- [MCP transport contract](https://github.com/sasuketorii/rev_scraping/blob/main/docs/MCP_REFERENCE.md)
+
+exec
+/bin/bash -lc "sed -n '1,200p' docs/json-schemas/recipe_import.output.json" in $REPO_ROOT
+ succeeded in 0ms:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "recipe_import.output",
+  "description": "Response from `recipe_import`. Reports how many of the decoded recipes were persisted and which were rejected (secret-leak, path-traversal, schema errors).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "imported",
+    "rejected",
+    "total"
+  ],
+  "properties": {
+    "imported": {
+      "type": "integer",
+      "description": "Count of recipes accepted and atomically written to the recipe directory.",
+      "examples": [
+        0,
+        7
+      ]
+    },
+    "rejected": {
+      "type": "array",
+      "description": "Per-recipe rejection records. Empty when every recipe was accepted.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "error"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Domain of the recipe that was rejected.",
+            "examples": [
+              "bad.example.com"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "description": "Human-readable rejection reason (redacted of secret values).",
+            "examples": [
+              "secret-leak: api_token field present"
+            ]
+          }
+        }
+      },
+      "examples": [
+        []
+      ]
+    },
+    "total": {
+      "type": "integer",
+      "description": "Total recipes decoded from the payload. Equals imported + rejected.length.",
+      "examples": [
+        0,
+        7
+      ]
+    },
+    "_meta": {
+      "type": "object",
+      "description": "P13.4: sanitize-pass metadata attached by stealth-mcp before this payload becomes LLM-visible. Always present; agents can ignore it unless inspecting prompt-injection telemetry. Shape stable per `stealth-sanitize::SanitizationReport` (schema_version=1).",
+      "additionalProperties": true,
+      "properties": {
+        "sanitize": {
+          "type": "object",
+          "description": "Resolved sanitize report. See `stealth_sanitize::SanitizationReport` for the canonical shape.",
+          "additionalProperties": true,
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "examples": [
+                1
+              ]
+            },
+            "policy_name": {
+              "type": "string",
+              "examples": [
+                "strict",
+                "balanced",
+                "passthrough"
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "enforce"
+              ],
+              "examples": [
+                "warn"
+              ]
+            },
+            "bytes_in": {
+              "type": "integer",
+              "examples": [
+                128
+              ]
+            },
+            "bytes_out": {
+              "type": "integer",
+              "examples": [
+                180
+              ]
+            },
+            "truncated": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "aborted": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "layers_applied": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "examples": [
+                [
+                  "L4:unicode",
+                  "L2:envelope",
+                  "L7:meta"
+                ]
+              ]
+            },
+            "canary_hits": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "examples": [
+                []
+              ]
+            },
+            "sanitize_id": {
+              "type": "string",
+              "description": "64-bit hex nonce.",
+              "examples": [
+                "a1b2c3d4e5f60718"
+              ]
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "sanitize": {
+            "schema_version": 1,
+            "policy_name": "balanced",
+            "mode": "warn",
+            "bytes_in": 12,
+            "bytes_out": 60,
+            "truncated": false,
+            "aborted": false,
+            "layers_applied": [
+              "L2:envelope",
+              "L7:meta"
+            ],
+            "canary_hits": [],
+            "sanitize_id": "a1b2c3d4e5f60718"
+          }
+        }
+      ]
+    }
+  }
+}
+
+exec
+/bin/bash -lc "sed -n '1,90p' docs/book/src/en/tutorial/05-claude-code.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Step 5 — Claude Code integration (5 minutes)
+
+This is the single most important page in the book. If you only read one
+chapter, read this one.
+
+## Register rev-stealth as an MCP server
+
+```sh
+claude mcp add rev-stealth -- rev-stealth mcp
+```
+
+That's the whole installation. `rev-stealth mcp` speaks line-delimited
+JSON-RPC 2.0 over stdin/stdout (see
+[`docs/MCP_REFERENCE.md`](https://github.com/sasuketorii/rev_scraping/blob/main/docs/MCP_REFERENCE.md)
+for the protocol).
+
+## Verify Claude can see the 16 tools
+
+In a fresh Claude Code session:
+
+> List every rev-stealth MCP tool by name.
+
+Claude should enumerate all 16 (`spider`, `relocate`, `cf_evaluate`,
+`doctor`, …). If only a subset is visible, run `rev-stealth doctor` and
+check `claude mcp list`.
+
+## Drive a real scrape from Claude
+
+Paste this into a Claude Code session:
+
+> Use the rev_stealth MCP to spider https://example.com and tell me the
+> page title.
+
+Claude will call the `spider` tool, receive a structured JSON response
+matching `docs/json-schemas/spider.output.json`, and answer in natural
+language. Because every tool has an `outputSchema`, Claude does not need
+to guess at the response shape.
+
+## Error envelope contract
+
+Every failure surfaces in this shape (matches
+[`I.7` `ErrorEnvelope`](../compat.md)):
+
+```json
+{
+  "kind": "RateLimit",
+  "message": "Server returned 429",
+  "hint": "Retry after the specified interval",
+  "retry_after_ms": 30000,
+  "doc_url": "https://sasuketorii.github.io/rev_scraping/en/errors/RateLimit.html"
+}
+```
+
+Claude can read `kind` and `doc_url`, follow the URL, and pick a fix
+strategy without further user input.
+
+## Smoke test
+
+```sh
+claude mcp list | grep -q rev-stealth
+# expected: exit 0
+```
+
+## What to do next
+
+- [Step 6 — Hermes orchestrator](./06-hermes.md) to chain `rev-stealth` with
+  other MCPs in a Hermes workflow.
+- [MCP Tools Cookbook](../tools/README.md) for per-tool JSON-RPC examples.
+
+exec
+/bin/bash -lc "sed -n '1,80p' docs/book/book.toml" in $REPO_ROOT
+ succeeded in 0ms:
+[book]
+title = "rev_scraping — The Black-Belt CLI for AI Agents"
+description = "Agent-first documentation for rev-stealth: install, integrate, scrape — without the Crawl4AI / Playwright MCP friction."
+authors = ["rev_scraping contributors"]
+language = "en"
+src = "src"
+# Note: full i18n via `mdbook-i18n-helpers` PO files is deferred to v1.4
+# (Lane O). For v1.3 we ship EN + JA as parallel page trees under src/en/
+# and src/ja/, both linked from SUMMARY.md.
+
+[build]
+build-dir = "../../target/book"
+create-missing = false
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/sasuketorii/rev_scraping"
+edit-url-template = "https://github.com/sasuketorii/rev_scraping/edit/main/docs/book/{path}"
+mathjax-support = false
+no-section-label = false
+site-url = "/rev_scraping/"
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[output.html.playground]
+runnable = false
+
+exec
+/bin/bash -lc "find docs/book/src/en/tutorial -maxdepth 1 -type f -name '*.md' | sort" in $REPO_ROOT
+ succeeded in 0ms:
+docs/book/src/en/tutorial/01-local.md
+docs/book/src/en/tutorial/02-recipe.md
+docs/book/src/en/tutorial/03-profile.md
+docs/book/src/en/tutorial/04-vpn.md
+docs/book/src/en/tutorial/05-claude-code.md
+docs/book/src/en/tutorial/06-hermes.md
+docs/book/src/en/tutorial/07-vps.md
+docs/book/src/en/tutorial/README.md
+
+exec
+/bin/bash -lc "find docs/book/src/en/errors -maxdepth 1 -type f -name '*.md' | sed 's#docs/book/src/en/errors/##' | sort | tail -n +1" in $REPO_ROOT
+ succeeded in 0ms:
+Aborted.md
+Aup.md
+Auth.md
+AuthSessionExpired.md
+AuthSessionNotFound.md
+AuthSessionPending.md
+BrowserCrashed.md
+BrowserNotFound.md
+Captcha.md
+CdpDisconnected.md
+CdpInjectionFailed.md
+CdpProtocol.md
+CookieDecryptFailed.md
+Internal.md
+Network.md
+NotFound.md
+README.md
+RateLimit.md
+RecipeInvalid.md
+RecipeNotFound.md
+Ssrf.md
+Timeout.md
+Validation.md
+VpnAllInstancesFailed.md
+VpnCountryMismatch.md
+VpnLeak.md
+VpnNotConfigured.md
+
+exec
+/bin/bash -lc "sed -n '24,70p' docs/book/src/en/tools/recipe_remove.md && sed -n '24,70p' docs/book/src/en/tools/auth_list.md" in $REPO_ROOT
+ succeeded in 0ms:
+```
+
+**Response** (success envelope, abridged — see `outputSchema` link above
+for the full field list):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "isError": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"removed\":false,\"domain\":\"example.com\"}"
+      }
+    ]
+  }
+}
+```
+
+The `text` field is a stringified JSON object that conforms to
+`docs/json-schemas/recipe_remove.output.json`.
+
+## Failure example — `RecipeNotFound` (wire `kind: "recipe_not_found"`)
+
+If the recipe to remove does not exist, the response is an `ErrorEnvelope`. The MCP layer
+serialises `kind` as the snake_case `wire_name` (not the PascalCase Rust
+variant), and `retryable: false` reflects whether retrying
+without changing inputs is plausibly safe (see
+`crates/stealth-agent-contracts/src/error.rs`, `all_error_kind_docs()`).
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "isError": true,
+    "content": [{
+      "type": "text",
+      "text": "{\"kind\":\"recipe_not_found\",\"message\":\"...\",\"retryable\":false,\"hint\":\"...\",\"doc_url\":\"https://sasuketorii.github.io/rev_scraping/en/errors/RecipeNotFound.html\"}"
+    }]
+  }
+}
+```
+
+Follow the [`RecipeNotFound` troubleshooting page](../errors/RecipeNotFound.md)
+
+**Response** (success envelope, abridged — see `outputSchema` link above
+for the full field list):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "isError": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"profiles\":[],\"total\":0,\"cookie_values_returned\":false}"
+      }
+    ]
+  }
+}
+```
+
+The `text` field is a stringified JSON object that conforms to
+`docs/json-schemas/auth_list.output.json`.
+
+## Failure example — `Internal` (wire `kind: "internal"`)
+
+If the profiles directory is unreadable, the response is an `ErrorEnvelope`. The MCP layer
+serialises `kind` as the snake_case `wire_name` (not the PascalCase Rust
+variant), and `retryable: false` reflects whether retrying
+without changing inputs is plausibly safe (see
+`crates/stealth-agent-contracts/src/error.rs`, `all_error_kind_docs()`).
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "isError": true,
+    "content": [{
+      "type": "text",
+      "text": "{\"kind\":\"internal\",\"message\":\"...\",\"retryable\":false,\"hint\":\"...\",\"doc_url\":\"https://sasuketorii.github.io/rev_scraping/en/errors/Internal.html\"}"
+    }]
+  }
+}
+```
+
+Follow the [`Internal` troubleshooting page](../errors/Internal.md)
+for the fix recipe.
+
+exec
+/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+import json, re
+from jsonschema import Draft7Validator
+for tool in ['recipe_import','auth_list','spider','recipe_remove']:
+    md=Path(f'docs/book/src/en/tools/{tool}.md')
+    txt=md.read_text()
+    m=re.search(r'\\*\\*Response\\*\\*.*?"'```json'"\\n(.*?)\\n"'```'"', txt, re.S)
+    print('\\nTOOL',tool,'match',bool(m))
+    if not m: continue
+    env=json.loads(m.group(1)); body=json.loads(env['result']['content'][0]['text'])
+    print('body',body)
+    schema=json.loads(Path(f'docs/json-schemas/{tool}.output.json').read_text())
+    errs=list(Draft7Validator(schema).iter_errors(body))
+    for e in errs[:3]: print('err', list(e.path), e.message)
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+
+TOOL recipe_import match True
+body {'imported': 0, 'rejected': [], 'total': 0}
+
+TOOL auth_list match True
+body {'profiles': [], 'total': 0, 'cookie_values_returned': False}
+
+TOOL spider match True
+body {'result': {}, 'operation': 'spider', 'ok': True}
+
+TOOL recipe_remove match True
+body {'removed': False, 'domain': 'example.com'}
+
+exec
+/bin/bash -lc "sed -n '1,130p' docs/book/src/en/SUMMARY.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: docs/book/src/en/SUMMARY.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,120p' docs/json-schemas/auth_list.output.json" in $REPO_ROOT
+ succeeded in 0ms:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "auth_list.output",
+  "description": "Response from `auth_list`. Enumerates ProfileMeta for every stored auth profile. Cookie values are never disclosed; only SHA-256-prefix hashes of cookie names feed the `cookie_count`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profiles",
+    "total",
+    "cookie_values_returned"
+  ],
+  "properties": {
+    "profiles": {
+      "type": "array",
+      "description": "Per-profile metadata. Empty when no profiles are stored or the auth_dir does not yet exist.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "domains",
+          "created_at",
+          "last_used",
+          "cookie_count",
+          "status"
+        ],
+        "properties": {
+          "profile": {
+            "type": "string",
+            "description": "Profile name.",
+            "examples": [
+              "example_main"
+            ]
+          },
+          "domains": {
+            "type": "array",
+            "description": "Cookie scope domains covered by this profile.",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "example.com"
+              ]
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "RFC-3339 timestamp of profile creation.",
+            "examples": [
+              "2026-03-04T12:00:00+00:00"
+            ]
+          },
+          "last_used": {
+            "type": "string",
+            "description": "RFC-3339 timestamp of the most recent profile use.",
+            "examples": [
+              "2026-05-21T09:15:42+00:00"
+            ]
+          },
+          "cookie_count": {
+            "type": "integer",
+            "description": "Number of cookies recorded (derived from SHA-256 name-prefix metadata).",
+            "examples": [
+              5
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Freshness classification for the profile.",
+            "enum": [
+              "Valid",
+              "ExpiringSoon",
+              "ExpiringCritical",
+              "PartiallyExpired",
+              "AllExpired",
+              "Missing"
+            ],
+            "examples": [
+              "Valid",
+              "ExpiringSoon"
+            ]
+          }
+        }
+      },
+      "examples": [
+        []
+      ]
+    },
+    "total": {
+      "type": "integer",
+      "description": "Total profiles returned. Equals profiles.length.",
+      "examples": [
+        0,
+        3
+      ]
+    },
+    "cookie_values_returned": {
+      "type": "boolean",
+      "description": "Always false. Contract marker.",
+      "examples": [
+        false
+      ]
+    },
+    "_meta": {
+      "type": "object",
+      "description": "P13.4: sanitize-pass metadata attached by stealth-mcp before this payload becomes LLM-visible. Always present; agents can ignore it unless inspecting prompt-injection telemetry. Shape stable per `stealth-sanitize::SanitizationReport` (schema_version=1).",
+      "additionalProperties": true,
+      "properties": {
+        "sanitize": {
+          "type": "object",
+          "description": "Resolved sanitize report. See `stealth_sanitize::SanitizationReport` for the canonical shape.",
+          "additionalProperties": true,
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "examples": [
+                1
+              ]
+            },
+
+exec
+/bin/bash -lc "rg --files docs/book/src | rg 'SUMMARY\\.md"'$|book.toml$'"'" in $REPO_ROOT
+ succeeded in 0ms:
+docs/book/src/SUMMARY.md
+
+exec
+/bin/bash -lc "python3 - <<'PY'
+from pathlib import Path
+import json, re, sys
+from jsonschema import Draft7Validator
+ok=[]; bad=[]; missing=[]
+for md in sorted(Path('docs/book/src/en/tools').glob('*.md')):
+    if md.name=='README.md':
+        continue
+    tool=md.stem
+    text=md.read_text()
+    m=re.search(r'\\*\\*Response\\*\\*.*?"'```json'"\\n(.*?)\\n"'```'"', text, re.S)
+    if not m:
+        missing.append(tool); continue
+    env=json.loads(m.group(1))
+    body=json.loads(env['result']['content'][0]['text'])
+    schema=json.loads(Path(f'docs/json-schemas/{tool}.output.json').read_text())
+    errs=list(Draft7Validator(schema).iter_errors(body))
+    if errs:
+        bad.append((tool, errs[0].message, list(errs[0].path)))
+    else:
+        ok.append(tool)
+print('ok_count',len(ok), ok)
+print('missing', missing)
+print('bad_count',len(bad))
+for b in bad:
+    print(b)
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+ok_count 16 ['auth_list', 'auth_login_complete', 'auth_login_start', 'auth_status', 'cf_evaluate', 'doctor', 'recipe_export', 'recipe_import', 'recipe_list', 'recipe_propose_endpoint', 'recipe_remove', 'recipe_show', 'relocate', 'session_show', 'spider', 'vpn_rotate']
+missing []
+bad_count 0
+
+exec
+/bin/bash -lc "sed -n '1,160p' docs/book/src/SUMMARY.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Summary
+
+[Introduction](./intro.md)
+
+---
+
+# English
+
+- [Overview](./en/README.md)
+- [Installation](./en/install.md)
+- [Quickstart Tutorial](./en/tutorial/README.md)
+  - [01. Local install](./en/tutorial/01-local.md)
+  - [02. Your first recipe](./en/tutorial/02-recipe.md)
+  - [03. Browser profile & cookies](./en/tutorial/03-profile.md)
+  - [04. VPN rotation](./en/tutorial/04-vpn.md)
+  - [05. Claude Code integration](./en/tutorial/05-claude-code.md)
+  - [06. Hermes orchestrator](./en/tutorial/06-hermes.md)
+  - [07. VPS deployment](./en/tutorial/07-vps.md)
+- [MCP Tools Cookbook](./en/tools/README.md)
+  - [spider](./en/tools/spider.md)
+  - [relocate](./en/tools/relocate.md)
+  - [cf_evaluate](./en/tools/cf_evaluate.md)
+  - [doctor](./en/tools/doctor.md)
+  - [recipe_list](./en/tools/recipe_list.md)
+  - [recipe_show](./en/tools/recipe_show.md)
+  - [recipe_remove](./en/tools/recipe_remove.md)
+  - [recipe_propose_endpoint](./en/tools/recipe_propose_endpoint.md)
+  - [recipe_export](./en/tools/recipe_export.md)
+  - [recipe_import](./en/tools/recipe_import.md)
+  - [auth_login_start](./en/tools/auth_login_start.md)
+  - [auth_login_complete](./en/tools/auth_login_complete.md)
+  - [auth_list](./en/tools/auth_list.md)
+  - [auth_status](./en/tools/auth_status.md)
+  - [session_show](./en/tools/session_show.md)
+  - [vpn_rotate](./en/tools/vpn_rotate.md)
+- [Migration Guides](./en/migration/README.md)
+  - [From Crawl4AI MCP](./en/migration/from-crawl4ai.md)
+  - [From Playwright MCP](./en/migration/from-playwright.md)
+- [Error Troubleshooting](./en/errors/README.md)
+  - [Aup](./en/errors/Aup.md)
+  - [Ssrf](./en/errors/Ssrf.md)
+  - [VpnLeak](./en/errors/VpnLeak.md)
+  - [RateLimit](./en/errors/RateLimit.md)
+  - [Timeout](./en/errors/Timeout.md)
+  - [Captcha](./en/errors/Captcha.md)
+  - [Auth](./en/errors/Auth.md)
+  - [NotFound](./en/errors/NotFound.md)
+  - [Validation](./en/errors/Validation.md)
+  - [Network](./en/errors/Network.md)
+  - [Internal](./en/errors/Internal.md)
+  - [RecipeNotFound](./en/errors/RecipeNotFound.md)
+  - [RecipeInvalid](./en/errors/RecipeInvalid.md)
+  - [AuthSessionExpired](./en/errors/AuthSessionExpired.md)
+  - [AuthSessionNotFound](./en/errors/AuthSessionNotFound.md)
+  - [AuthSessionPending](./en/errors/AuthSessionPending.md)
+  - [VpnNotConfigured](./en/errors/VpnNotConfigured.md)
+  - [VpnAllInstancesFailed](./en/errors/VpnAllInstancesFailed.md)
+  - [VpnCountryMismatch](./en/errors/VpnCountryMismatch.md)
+  - [CdpProtocol](./en/errors/CdpProtocol.md)
+  - [CdpDisconnected](./en/errors/CdpDisconnected.md)
+  - [CdpInjectionFailed](./en/errors/CdpInjectionFailed.md)
+  - [BrowserCrashed](./en/errors/BrowserCrashed.md)
+  - [BrowserNotFound](./en/errors/BrowserNotFound.md)
+  - [CookieDecryptFailed](./en/errors/CookieDecryptFailed.md)
+  - [Aborted](./en/errors/Aborted.md)
+- [Competitive Landscape](./en/landscape.md)
+- [Compatibility & Semver](./en/compat.md)
+
+---
+
+# 日本語
+
+- [概要](./ja/README.md)
+- [インストール](./ja/install.md)
+- [クイックスタート](./ja/tutorial.md)
+- [MCP ツール一覧](./ja/tools.md)
+- [移行ガイド](./ja/migration.md)
+- [エラー対処](./ja/errors.md)
+
+exec
+/bin/bash -lc "sed -n '1,120p' docs/book/src/index.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: docs/book/src/index.md: No such file or directory
+
+exec
+/bin/bash -lc 'rg -n "mdbook-i18n|i18n|toggle|日本語|English|EN|JA|ja/|en/" docs/book/src/SUMMARY.md docs/book/book.toml docs/book/src/index.md' in $REPO_ROOT
+ exited 2 in 0ms:
+rg: docs/book/src/index.md: No such file or directory (os error 2)
+docs/book/book.toml:7:# Note: full i18n via `mdbook-i18n-helpers` PO files is deferred to v1.4
+docs/book/book.toml:8:# (Lane O). For v1.3 we ship EN + JA as parallel page trees under src/en/
+docs/book/book.toml:9:# and src/ja/, both linked from SUMMARY.md.
+docs/book/src/SUMMARY.md:7:# English
+docs/book/src/SUMMARY.md:9:- [Overview](./en/README.md)
+docs/book/src/SUMMARY.md:10:- [Installation](./en/install.md)
+docs/book/src/SUMMARY.md:11:- [Quickstart Tutorial](./en/tutorial/README.md)
+docs/book/src/SUMMARY.md:12:  - [01. Local install](./en/tutorial/01-local.md)
+docs/book/src/SUMMARY.md:13:  - [02. Your first recipe](./en/tutorial/02-recipe.md)
+docs/book/src/SUMMARY.md:14:  - [03. Browser profile & cookies](./en/tutorial/03-profile.md)
+docs/book/src/SUMMARY.md:15:  - [04. VPN rotation](./en/tutorial/04-vpn.md)
+docs/book/src/SUMMARY.md:16:  - [05. Claude Code integration](./en/tutorial/05-claude-code.md)
+docs/book/src/SUMMARY.md:17:  - [06. Hermes orchestrator](./en/tutorial/06-hermes.md)
+docs/book/src/SUMMARY.md:18:  - [07. VPS deployment](./en/tutorial/07-vps.md)
+docs/book/src/SUMMARY.md:19:- [MCP Tools Cookbook](./en/tools/README.md)
+docs/book/src/SUMMARY.md:20:  - [spider](./en/tools/spider.md)
+docs/book/src/SUMMARY.md:21:  - [relocate](./en/tools/relocate.md)
+docs/book/src/SUMMARY.md:22:  - [cf_evaluate](./en/tools/cf_evaluate.md)
+docs/book/src/SUMMARY.md:23:  - [doctor](./en/tools/doctor.md)
+docs/book/src/SUMMARY.md:24:  - [recipe_list](./en/tools/recipe_list.md)
+docs/book/src/SUMMARY.md:25:  - [recipe_show](./en/tools/recipe_show.md)
+docs/book/src/SUMMARY.md:26:  - [recipe_remove](./en/tools/recipe_remove.md)
+docs/book/src/SUMMARY.md:27:  - [recipe_propose_endpoint](./en/tools/recipe_propose_endpoint.md)
+docs/book/src/SUMMARY.md:28:  - [recipe_export](./en/tools/recipe_export.md)
+docs/book/src/SUMMARY.md:29:  - [recipe_import](./en/tools/recipe_import.md)
+docs/book/src/SUMMARY.md:30:  - [auth_login_start](./en/tools/auth_login_start.md)
+docs/book/src/SUMMARY.md:31:  - [auth_login_complete](./en/tools/auth_login_complete.md)
+docs/book/src/SUMMARY.md:32:  - [auth_list](./en/tools/auth_list.md)
+docs/book/src/SUMMARY.md:33:  - [auth_status](./en/tools/auth_status.md)
+docs/book/src/SUMMARY.md:34:  - [session_show](./en/tools/session_show.md)
+docs/book/src/SUMMARY.md:35:  - [vpn_rotate](./en/tools/vpn_rotate.md)
+docs/book/src/SUMMARY.md:36:- [Migration Guides](./en/migration/README.md)
+docs/book/src/SUMMARY.md:37:  - [From Crawl4AI MCP](./en/migration/from-crawl4ai.md)
+docs/book/src/SUMMARY.md:38:  - [From Playwright MCP](./en/migration/from-playwright.md)
+docs/book/src/SUMMARY.md:39:- [Error Troubleshooting](./en/errors/README.md)
+docs/book/src/SUMMARY.md:40:  - [Aup](./en/errors/Aup.md)
+docs/book/src/SUMMARY.md:41:  - [Ssrf](./en/errors/Ssrf.md)
+docs/book/src/SUMMARY.md:42:  - [VpnLeak](./en/errors/VpnLeak.md)
+docs/book/src/SUMMARY.md:43:  - [RateLimit](./en/errors/RateLimit.md)
+docs/book/src/SUMMARY.md:44:  - [Timeout](./en/errors/Timeout.md)
+docs/book/src/SUMMARY.md:45:  - [Captcha](./en/errors/Captcha.md)
+docs/book/src/SUMMARY.md:46:  - [Auth](./en/errors/Auth.md)
+docs/book/src/SUMMARY.md:47:  - [NotFound](./en/errors/NotFound.md)
+docs/book/src/SUMMARY.md:48:  - [Validation](./en/errors/Validation.md)
+docs/book/src/SUMMARY.md:49:  - [Network](./en/errors/Network.md)
+docs/book/src/SUMMARY.md:50:  - [Internal](./en/errors/Internal.md)
+docs/book/src/SUMMARY.md:51:  - [RecipeNotFound](./en/errors/RecipeNotFound.md)
+docs/book/src/SUMMARY.md:52:  - [RecipeInvalid](./en/errors/RecipeInvalid.md)
+docs/book/src/SUMMARY.md:53:  - [AuthSessionExpired](./en/errors/AuthSessionExpired.md)
+docs/book/src/SUMMARY.md:54:  - [AuthSessionNotFound](./en/errors/AuthSessionNotFound.md)
+docs/book/src/SUMMARY.md:55:  - [AuthSessionPending](./en/errors/AuthSessionPending.md)
+docs/book/src/SUMMARY.md:56:  - [VpnNotConfigured](./en/errors/VpnNotConfigured.md)
+docs/book/src/SUMMARY.md:57:  - [VpnAllInstancesFailed](./en/errors/VpnAllInstancesFailed.md)
+docs/book/src/SUMMARY.md:58:  - [VpnCountryMismatch](./en/errors/VpnCountryMismatch.md)
+docs/book/src/SUMMARY.md:59:  - [CdpProtocol](./en/errors/CdpProtocol.md)
+docs/book/src/SUMMARY.md:60:  - [CdpDisconnected](./en/errors/CdpDisconnected.md)
+docs/book/src/SUMMARY.md:61:  - [CdpInjectionFailed](./en/errors/CdpInjectionFailed.md)
+docs/book/src/SUMMARY.md:62:  - [BrowserCrashed](./en/errors/BrowserCrashed.md)
+docs/book/src/SUMMARY.md:63:  - [BrowserNotFound](./en/errors/BrowserNotFound.md)
+docs/book/src/SUMMARY.md:64:  - [CookieDecryptFailed](./en/errors/CookieDecryptFailed.md)
+docs/book/src/SUMMARY.md:65:  - [Aborted](./en/errors/Aborted.md)
+docs/book/src/SUMMARY.md:66:- [Competitive Landscape](./en/landscape.md)
+docs/book/src/SUMMARY.md:67:- [Compatibility & Semver](./en/compat.md)
+docs/book/src/SUMMARY.md:71:# 日本語
+docs/book/src/SUMMARY.md:73:- [概要](./ja/README.md)
+docs/book/src/SUMMARY.md:74:- [インストール](./ja/install.md)
+docs/book/src/SUMMARY.md:75:- [クイックスタート](./ja/tutorial.md)
+docs/book/src/SUMMARY.md:76:- [MCP ツール一覧](./ja/tools.md)
+docs/book/src/SUMMARY.md:77:- [移行ガイド](./ja/migration.md)
+docs/book/src/SUMMARY.md:78:- [エラー対処](./ja/errors.md)
+
+codex
+schema 検証は最終状態どおり 16/16 PASS でした。残る評価上の減点は、operator-approved な i18n helper descope と、Claude Code ページ内の ErrorEnvelope 例が ErrorKind ページほど厳密ではない点に限定して扱います。
+exec
+/bin/bash -lc 'cd docs/book && mdbook build' in $REPO_ROOT
+ succeeded in 0ms:
+ INFO Book building has started
+ INFO Running the html backend
+ INFO HTML book written to `$REPO_ROOT/docs/book/../../target/book`
+
+exec
+/bin/bash -lc "sed -n '1,90p' docs/book/src/en/errors/RateLimit.md" in $REPO_ROOT
+ succeeded in 0ms:
+# `RateLimit`
+
+> **Wire `kind`** (snake_case): `rate_limit`
+> **When emitted**: Per-host or global rate limit exceeded.
+> **Retryable**: yes — safe to retry with backoff
+
+## `ErrorEnvelope` shape
+
+The MCP layer serialises this variant as a snake_case `kind`. The
+`doc_url` field is injected by the MCP server (the in-tree
+`ErrorEnvelope` struct itself does not carry it — it is added by the
+JSON-RPC wrapper for agent consumption).
+
+```json
+{
+  "kind": "rate_limit",
+  "message": "<context-specific>",
+  "retryable": true,
+  "hint": "Honor `retry_after_ms`; reduce per-host QPS.",
+  "retry_after_ms": <number-or-null>,
+  "doc_url": "https://sasuketorii.github.io/rev_scraping/en/errors/RateLimit.html"
+}
+```
+
+## Reproduction
+
+The fastest way to see this error in your own shell:
+
+```sh
+for i in $(seq 1 100); do rev-stealth spider --url https://example.com; done
+```
+
+The JSON-RPC `result.isError` will be `true` and the embedded text
+content carries the envelope above.
+
+## Fix path
+
+Honor `retry_after_ms`; reduce per-host QPS.
+
+**Common root causes**:
+
+- Per-host QPS exceeded.
+- Global concurrency exceeded.
+- Origin returned 429 with `Retry-After`.
+
+## Related
+
+- [Error reference index](./README.md)
+- [Tools cookbook](../tools/README.md)
+- Source: [`crates/stealth-agent-contracts/src/error.rs`](https://github.com/sasuketorii/rev_scraping/blob/main/crates/stealth-agent-contracts/src/error.rs)
+
+exec
+/bin/bash -lc "sed -n '1,110p' docs/book/src/en/errors/README.md" in $REPO_ROOT
+ succeeded in 0ms:
+# Error troubleshooting
+
+Every `rev-stealth` failure surfaces as an `ErrorEnvelope` with these
+fields (defined in `crates/stealth-agent-contracts/src/error.rs`):
+
+```rust,ignore
+pub struct ErrorEnvelope {
+    pub kind: ErrorKind,       // snake_case on the wire
+    pub message: String,
+    pub retryable: bool,
+    pub hint: Option<String>,
+    pub retry_after_ms: Option<u64>,
+}
+```
+
+On the wire `kind` is the snake_case `wire_name` from the table below.
+Each page also surfaces a `doc_url` produced by the MCP layer that
+points to its troubleshooting page.
+
+| Variant | wire `kind` | When emitted | Retryable? |
+|---|---|---|---|
+| [`Aup`](./Aup.md) | `aup` | Acceptable Use Policy violation (site / robots / contract). | no |
+| [`Ssrf`](./Ssrf.md) | `ssrf` | Server-Side Request Forgery guard tripped (private/internal target). | no |
+| [`VpnLeak`](./VpnLeak.md) | `vpn_leak` | VPN / egress IP leak detected — real IP would have been exposed. | yes |
+| [`RateLimit`](./RateLimit.md) | `rate_limit` | Per-host or global rate limit exceeded. | yes |
+| [`Timeout`](./Timeout.md) | `timeout` | Operation exceeded its timeout budget. | yes |
+| [`Captcha`](./Captcha.md) | `captcha` | Captcha challenge encountered and not bypassable in current mode. | no |
+| [`Auth`](./Auth.md) | `auth` | Authentication / authorization failure. | no |
+| [`NotFound`](./NotFound.md) | `not_found` | Target resource not found. | no |
+| [`Validation`](./Validation.md) | `validation` | Input validation failure. | no |
+| [`Network`](./Network.md) | `network` | Lower-level network / transport failure. | yes |
+| [`Internal`](./Internal.md) | `internal` | Unclassified internal error (last resort). | no |
+| [`RecipeNotFound`](./RecipeNotFound.md) | `recipe_not_found` | Recipe lookup failed: the requested `domain` has no recipe on disk. | no |
+| [`RecipeInvalid`](./RecipeInvalid.md) | `recipe_invalid` | Recipe payload (TOML/JSON) failed schema or semantic validation. | no |
+| [`AuthSessionExpired`](./AuthSessionExpired.md) | `auth_session_expired` | `auth_login_complete` polled past `login_timeout` budget. | yes |
+| [`AuthSessionNotFound`](./AuthSessionNotFound.md) | `auth_session_not_found` | `session_token` is unknown to the registry (never issued, GC'd, or already consumed). | no |
+| [`AuthSessionPending`](./AuthSessionPending.md) | `auth_session_pending` | `session_token` exists but the login helper has not yet finished. | yes |
+| [`VpnNotConfigured`](./VpnNotConfigured.md) | `vpn_not_configured` | VPN rotation requested but no VPN backend is configured. | no |
+| [`VpnAllInstancesFailed`](./VpnAllInstancesFailed.md) | `vpn_all_instances_failed` | VPN rotation tried every configured instance and none came up. | yes |
+| [`VpnCountryMismatch`](./VpnCountryMismatch.md) | `vpn_country_mismatch` | VPN egress is up but the resolved country does not match the requested `country` constraint. | yes |
+| [`CdpProtocol`](./CdpProtocol.md) | `cdp_protocol` | Chrome DevTools Protocol returned an unexpected error code. | yes |
+| [`CdpDisconnected`](./CdpDisconnected.md) | `cdp_disconnected` | CDP WebSocket disconnected before the operation completed. | yes |
+| [`CdpInjectionFailed`](./CdpInjectionFailed.md) | `cdp_injection_failed` | Stealth JS injection into the target page failed. | yes |
+| [`BrowserCrashed`](./BrowserCrashed.md) | `browser_crashed` | Headless browser process crashed mid-operation. | yes |
+| [`BrowserNotFound`](./BrowserNotFound.md) | `browser_not_found` | Headless browser binary could not be located on PATH. | no |
+| [`CookieDecryptFailed`](./CookieDecryptFailed.md) | `cookie_decrypt_failed` | On-disk cookie store could not be decrypted (bad passphrase / corruption). | no |
+| [`Aborted`](./Aborted.md) | `aborted` | Operation cancelled by caller (e.g. shutdown signal). | yes |
+
+exec
+/bin/bash -lc 'rg -n "RateLimit|retryable|kind|doc_url|ErrorEnvelope|claude mcp add|claude mcp list" docs/book/src/en/tutorial/05-claude-code.md docs/book/src/en/errors/README.md docs/book/src/en/errors/RateLimit.md' in $REPO_ROOT
+ succeeded in 0ms:
+docs/book/src/en/errors/README.md:3:Every `rev-stealth` failure surfaces as an `ErrorEnvelope` with these
+docs/book/src/en/errors/README.md:7:pub struct ErrorEnvelope {
+docs/book/src/en/errors/README.md:8:    pub kind: ErrorKind,       // snake_case on the wire
+docs/book/src/en/errors/README.md:10:    pub retryable: bool,
+docs/book/src/en/errors/README.md:16:On the wire `kind` is the snake_case `wire_name` from the table below.
+docs/book/src/en/errors/README.md:17:Each page also surfaces a `doc_url` produced by the MCP layer that
+docs/book/src/en/errors/README.md:20:| Variant | wire `kind` | When emitted | Retryable? |
+docs/book/src/en/errors/README.md:25:| [`RateLimit`](./RateLimit.md) | `rate_limit` | Per-host or global rate limit exceeded. | yes |
+docs/book/src/en/errors/RateLimit.md:1:# `RateLimit`
+docs/book/src/en/errors/RateLimit.md:3:> **Wire `kind`** (snake_case): `rate_limit`
+docs/book/src/en/errors/RateLimit.md:7:## `ErrorEnvelope` shape
+docs/book/src/en/errors/RateLimit.md:9:The MCP layer serialises this variant as a snake_case `kind`. The
+docs/book/src/en/errors/RateLimit.md:10:`doc_url` field is injected by the MCP server (the in-tree
+docs/book/src/en/errors/RateLimit.md:11:`ErrorEnvelope` struct itself does not carry it — it is added by the
+docs/book/src/en/errors/RateLimit.md:16:  "kind": "rate_limit",
+docs/book/src/en/errors/RateLimit.md:18:  "retryable": true,
+docs/book/src/en/errors/RateLimit.md:21:  "doc_url": "https://sasuketorii.github.io/rev_scraping/en/errors/RateLimit.html"
+docs/book/src/en/tutorial/05-claude-code.md:9:claude mcp add rev-stealth -- rev-stealth mcp
+docs/book/src/en/tutorial/05-claude-code.md:25:check `claude mcp list`.
+docs/book/src/en/tutorial/05-claude-code.md:42:[`I.7` `ErrorEnvelope`](../compat.md)):
+docs/book/src/en/tutorial/05-claude-code.md:46:  "kind": "RateLimit",
+docs/book/src/en/tutorial/05-claude-code.md:50:  "doc_url": "https://sasuketorii.github.io/rev_scraping/en/errors/RateLimit.html"
+docs/book/src/en/tutorial/05-claude-code.md:54:Claude can read `kind` and `doc_url`, follow the URL, and pick a fix
+docs/book/src/en/tutorial/05-claude-code.md:60:claude mcp list | grep -q rev-stealth
+
+exec
+/bin/bash -lc 'cd docs/book && mdbook test' in $REPO_ROOT
+ succeeded in 1636ms:
+ INFO Testing chapter '03. Browser profile & cookies': "en/tutorial/03-profile.md"
+ INFO Testing chapter '04. VPN rotation': "en/tutorial/04-vpn.md"
+ INFO Testing chapter '05. Claude Code integration': "en/tutorial/05-claude-code.md"
+ INFO Testing chapter '06. Hermes orchestrator': "en/tutorial/06-hermes.md"
+ INFO Testing chapter '07. VPS deployment': "en/tutorial/07-vps.md"
+ INFO Testing chapter 'MCP Tools Cookbook': "en/tools/index.md"
+ INFO Testing chapter 'spider': "en/tools/spider.md"
+ INFO Testing chapter 'relocate': "en/tools/relocate.md"
+ INFO Testing chapter 'cf_evaluate': "en/tools/cf_evaluate.md"
+ INFO Testing chapter 'doctor': "en/tools/doctor.md"
+ INFO Testing chapter 'recipe_list': "en/tools/recipe_list.md"
+ INFO Testing chapter 'recipe_show': "en/tools/recipe_show.md"
+ INFO Testing chapter 'recipe_remove': "en/tools/recipe_remove.md"
+ INFO Testing chapter 'recipe_propose_endpoint': "en/tools/recipe_propose_endpoint.md"
+ INFO Testing chapter 'recipe_export': "en/tools/recipe_export.md"
+ INFO Testing chapter 'recipe_import': "en/tools/recipe_import.md"
+ INFO Testing chapter 'auth_login_start': "en/tools/auth_login_start.md"
+ INFO Testing chapter 'auth_login_complete': "en/tools/auth_login_complete.md"
+ INFO Testing chapter 'auth_list': "en/tools/auth_list.md"
+ INFO Testing chapter 'auth_status': "en/tools/auth_status.md"
+ INFO Testing chapter 'session_show': "en/tools/session_show.md"
+ INFO Testing chapter 'vpn_rotate': "en/tools/vpn_rotate.md"
+ INFO Testing chapter 'Migration Guides': "en/migration/index.md"
+ INFO Testing chapter 'From Crawl4AI MCP': "en/migration/from-crawl4ai.md"
+ INFO Testing chapter 'From Playwright MCP': "en/migration/from-playwright.md"
+ INFO Testing chapter 'Error Troubleshooting': "en/errors/index.md"
+ INFO Testing chapter 'Aup': "en/errors/Aup.md"
+ INFO Testing chapter 'Ssrf': "en/errors/Ssrf.md"
+ INFO Testing chapter 'VpnLeak': "en/errors/VpnLeak.md"
+ INFO Testing chapter 'RateLimit': "en/errors/RateLimit.md"
+ INFO Testing chapter 'Timeout': "en/errors/Timeout.md"
+ INFO Testing chapter 'Captcha': "en/errors/Captcha.md"
+ INFO Testing chapter 'Auth': "en/errors/Auth.md"
+ INFO Testing chapter 'NotFound': "en/errors/NotFound.md"
+ INFO Testing chapter 'Validation': "en/errors/Validation.md"
+ INFO Testing chapter 'Network': "en/errors/Network.md"
+ INFO Testing chapter 'Internal': "en/errors/Internal.md"
+ INFO Testing chapter 'RecipeNotFound': "en/errors/RecipeNotFound.md"
+ INFO Testing chapter 'RecipeInvalid': "en/errors/RecipeInvalid.md"
+ INFO Testing chapter 'AuthSessionExpired': "en/errors/AuthSessionExpired.md"
+ INFO Testing chapter 'AuthSessionNotFound': "en/errors/AuthSessionNotFound.md"
+ INFO Testing chapter 'AuthSessionPending': "en/errors/AuthSessionPending.md"
+ INFO Testing chapter 'VpnNotConfigured': "en/errors/VpnNotConfigured.md"
+ INFO Testing chapter 'VpnAllInstancesFailed': "en/errors/VpnAllInstancesFailed.md"
+ INFO Testing chapter 'VpnCountryMismatch': "en/errors/VpnCountryMismatch.md"
+ INFO Testing chapter 'CdpProtocol': "en/errors/CdpProtocol.md"
+ INFO Testing chapter 'CdpDisconnected': "en/errors/CdpDisconnected.md"
+ INFO Testing chapter 'CdpInjectionFailed': "en/errors/CdpInjectionFailed.md"
+ INFO Testing chapter 'BrowserCrashed': "en/errors/BrowserCrashed.md"
+ INFO Testing chapter 'BrowserNotFound': "en/errors/BrowserNotFound.md"
+ INFO Testing chapter 'CookieDecryptFailed': "en/errors/CookieDecryptFailed.md"
+ INFO Testing chapter 'Aborted': "en/errors/Aborted.md"
+ INFO Testing chapter 'Competitive Landscape': "en/landscape.md"
+ INFO Testing chapter 'Compatibility & Semver': "en/compat.md"
+ INFO Testing chapter '概要': "ja/index.md"
+ INFO Testing chapter 'インストール': "ja/install.md"
+ INFO Testing chapter 'クイックスタート': "ja/tutorial.md"
+ INFO Testing chapter 'MCP ツール一覧': "ja/tools.md"
+ INFO Testing chapter '移行ガイド': "ja/migration.md"
+ INFO Testing chapter 'エラー対処': "ja/errors.md"
+
+codex
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 9.4 | J.1-J.7 は実質充足。mdBook build/test、16 tool cookbook、26 ErrorKind、migration、landscape まで揃っている。i18n helper と live Pages は operator-approved descope / 設定待ちなので小幅減点。 |
+| B | 9.3 | mdBook、rustdoc、jsonschema、landscape sync で外部検証可能。CI/workflow 化もあるが、Pages 有効化は手動前提。 |
+| C | 9.2 | Agent docs として Crawl4AI/Playwright MCP 系より具体的で、tool/error/migration が揃う。完全な多言語 toggle 未達で満点ではない。 |
+| D | 9.1 | Lane J 特化条件の「Claude Code 5分導入」と「26 ErrorKind 個別解説」は達成。tutorial/05 の ErrorEnvelope 例だけ ErrorKind ページほど厳密でないため軽微減点。 |
+| E | 8.8 | mdBook + JSON Schema は保守しやすい。best-effort rustdoc と v1.4 送りの i18n helper が将来負債として残る。 |
+| F | 9.4 | mdBook build/test PASS、16 success Response の Draft-07 schema validation PASS、review round evidence あり。live Pages 確認は未完。 |
+| G | 9.3 | 次担当が読める網羅性は高い。landscape は authoritative copy と book copy が byte-identical。小さな tutorial 表記ズレのみ残る。 |
+
+overall = 9.23 (weighted)
+
+verdict: PASS (≥9.0)
+
+deltas to reach 9.0 if FAIL: none
+tokens used
+110,202
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"cb5f5b63-f050-4d1f-a7f9-f0a917f53db6","timestamp":"2026-05-22T20:37:01Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":117715,"tokens_in":90762,"tokens_out":1,"total_tokens":175,"dry_run":false,"specialty_status":"none"}

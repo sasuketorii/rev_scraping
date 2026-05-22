@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.1",
+  "issues": [
+    {
+      "kind": "info-flat-top-level",
+      "path": [
+        "doctor"
+      ],
+      "note": "top-level leaf command (no <verb> level); confirm intentional"
+    },
+    {
+      "kind": "info-flat-top-level",
+      "path": [
+        "spider"
+      ],
+      "note": "top-level leaf command (no <verb> level); confirm intentional"
+    },
+    {
+      "kind": "info-flat-top-level",
+      "path": [
+        "relocate"
+      ],
+      "note": "top-level leaf command (no <verb> level); confirm intentional"
+    },
+    {
+      "kind": "info-flat-top-level",
+      "path": [
+        "cf-evaluate"
+      ],
+      "note": "top-level leaf command (no <verb> level); confirm intentional"
+    },
+    {
+      "kind": "info-flat-top-level",
+      "path": [
+        "measure"
+      ],
+      "note": "top-level leaf command (no <verb> level); confirm intentional"
+    }
+  ],
+  "issue_count": 5
+}

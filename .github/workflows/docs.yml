@@ -1,0 +1,88 @@
+name: Docs (mdBook + rustdoc) → GitHub Pages
+
+# One-time manual step before this workflow can deploy successfully:
+#   Settings → Pages → Source: "GitHub Actions" (not "Deploy from a branch").
+# See `.agent/active/v1_3_uplift_execplan_rev1.md` (Risks & mitigations,
+# row J.1). Until Pages is enabled in repo settings, the deploy job will
+# fail and https://sasuketorii.github.io/rev_scraping/ returns 404. The
+# build job still produces the artifact and can be downloaded locally.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install mdBook
+        run: |
+          set -euo pipefail
+          MDBOOK_VERSION=v0.5.3
+          curl -fsSL \
+            "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C /usr/local/bin
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build mdBook
+        working-directory: docs/book
+        run: mdbook build
+
+      - name: Build rustdoc with --document-private-items (best-effort)
+        # Lane J.5 spec calls for `rustdoc --document-private-items`. We
+        # publish it as auxiliary reference, NOT as a release gate: intra-doc
+        # link warnings in vendored / in-flight crates would otherwise block
+        # the mdBook deploy. Tighten to `-D warnings` in v1.4 once every
+        # workspace crate has reached the `#![deny(missing_docs)]` bar
+        # (currently only stealth-agent-contracts).
+        run: |
+          cargo doc --workspace --no-deps --document-private-items \
+            || cargo doc --workspace --no-deps \
+            || true
+
+      - name: Assemble Pages payload
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R target/book/* _site/
+          mkdir -p _site/api
+          if [ -d target/doc ]; then
+            cp -R target/doc/* _site/api/
+          fi
+          # Landing page redirect for /api/
+          if [ ! -f _site/api/index.html ]; then
+            echo '<meta http-equiv="refresh" content="0;url=./rev_stealth_cli/index.html">' > _site/api/index.html
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

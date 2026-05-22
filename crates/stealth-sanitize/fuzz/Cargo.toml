@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT
+# Lane K K.5 — cargo-fuzz harness for stealth-sanitize.
+#
+# Build with:
+#   cargo +nightly fuzz run sanitize_full
+#   cargo +nightly fuzz run sanitize_l4_unicode
+#
+# Nightly GH cron runs each target ~1h/day. Crash artifacts are pinned
+# as seed corpus under fuzz/corpus/<target>/.
+
+[package]
+name = "stealth-sanitize-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+serde_json = "1"
+stealth-sanitize = { path = ".." }
+stealth-mcp = { path = "../../stealth-mcp" }
+
+[[bin]]
+name = "sanitize_full"
+path = "fuzz_targets/sanitize_full.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sanitize_l4_unicode"
+path = "fuzz_targets/sanitize_l4_unicode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mcp_jsonrpc_frame"
+path = "fuzz_targets/mcp_jsonrpc_frame.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+# Detach fuzz subdir from the parent workspace so `cargo build` at the
+# repo root does not try to compile libfuzzer-sys (requires nightly +
+# `-Z sanitizer=address`).

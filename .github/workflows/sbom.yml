@@ -1,0 +1,116 @@
+name: SBOM
+
+# Lane K K.8 (deduplicated with Lane H.6 — both share SBOM/cosign infra).
+#
+# Lane H release.yml already produces:
+#   - docker/build-push-action sbom: true   (image-level SBOM)
+#   - cosign sign-blob on every binary archive (keyless OIDC)
+#   - attest-build-provenance (SLSA L3) on binaries
+#
+# This workflow adds the workspace-level Rust SBOM that Lane H does not:
+#   - cargo-cyclonedx -> .cdx.json (CycloneDX 1.5)
+#   - syft            -> .spdx.json (SPDX 2.3)
+# Both files are uploaded as release assets on tag push, and as a job
+# artifact on every PR for review.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/sbom.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to attach assets on tag push
+  id-token: write   # required for cosign keyless OIDC
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  sbom:
+    name: workspace SBOM (CycloneDX + SPDX)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable-sbom
+          workspaces: |
+            . -> target
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-cyclonedx
+      - name: cargo cyclonedx (workspace, JSON, all features)
+        run: |
+          set -euo pipefail
+          cargo cyclonedx --format json --all
+          mkdir -p dist/sbom
+          # cargo-cyclonedx writes per-crate bom.json into each crate dir.
+          # Copy each into dist/sbom/ with the crate name prefix.
+          for f in crates/*/bom.json; do
+            test -f "$f" || continue
+            crate_dir=$(dirname "$f")
+            crate_name=$(basename "$crate_dir")
+            cp "$f" "dist/sbom/${crate_name}.cdx.json"
+          done
+          # Top-level workspace bom (if cargo-cyclonedx emits one).
+          if [ -f bom.json ]; then
+            cp bom.json dist/sbom/workspace.cdx.json
+          fi
+
+      - name: Install syft (SPDX)
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: syft to SPDX JSON
+        run: |
+          set -euo pipefail
+          mkdir -p dist/sbom
+          syft scan dir:. -o spdx-json=dist/sbom/workspace.spdx.json
+
+      - name: Install cosign (tag push only)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: sigstore/cosign-installer@v3
+
+      - name: cosign sign-blob (workspace SBOMs)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          COSIGN_YES: "true"
+        run: |
+          set -euo pipefail
+          for f in dist/sbom/workspace.cdx.json dist/sbom/workspace.spdx.json; do
+            test -f "$f" || continue
+            cosign sign-blob --yes \
+              --bundle "${f}.cosign.bundle" \
+              "$f"
+          done
+
+      - name: Upload SBOM artifact (PR + dispatch)
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: dist/sbom/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attach SBOM to GitHub Release (tag)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sbom/workspace.cdx.json
+            dist/sbom/workspace.spdx.json
+            dist/sbom/workspace.cdx.json.cosign.bundle
+            dist/sbom/workspace.spdx.json.cosign.bundle
+          draft: true
+          fail_on_unmatched_files: false

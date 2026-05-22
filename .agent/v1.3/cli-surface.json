@@ -1,0 +1,2695 @@
+{
+  "schema_version": "1.1",
+  "binary": "rev-stealth",
+  "exit_code_dictionary": [
+    {
+      "code": 0,
+      "name": "Ok",
+      "rust_variant": "ExitCode::Ok",
+      "description": "Success."
+    },
+    {
+      "code": 1,
+      "name": "UserError",
+      "rust_variant": "ExitCode::UserError",
+      "description": "User input error (bad args / bad config)."
+    },
+    {
+      "code": 2,
+      "name": "TransientError",
+      "rust_variant": "ExitCode::TransientError",
+      "description": "Transient failure (retryable: network / VPN flap)."
+    },
+    {
+      "code": 3,
+      "name": "PermanentError",
+      "rust_variant": "ExitCode::PermanentError",
+      "description": "Permanent failure (unsupported / not implemented / fatal)."
+    },
+    {
+      "code": 4,
+      "name": "AuthExpired",
+      "rust_variant": "ExitCode::AuthExpired",
+      "description": "Stored authentication is missing, expired, or unusable (Phase 9a)."
+    },
+    {
+      "code": 7,
+      "name": "Leak",
+      "rust_variant": "ExitCode::Leak",
+      "description": "Fail-closed: VPN / DNS / IPv6 / WebRTC leak detected (Phase 6c)."
+    }
+  ],
+  "exit_code_coverage": {
+    "total_commands": 43,
+    "mapped_commands": 43,
+    "missing": []
+  },
+  "root": {
+    "path": [],
+    "description": "Defender-facing evaluation toolkit: captcha resilience / browser stealth / VPN rotation / adaptive scraping (authorized targets only)",
+    "flags": [
+      {
+        "long": "--format",
+        "short": null,
+        "takes_value": true,
+        "value_name": "FORMAT",
+        "description": "Output format [default: human] [possible values: human, json]"
+      },
+      {
+        "long": "--verbose",
+        "short": "-v",
+        "takes_value": false,
+        "value_name": null,
+        "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+      },
+      {
+        "long": "--help",
+        "short": "-h",
+        "takes_value": false,
+        "value_name": null,
+        "description": "Print help"
+      },
+      {
+        "long": "--version",
+        "short": "-V",
+        "takes_value": false,
+        "value_name": null,
+        "description": "Print version"
+      }
+    ],
+    "positionals": [],
+    "exit_codes": [],
+    "subcommands": [
+      {
+        "path": [
+          "captcha"
+        ],
+        "description": "CAPTCHA bypass operations (reCAPTCHA v2 / v3 / hCaptcha / Turnstile)",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "subcommands": [
+          {
+            "path": [
+              "captcha",
+              "solve"
+            ],
+            "description": "Solve a CAPTCHA challenge",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--type",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TYPE",
+                "description": "Challenge type: `recaptcha-v2`, `recaptcha-v3`, `hcaptcha`, `turnstile`"
+              },
+              {
+                "long": "--site-url",
+                "short": null,
+                "takes_value": true,
+                "value_name": "URL",
+                "description": "Target site URL hosting the challenge"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--site-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "KEY",
+                "description": "Sitekey (auto-detected if omitted on supported challenge types)"
+              },
+              {
+                "long": "--action",
+                "short": null,
+                "takes_value": true,
+                "value_name": "ACTION",
+                "description": "reCAPTCHA v3 action label [default: submit]"
+              },
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Skip the live solver and exercise the sidecar plumbing only. Useful for CI smoke tests"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "captcha",
+              "verify"
+            ],
+            "description": "Verify a previously-issued token (round-trips through the challenge provider's verify endpoint)",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--type",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TYPE",
+                "description": "Challenge type, same vocabulary as `solve --type`"
+              },
+              {
+                "long": "--token",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TOKEN",
+                "description": "Token returned by `solve`"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--secret",
+                "short": null,
+                "takes_value": true,
+                "value_name": "SECRET",
+                "description": "Provider secret (loaded from env in production) [env: REV_STEALTH_CAPTCHA_SECRET=]"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "subcommands": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "browser"
+        ],
+        "description": "Stealth browser operations (launch a profile, run a stealth-test sweep)",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "subcommands": [
+          {
+            "path": [
+              "browser",
+              "launch"
+            ],
+            "description": "Launch a stealth browser, navigate to a URL, and emit JSON about the resulting page (UA / viewport / title / final URL). Useful as a smoke test that the launcher works on this host",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": "Profile slug. One of: `desktop`, `mobile-ios`, `mobile-android`, `ipad`, `galaxy-ultra` [default: mobile-ios]"
+              },
+              {
+                "long": "--stealth",
+                "short": null,
+                "takes_value": true,
+                "value_name": "STEALTH",
+                "description": "Stealth level: `off`, `basic`, `full` [default: full]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--url",
+                "short": null,
+                "takes_value": true,
+                "value_name": "URL",
+                "description": "Navigate to this URL after launch. Default: `about:blank` [default: about:blank]"
+              },
+              {
+                "long": "--headed",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Run with a visible chrome window instead of new-headless mode"
+              },
+              {
+                "long": "--chrome",
+                "short": null,
+                "takes_value": true,
+                "value_name": "CHROME",
+                "description": "Override the chrome executable path. By default, chromiumoxide auto-detects the system chrome [env: REV_STEALTH_CHROME=]"
+              },
+              {
+                "long": "--dwell",
+                "short": null,
+                "takes_value": true,
+                "value_name": "DWELL",
+                "description": "Hold the page for this many seconds after navigation (lets a detector finish its work). Default 0 = exit as soon as `document.readyState` settles [default: 0]"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "browser",
+              "stealth-test"
+            ],
+            "description": "Run a stealth self-test: launch a stealth browser, navigate to the target detection page (defaults to bot.sannysoft.com), wait briefly, then dump UA / viewport / title",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Detection page to probe [default: https://bot.sannysoft.com/]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": "[default: mobile-ios]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--stealth",
+                "short": null,
+                "takes_value": true,
+                "value_name": "STEALTH",
+                "description": "[default: full]"
+              },
+              {
+                "long": "--dwell",
+                "short": null,
+                "takes_value": true,
+                "value_name": "DWELL",
+                "description": "[default: 5]"
+              },
+              {
+                "long": "--headed",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": ""
+              },
+              {
+                "long": "--chrome",
+                "short": null,
+                "takes_value": true,
+                "value_name": "CHROME",
+                "description": "[env: REV_STEALTH_CHROME=]"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "subcommands": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "vpn"
+        ],
+        "description": "VPN IP rotation operations (Surfshark / Gluetun lazy-rotate-on-fail)",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          2,
+          3,
+          7
+        ],
+        "subcommands": [
+          {
+            "path": [
+              "vpn",
+              "rotate"
+            ],
+            "description": "Trigger a VPN rotation. With `lazy-on-fail`, rotation is skipped unless the failure counter has crossed the threshold",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--provider",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROVIDER",
+                "description": "VPN provider slug (currently only `surfshark`) [default: surfshark]"
+              },
+              {
+                "long": "--strategy",
+                "short": null,
+                "takes_value": true,
+                "value_name": "STRATEGY",
+                "description": "Rotation strategy: `lazy-on-fail`, `every-n`, `interval` [default: lazy-on-fail]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--region",
+                "short": null,
+                "takes_value": true,
+                "value_name": "REGION",
+                "description": "Optional region (`jp`, `us-west`, `de`, ...). Cycled through when omitted"
+              },
+              {
+                "long": "--reason",
+                "short": null,
+                "takes_value": true,
+                "value_name": "REASON",
+                "description": "Reason hint; recorded in the audit log for forensics [default: manual]"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              2,
+              3,
+              7
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "vpn",
+              "status"
+            ],
+            "description": "Show the current public IP and the VPN container state",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--provider",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROVIDER",
+                "description": "Provider slug to scope the status query [default: surfshark]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              2,
+              3,
+              7
+            ],
+            "subcommands": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "doctor"
+        ],
+        "description": "Pre-flight leak-prevention checks (kill-switch / DNS / IPv6 / WebRTC). Exits with code 7 when any check fails (fail-closed)",
+        "flags": [
+          {
+            "long": "--container",
+            "short": null,
+            "takes_value": true,
+            "value_name": "CONTAINER",
+            "description": "VPN container name to inspect [default: gluetun]"
+          },
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--expected-country",
+            "short": null,
+            "takes_value": true,
+            "value_name": "EXPECTED_COUNTRY",
+            "description": "Expected VPN exit country (ISO-2, e.g. \"JP\"). Skipped when omitted"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for doctor diagnostic results: `json` (machine-parseable, default) or `text` (human-readable) [default: json] [possible values: json, text]"
+          },
+          {
+            "long": "--skip-exit-ip",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Skip the live `ipinfo.io` exit-IP probe (offline / CI mode)"
+          },
+          {
+            "long": "--deep",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "v1.1.0 (P16): run extended stack health checks (obscura binary, VPN instance pool, sites recipe count, auth profile validity, AuthStore key source). The default check set stays minimal so the existing fail-closed contract (exit 7 on leak) is unchanged; `--deep` adds non-leak diagnostic WARN/FAIL items"
+          },
+          {
+            "long": "--vps",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "P10.3: run VPS deploy readiness checks (systemd unit prerequisites, dedicated user, /var/log + /var/lib dir permissions, credstore, chrome/xvfb-run on PATH, docker + gluetun image, DISPLAY env). FAIL items exit 3 (permanent); WARN-only stays exit 0. Independent from the leak-fail-closed contract used by the base checks"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          7
+        ],
+        "subcommands": []
+      },
+      {
+        "path": [
+          "spider"
+        ],
+        "description": "AUP-gated browse + optional CF eval + optional adaptive relocate",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--url",
+            "short": null,
+            "takes_value": true,
+            "value_name": "URL",
+            "description": "Target URL"
+          },
+          {
+            "long": "--session-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "SESSION_ID",
+            "description": "Session id (auto-generated when omitted)"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--mobile-preset",
+            "short": null,
+            "takes_value": true,
+            "value_name": "MOBILE_PRESET",
+            "description": "Mobile fingerprint preset slug"
+          },
+          {
+            "long": "--cf-evaluate",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Evaluate Cloudflare Turnstile resilience (defender-testbed; no solver)"
+          },
+          {
+            "long": "--vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Route through `vpn-rotate` before launch"
+          },
+          {
+            "long": "--stable-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "STABLE_ID",
+            "description": "stable_id to locate via `stealth-parse` after navigation"
+          },
+          {
+            "long": "--threshold",
+            "short": null,
+            "takes_value": true,
+            "value_name": "THRESHOLD",
+            "description": "Similarity threshold for relocate [default: 0.85]"
+          },
+          {
+            "long": "--strict",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Treat Ambiguous relocate as a hard failure (exit code 10)"
+          },
+          {
+            "long": "--i-have-authorization",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "AUP bypass (logs a warn). Equivalent to env-ack for the day"
+          },
+          {
+            "long": "--obscura",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OBSCURA",
+            "description": "Path to the obscura binary. Overridable via env [env: REV_STEALTH_OBSCURA=]"
+          },
+          {
+            "long": "--parse-store",
+            "short": null,
+            "takes_value": true,
+            "value_name": "PARSE_STORE",
+            "description": "Optional ParseStore path (defaults to `~/.rev_scraping/parse.sqlite`)"
+          },
+          {
+            "long": "--use-auth",
+            "short": null,
+            "takes_value": true,
+            "value_name": "USE_AUTH",
+            "description": "Replay stored auth cookies and browser headers from the named profile"
+          },
+          {
+            "long": "--auth-domain",
+            "short": null,
+            "takes_value": true,
+            "value_name": "AUTH_DOMAIN",
+            "description": "Auth AAD/domain context to load; defaults to the target host"
+          },
+          {
+            "long": "--http-only",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Skip obscura entirely and fetch via reqwest. Implies no JS execution, no CF eval, no DOM injection"
+          },
+          {
+            "long": "--auto-fallback",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "When obscura launch / CDP fails, automatically retry with reqwest. Default true; set `--no-auto-fallback` to disable for deterministic agent workflows that need a hard exit-3 on browser failure"
+          },
+          {
+            "long": "--no-auto-fallback",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Explicit disable for `--auto-fallback` (overrides the default)"
+          },
+          {
+            "long": "--dump-html",
+            "short": null,
+            "takes_value": true,
+            "value_name": "DUMP_HTML",
+            "description": "Dump the fetched HTML to the given path (UTF-8). With obscura, the post-render `document.documentElement.outerHTML` is captured (so SPAs land hydrated); with the reqwest fallback / `--http-only`, the raw response body is written. Parent directories are created as needed and the file is created with mode `0600` on Unix"
+          },
+          {
+            "long": "--wait-ms",
+            "short": null,
+            "takes_value": true,
+            "value_name": "WAIT_MS",
+            "description": "After obscura navigate completes, wait N milliseconds before dumping the HTML. Useful for SPA hydration. No-op on the reqwest fallback path"
+          },
+          {
+            "long": "--wait-selector",
+            "short": null,
+            "takes_value": true,
+            "value_name": "WAIT_SELECTOR",
+            "description": "After obscura navigate completes, wait until the given CSS selector appears in the DOM (max 30 seconds). Takes precedence over `--wait-ms`. No-op on the reqwest fallback path"
+          },
+          {
+            "long": "--require-vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Force the VPN-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1` only in the sense that env can't be loosened further"
+          },
+          {
+            "long": "--allow-no-vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1` (which is the only way to enforce the policy from outside the process)"
+          },
+          {
+            "long": "--vpn-instance",
+            "short": null,
+            "takes_value": true,
+            "value_name": "VPN_INSTANCE",
+            "description": "Force this invocation to use the named VPN instance, overriding the HRW session-sticky pick. Useful for tests and reproducible runs. Must match a `name` in the configured `vpn_instances` list"
+          },
+          {
+            "long": "--proxy-tier",
+            "short": null,
+            "takes_value": true,
+            "value_name": "PROXY_TIER",
+            "description": "Force a named proxy tier (e.g. \"direct\", \"surfshark\", \"warp\", \"iproyal\") or \"auto\" to use the configured fallback chain. Mutually exclusive with `--vpn-instance` unless the tier is exactly \"surfshark\""
+          },
+          {
+            "long": "--no-fallback",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Disable the fallback chain; one attempt at the selected tier only"
+          },
+          {
+            "long": "--leak-poll-secs",
+            "short": null,
+            "takes_value": true,
+            "value_name": "LEAK_POLL_SECS",
+            "description": "Polling interval (seconds) for the background leak monitor. Only honoured when `require_vpn=true`. Range [5, 300]; out-of-range values are clamped. Default 30s [default: 30]"
+          },
+          {
+            "long": "--no-cache",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Skip recipe lookup AND skeleton save for this invocation"
+          },
+          {
+            "long": "--cache-refresh",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Ignore any existing recipe, run full discovery, and overwrite the recipe on success"
+          },
+          {
+            "long": "--cache-only",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Hard-require a recipe hit. On miss, exit code 9 and do nothing"
+          },
+          {
+            "long": "--cache-ttl",
+            "short": null,
+            "takes_value": true,
+            "value_name": "CACHE_TTL",
+            "description": "Treat recipes whose `last_verified` is older than DAYS as expired. Default: 30 days. Expired recipes are refreshed and overwritten [default: 30]"
+          },
+          {
+            "long": "--recipe-dir",
+            "short": null,
+            "takes_value": true,
+            "value_name": "RECIPE_DIR",
+            "description": "Override the recipe directory (defaults to `~/.rev_scraping/sites/`)"
+          },
+          {
+            "long": "--recipe-endpoint",
+            "short": null,
+            "takes_value": true,
+            "value_name": "RECIPE_ENDPOINT",
+            "description": "When a recipe is hit and exposes API endpoints, call the endpoint matching this `purpose` directly via reqwest, skipping browser entirely"
+          },
+          {
+            "long": "--recipe-param",
+            "short": null,
+            "takes_value": true,
+            "value_name": "KEY=VALUE",
+            "description": "Placeholder substitutions for the recipe endpoint URL. Repeatable; e.g. `--recipe-param username=alice --recipe-param id=42`"
+          },
+          {
+            "long": "--recipe-no-learn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Disable Phase 7c auto-learning (Network capture + JS bundle scan + recipe upsert). Privacy-sensitive runs may opt out; the skeleton save still applies unless `--no-cache` is set. Default: off (i.e. learning is ON)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          7
+        ],
+        "subcommands": []
+      },
+      {
+        "path": [
+          "relocate"
+        ],
+        "description": "Locate a previously fingerprinted element in a saved HTML or fresh URL",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--session-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "SESSION_ID",
+            "description": "Session id (informational; not required to open the store)"
+          },
+          {
+            "long": "--stable-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "STABLE_ID",
+            "description": "stable_id of the element to locate"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--html-file",
+            "short": null,
+            "takes_value": true,
+            "value_name": "HTML_FILE",
+            "description": "Local HTML file to scan"
+          },
+          {
+            "long": "--url",
+            "short": null,
+            "takes_value": true,
+            "value_name": "URL",
+            "description": "Remote URL to fetch (HTTP-only, no browser launch)"
+          },
+          {
+            "long": "--threshold",
+            "short": null,
+            "takes_value": true,
+            "value_name": "THRESHOLD",
+            "description": "Similarity threshold [default: 0.85]"
+          },
+          {
+            "long": "--parse-store",
+            "short": null,
+            "takes_value": true,
+            "value_name": "PARSE_STORE",
+            "description": "Optional ParseStore path (defaults to `~/.rev_scraping/parse.sqlite`)"
+          },
+          {
+            "long": "--strict",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Treat Ambiguous as exit 10"
+          },
+          {
+            "long": "--i-have-authorization",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "AUP bypass (logs a warn). Required when `--url` targets a non-allowlisted host"
+          },
+          {
+            "long": "--require-vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Phase 6c: fail-closed VPN-required guard. Applies to `--url` only; `--html-file` is a local read"
+          },
+          {
+            "long": "--allow-no-vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": ""
+          },
+          {
+            "long": "--vpn-instance",
+            "short": null,
+            "takes_value": true,
+            "value_name": "VPN_INSTANCE",
+            "description": "Phase 6d: force a specific VPN instance from the configured pool"
+          },
+          {
+            "long": "--proxy-tier",
+            "short": null,
+            "takes_value": true,
+            "value_name": "PROXY_TIER",
+            "description": "Force a named proxy tier (e.g. \"direct\", \"surfshark\", \"warp\", \"iproyal\") or \"auto\" to use the configured fallback chain. Mutually exclusive with `--vpn-instance` unless the tier is exactly \"surfshark\""
+          },
+          {
+            "long": "--no-fallback",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Disable the fallback chain; one attempt at the selected tier only"
+          },
+          {
+            "long": "--use-auth",
+            "short": null,
+            "takes_value": true,
+            "value_name": "USE_AUTH",
+            "description": "Replay stored auth cookies and browser headers from the named profile"
+          },
+          {
+            "long": "--auth-domain",
+            "short": null,
+            "takes_value": true,
+            "value_name": "AUTH_DOMAIN",
+            "description": "Auth AAD/domain context to load; defaults to the target host"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          3
+        ],
+        "subcommands": []
+      },
+      {
+        "path": [
+          "cf-evaluate"
+        ],
+        "description": "Defender-testbed evaluation of Cloudflare Turnstile resilience",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--url",
+            "short": null,
+            "takes_value": true,
+            "value_name": "URL",
+            "description": ""
+          },
+          {
+            "long": "--session-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "SESSION_ID",
+            "description": ""
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--i-have-authorization",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": ""
+          },
+          {
+            "long": "--obscura",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OBSCURA",
+            "description": "[env: REV_STEALTH_OBSCURA=]"
+          },
+          {
+            "long": "--require-vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Phase 6c: fail-closed VPN-required guard. See spider --require-vpn"
+          },
+          {
+            "long": "--allow-no-vpn",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": ""
+          },
+          {
+            "long": "--vpn-instance",
+            "short": null,
+            "takes_value": true,
+            "value_name": "VPN_INSTANCE",
+            "description": "Phase 6d: force a specific VPN instance from the configured pool"
+          },
+          {
+            "long": "--proxy-tier",
+            "short": null,
+            "takes_value": true,
+            "value_name": "PROXY_TIER",
+            "description": "Force a named proxy tier (e.g. \"direct\", \"surfshark\", \"warp\", \"iproyal\") or \"auto\" to use the configured fallback chain. Mutually exclusive with `--vpn-instance` unless the tier is exactly \"surfshark\""
+          },
+          {
+            "long": "--no-fallback",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Disable the fallback chain; one attempt at the selected tier only"
+          },
+          {
+            "long": "--leak-poll-secs",
+            "short": null,
+            "takes_value": true,
+            "value_name": "LEAK_POLL_SECS",
+            "description": "Phase 6e: background leak monitor poll interval (seconds) [default: 30]"
+          },
+          {
+            "long": "--use-auth",
+            "short": null,
+            "takes_value": true,
+            "value_name": "USE_AUTH",
+            "description": "Replay stored auth cookies and browser headers from the named profile"
+          },
+          {
+            "long": "--auth-domain",
+            "short": null,
+            "takes_value": true,
+            "value_name": "AUTH_DOMAIN",
+            "description": "Auth AAD/domain context to load; defaults to the target host"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "subcommands": []
+      },
+      {
+        "path": [
+          "auth"
+        ],
+        "description": "Authenticated session capture / lifecycle (Phase 9d). Subcommands: login / list / show / delete / status / refresh",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          3,
+          4
+        ],
+        "subcommands": [
+          {
+            "path": [
+              "auth",
+              "login"
+            ],
+            "description": "Spawn `rev-auth` for interactive login; AUP-gated",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": ""
+              },
+              {
+                "long": "--url",
+                "short": null,
+                "takes_value": true,
+                "value_name": "URL",
+                "description": ""
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--domain",
+                "short": null,
+                "takes_value": true,
+                "value_name": "DOMAIN",
+                "description": ""
+              },
+              {
+                "long": "--completion-pattern",
+                "short": null,
+                "takes_value": true,
+                "value_name": "COMPLETION_PATTERN",
+                "description": ""
+              },
+              {
+                "long": "--obscura-bin",
+                "short": null,
+                "takes_value": true,
+                "value_name": "OBSCURA_BIN",
+                "description": "[env: REV_OBSCURA_BIN=]"
+              },
+              {
+                "long": "--rev-auth-bin",
+                "short": null,
+                "takes_value": true,
+                "value_name": "REV_AUTH_BIN",
+                "description": "Override the `rev-auth` helper binary path (defaults to `which rev-auth`) [env: REV_AUTH_BIN=]"
+              },
+              {
+                "long": "--aad-context",
+                "short": null,
+                "takes_value": true,
+                "value_name": "AAD_CONTEXT",
+                "description": "Additional AAD context (e.g. proxy route) bound to the cookie blob [default: \"\"]"
+              },
+              {
+                "long": "--require-vpn",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Force the VPN-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`"
+              },
+              {
+                "long": "--allow-no-vpn",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3,
+              4
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "auth",
+              "list"
+            ],
+            "description": "List saved profiles (metadata only, cookie values never disclosed)",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "auth",
+              "show"
+            ],
+            "description": "Show a single profile's metadata (redacted)",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": ""
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "auth",
+              "delete"
+            ],
+            "description": "Delete a profile with shred-on-delete",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": ""
+              },
+              {
+                "long": "--force",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Skip the interactive confirmation prompt"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "auth",
+              "status"
+            ],
+            "description": "Report freshness/expiry status for a profile",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": ""
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3,
+              4
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "auth",
+              "refresh"
+            ],
+            "description": "Re-run interactive login, overwriting an existing profile",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--profile",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PROFILE",
+                "description": ""
+              },
+              {
+                "long": "--url",
+                "short": null,
+                "takes_value": true,
+                "value_name": "URL",
+                "description": ""
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--domain",
+                "short": null,
+                "takes_value": true,
+                "value_name": "DOMAIN",
+                "description": ""
+              },
+              {
+                "long": "--completion-pattern",
+                "short": null,
+                "takes_value": true,
+                "value_name": "COMPLETION_PATTERN",
+                "description": ""
+              },
+              {
+                "long": "--obscura-bin",
+                "short": null,
+                "takes_value": true,
+                "value_name": "OBSCURA_BIN",
+                "description": "[env: REV_OBSCURA_BIN=]"
+              },
+              {
+                "long": "--rev-auth-bin",
+                "short": null,
+                "takes_value": true,
+                "value_name": "REV_AUTH_BIN",
+                "description": "[env: REV_AUTH_BIN=]"
+              },
+              {
+                "long": "--aad-context",
+                "short": null,
+                "takes_value": true,
+                "value_name": "AAD_CONTEXT",
+                "description": "[default: \"\"]"
+              },
+              {
+                "long": "--require-vpn",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Force the VPN-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`"
+              },
+              {
+                "long": "--allow-no-vpn",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3,
+              4
+            ],
+            "subcommands": []
+          }
+        ]
+      },
+      {
+        "path": [
+          "measure"
+        ],
+        "description": "v1.1.0 (P15): local fingerprint diagnostics for monitoring. External SaaS calls are opt-in via `--enable-external`",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--url",
+            "short": null,
+            "takes_value": true,
+            "value_name": "URL",
+            "description": "URL to measure against. The page is not actually fetched unless `--enable-external` is set; we only validate the URL shape here"
+          },
+          {
+            "long": "--enable-external",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Opt-in to external fingerprint SaaS calls (CreepJS, bot.sannysoft.com, etc.). Default: disabled"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--enable-egress-probe",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "P10.5: Opt-in to a VPS egress probe (HEAD request against a minimal endpoint) to measure exit IP / TLS / DNS leak after deploy. Even with this flag set, the probe is only active when the binary was built with the `vps-egress-probe` Cargo feature; otherwise a deterministic `disabled` stub is returned. Default: disabled"
+          },
+          {
+            "long": "--user-agent",
+            "short": null,
+            "takes_value": true,
+            "value_name": "USER_AGENT",
+            "description": "Optional override for the User-Agent we attribute the measurement to. When omitted we use a neutral rev-stealth placeholder"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "subcommands": []
+      },
+      {
+        "path": [
+          "config"
+        ],
+        "description": "v1.2.0 (P6.1): inspect the layered config (`show` / `paths` / `validate` / `diff` / `get`)",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "config_output_format",
+            "description": "Output format. Overrides the global `--format` only for this subtree [default: text] [possible values: text, json, yaml]"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          3
+        ],
+        "subcommands": [
+          {
+            "path": [
+              "config",
+              "show"
+            ],
+            "description": "Print the merged effective config from all 4 source layers (policy.toml / authorized.toml / sites/* / env). Secret-looking env values are replaced with `<redacted>`",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "paths"
+            ],
+            "description": "List each config file path (absolute), its existence, and permission bits (unix mode)",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "validate"
+            ],
+            "description": "Run the P5.1 validate engine over the live config files. Exit 0 on LGTM; exit 1 with structured issue list on violations",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "diff"
+            ],
+            "description": "Print a unified diff between the live `<path>` and the in-repo `templates/policy.toml` baseline. Headers use `---` / `+++`",
+            "flags": [
+              {
+                "long": "--against",
+                "short": null,
+                "takes_value": true,
+                "value_name": "AGAINST",
+                "description": "Override the baseline (defaults to `templates/policy.toml`)"
+              },
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [
+              {
+                "name": "PATH",
+                "description": "Path to the live config file (e.g. `~/.rev_scraping/policy.toml`)"
+              }
+            ],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "get"
+            ],
+            "description": "Resolve a dotted key path (e.g. `policy.require_vpn`) against the merged config and print the value. Secret-looking values redacted",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [
+              {
+                "name": "KEY",
+                "description": "Dotted key, e.g. `policy.require_vpn` or `env.VPN_INSTANCES`"
+              }
+            ],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "set"
+            ],
+            "description": "P6.3: Set a dotted-path key on `policy.toml` (or another target file) to a value. Type is inferred from the literal text (`true`/`false` \u2192 bool, all-digits \u2192 int, otherwise string). The value is written through the atomic ConfigWriter only after the resulting document passes strict validation. Secret values are NOT echoed back",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file to mutate. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [
+              {
+                "name": "KEY",
+                "description": "Dotted key, e.g. `policy.require_vpn` or `require_vpn`. A leading `policy.` / `authorized.` segment is treated as a layer hint and stripped before traversing the TOML document"
+              },
+              {
+                "name": "VALUE",
+                "description": "Value as a literal token. Inferred as bool (`true`/`false`), int (all-digits, optional leading `-`), or string (everything else). To force string mode wrap the value in quotes from the shell"
+              }
+            ],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "edit"
+            ],
+            "description": "P6.3: Open the target file in `$EDITOR` (falling back to `vi`). On editor exit, the candidate is validated. If validation succeeds the file is committed via ConfigWriter (atomic 0600 + `.bak.<epoch>`). If validation fails, the original file is left untouched and the temp file is preserved so the operator can recover their edits",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file to open. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
+                "long": "--editor",
+                "short": null,
+                "takes_value": true,
+                "value_name": "EDITOR",
+                "description": "Override `$EDITOR`. Mostly for tests (e.g. `--editor \"cp my.toml\"`)"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "migrate"
+            ],
+            "description": "P6.3: Migrate `policy.toml` (and authorized.toml) from its current `schema_version` to the latest known version. v1 \u2192 v1 is a no-op (returns exit 0 + an audit-trail line). The harness is in place for future v2+ migrations to plug into",
+            "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Dry-run: print the migration plan without writing. (v1\u2192v1 is a no-op either way; the flag is here so the future v2 migration path has a stable name.)"
+              },
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "init"
+            ],
+            "description": "P6.2: Initialize the per-user config tree under `~/.rev_scraping/` (or `$REV_SCRAPING_HOME`). Creates `policy.toml` (0600), `authorized.toml` (0600), and `sites/` (0700) via the atomic ConfigWriter. Existing files are preserved unless `--force` is passed (which routes the overwrite through `.bak.<epoch>` backup)",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Limit init to a single file. Default `all` [default: all] [possible values: all, policy, authorized, sites]"
+              },
+              {
+                "long": "--force",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Overwrite existing files (routes through `.bak.<epoch>` backup via the P5.2 ConfigWriter \u2014 never destructive)"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--non-interactive",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Skip interactive confirmation. Required for CI / scripted use. The current implementation never prompts (init is non-destructive without --force), but the flag is reserved + tested so callers can adopt it now without a future breaking change"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "history"
+            ],
+            "description": "P6.4: List the `.bak.<epoch>` backups for the target config file in newest\u2192oldest order (sorted by mtime, tie-broken by filename desc to match the epoch-ms suffix)",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file's backups to list. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "rollback"
+            ],
+            "description": "P6.4: Restore a previously captured `.bak.<epoch>` backup onto the target's current path. The current file (if any) is preserved as a fresh `.bak.<epoch>` by routing the restore write through `ConfigWriter::write_with_backup`",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file to roll back. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [
+              {
+                "name": "BAK_NAME",
+                "description": "The exact backup filename to restore (e.g. `policy.toml.bak.1700000000000`). Resolved relative to the target file's parent directory. Path traversal is rejected"
+              }
+            ],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "gc"
+            ],
+            "description": "P6.4: Garbage-collect `.bak.<epoch>` backups for the target config file, keeping the newest `--keep` (default 5). All older backups are deleted; the current file is untouched",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--keep",
+                "short": null,
+                "takes_value": true,
+                "value_name": "KEEP",
+                "description": "Number of newest backups to keep. Defaults to 5 [default: 5]"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file's backups to GC. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "config",
+              "profile"
+            ],
+            "description": "P6.5: Manage per-profile config trees under `<base>/profiles/<name>/`. Profiles share the same internal layout as the top-level config (`policy.toml`, `authorized.toml`, `sites/`) and are activated by exporting `REV_SCRAPING_HOME=<base>/profiles/<name>`",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": [
+              {
+                "path": [
+                  "config",
+                  "profile",
+                  "list"
+                ],
+                "description": "List every profile directory under `<base>/profiles/`",
+                "flags": [
+                  {
+                    "long": "--format",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "FORMAT",
+                    "description": "Output format [default: human] [possible values: human, json]"
+                  },
+                  {
+                    "long": "--verbose",
+                    "short": "-v",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+                  },
+                  {
+                    "long": "--help",
+                    "short": "-h",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Print help"
+                  }
+                ],
+                "positionals": [],
+                "exit_codes": [
+                  0,
+                  1,
+                  3
+                ],
+                "subcommands": []
+              },
+              {
+                "path": [
+                  "config",
+                  "profile",
+                  "create"
+                ],
+                "description": "Create a new profile directory and seed `policy.toml`, `authorized.toml`, and `sites/` via ConfigWriter (same skeleton as `config init`). Refuses if the profile already exists",
+                "flags": [
+                  {
+                    "long": "--format",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "FORMAT",
+                    "description": "Output format [default: human] [possible values: human, json]"
+                  },
+                  {
+                    "long": "--verbose",
+                    "short": "-v",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+                  },
+                  {
+                    "long": "--help",
+                    "short": "-h",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Print help"
+                  }
+                ],
+                "positionals": [
+                  {
+                    "name": "NAME",
+                    "description": "Profile name. Must match `[A-Za-z0-9_-]{1,64}` (no `/`, `\\`, `.`, whitespace, control chars). Path-traversal is rejected"
+                  }
+                ],
+                "exit_codes": [
+                  0,
+                  1,
+                  3
+                ],
+                "subcommands": []
+              },
+              {
+                "path": [
+                  "config",
+                  "profile",
+                  "switch"
+                ],
+                "description": "Print the shell-export line needed to activate the profile. We never mutate the operator's environment from inside the process \u2014 the operator must eval/source the printed line",
+                "flags": [
+                  {
+                    "long": "--format",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "FORMAT",
+                    "description": "Output format [default: human] [possible values: human, json]"
+                  },
+                  {
+                    "long": "--verbose",
+                    "short": "-v",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+                  },
+                  {
+                    "long": "--help",
+                    "short": "-h",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Print help"
+                  }
+                ],
+                "positionals": [
+                  {
+                    "name": "NAME",
+                    "description": "Profile name (must already exist)"
+                  }
+                ],
+                "exit_codes": [
+                  0,
+                  1,
+                  3
+                ],
+                "subcommands": []
+              },
+              {
+                "path": [
+                  "config",
+                  "profile",
+                  "delete"
+                ],
+                "description": "Best-effort overwrite-then-delete (`shred-like`) for the profile directory. Refuses if the profile is currently active per `$REV_SCRAPING_HOME` resolution",
+                "flags": [
+                  {
+                    "long": "--format",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "FORMAT",
+                    "description": "Output format [default: human] [possible values: human, json]"
+                  },
+                  {
+                    "long": "--yes",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Required for non-interactive deletion. Without it we exit 2 with an error so an operator typo cannot wipe a profile"
+                  },
+                  {
+                    "long": "--verbose",
+                    "short": "-v",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+                  },
+                  {
+                    "long": "--help",
+                    "short": "-h",
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "Print help"
+                  }
+                ],
+                "positionals": [
+                  {
+                    "name": "NAME",
+                    "description": "Profile name to remove"
+                  }
+                ],
+                "exit_codes": [
+                  0,
+                  1,
+                  3
+                ],
+                "subcommands": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "path": [
+          "hermes"
+        ],
+        "description": "v1.2.0 (P7.3): manage the Hermes plugin scaffold (`install` / `uninstall` / `verify`)",
+        "flags": [
+          {
+            "long": "--format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "FORMAT",
+            "description": "Output format [default: human] [possible values: human, json]"
+          },
+          {
+            "long": "--verbose",
+            "short": "-v",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--help",
+            "short": "-h",
+            "takes_value": false,
+            "value_name": null,
+            "description": "Print help"
+          }
+        ],
+        "positionals": [],
+        "exit_codes": [
+          0,
+          1,
+          3
+        ],
+        "subcommands": [
+          {
+            "path": [
+              "hermes",
+              "install"
+            ],
+            "description": "Install the Hermes plugin scaffold into `<prefix>`",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--prefix",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PREFIX",
+                "description": "Destination directory. Defaults to `$HOME/.hermes/plugins/rev-scraping-mcp`"
+              },
+              {
+                "long": "--source",
+                "short": null,
+                "takes_value": true,
+                "value_name": "SOURCE",
+                "description": "Override the scaffold source directory (defaults to the `dist/hermes/rev-scraping-mcp` shipped with the repo)"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--force",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Overwrite an existing non-empty destination"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "hermes",
+              "uninstall"
+            ],
+            "description": "Remove a previously installed Hermes plugin",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--prefix",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PREFIX",
+                "description": "Plugin directory to remove. Defaults to `$HOME/.hermes/plugins/rev-scraping-mcp`"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          },
+          {
+            "path": [
+              "hermes",
+              "verify"
+            ],
+            "description": "Verify a Hermes plugin install on disk",
+            "flags": [
+              {
+                "long": "--format",
+                "short": null,
+                "takes_value": true,
+                "value_name": "FORMAT",
+                "description": "Output format [default: human] [possible values: human, json]"
+              },
+              {
+                "long": "--prefix",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PREFIX",
+                "description": "Plugin directory to verify. Defaults to `$HOME/.hermes/plugins/rev-scraping-mcp`"
+              },
+              {
+                "long": "--skip-python-check",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "Skip the `python3 -c \"import ast; ast.parse(...)\"` syntax probe of `__init__.py`. The probe runs by default; pass this flag in environments without `python3` on `$PATH` (minimal containers, CI workers without the Python toolchain)"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--help",
+                "short": "-h",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Print help"
+              }
+            ],
+            "positionals": [],
+            "exit_codes": [
+              0,
+              1,
+              3
+            ],
+            "subcommands": []
+          }
+        ]
+      }
+    ]
+  }
+}

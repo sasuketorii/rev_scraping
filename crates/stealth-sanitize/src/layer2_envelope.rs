@@ -35,13 +35,7 @@ pub(crate) fn apply_l2(
     acc
 }
 
-fn walk(
-    value: &mut Value,
-    origin: &str,
-    tool: &str,
-    sanitize_id: &str,
-    acc: &mut Layer2Result,
-) {
+fn walk(value: &mut Value, origin: &str, tool: &str, sanitize_id: &str, acc: &mut Layer2Result) {
     match value {
         Value::String(s) => {
             let body = neutralize_forgery(s);

@@ -1,0 +1,56 @@
+name: Bench
+
+# Lane K K.7 — criterion microbench gate.
+#
+# v1.3 scope: run the in-tree criterion benches on PR and emit a JSON
+# artifact. A follow-up integration (bencher.dev or iai-callgrind in
+# offline mode) consumes the artifact to post a per-PR diff comment;
+# regression > 10% triggers a "bench-regression" label.
+#
+# v1.3 is informational-only (continue-on-error: true). v1.4 promotes
+# the > 10% rule to a hard gate.
+
+on:
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/bench.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  criterion:
+    name: cargo bench (sanitize hotpath)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable-bench
+          workspaces: |
+            . -> target
+      - name: cargo bench --no-run
+        run: cargo bench -p stealth-sanitize --bench sanitize_hotpath --no-run
+      - name: cargo bench (criterion, short)
+        run: |
+          set -euo pipefail
+          cargo bench -p stealth-sanitize --bench sanitize_hotpath -- \
+            --warm-up-time 1 --measurement-time 3 --noplot \
+            --output-format bencher \
+            | tee bench-bencher.txt
+      - name: Upload criterion JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-${{ github.sha }}
+          path: |
+            bench-bencher.txt
+            target/criterion/**/estimates.json
+          if-no-files-found: ignore
+          retention-days: 14

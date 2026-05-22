@@ -50,6 +50,58 @@ jobs:
       - name: cargo audit --deny warnings
         run: cargo audit --deny warnings
 
+  cargo-msrv:
+    # Lane K K.2: third gate of the three-point supply-chain check
+    # (cargo-deny + cargo-audit + cargo-msrv verify). Confirms the
+    # workspace `rust-version = "1.83"` claim is still buildable against
+    # the pinned MSRV so dependency bumps don't silently force a newer
+    # compiler on consumers.
+    name: cargo msrv verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
+      - name: cargo msrv verify --workspace
+        run: cargo msrv verify --workspace --output-format json
+
+  forbid-unsafe-lint:
+    # Lane K K.3: enforce `#![forbid(unsafe_code)]` on every crate root.
+    # `obscura-bridge` is exempted from the deny-list per spec because it
+    # shells out to a vendored binary and may need to grow `unsafe` blocks
+    # in the future; the spec calls for `#![deny(unsafe_op_in_unsafe_fn)]`
+    # plus a SAFETY doc lint when that happens. At v1.3 boundary no crate
+    # actually uses `unsafe`, so the strict `forbid` is applied uniformly
+    # and this job ensures no future crate root silently drops the lint.
+    name: forbid(unsafe_code) crate-root check
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify every crates/*/src/lib.rs has #![forbid(unsafe_code)]
+        run: |
+          set -euo pipefail
+          missing=()
+          for f in crates/*/src/lib.rs; do
+            if ! grep -q '#!\[forbid(unsafe_code)\]' "$f"; then
+              missing+=("$f")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::missing #![forbid(unsafe_code)] in:"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo "OK: $(ls crates/*/src/lib.rs | wc -l) crate roots verified."
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-22.04

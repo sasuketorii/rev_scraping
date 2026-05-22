@@ -448,3 +448,118 @@ jobs:
             target/**/*.log
             target/**/*.stderr
           if-no-files-found: ignore
+
+  # =========================================================================
+  # Lane I — API stability & semver (v1.3)
+  # =========================================================================
+  #
+  # I.1: cli-public-api snapshot drift gate. Drift = any byte-level diff
+  # against `.agent/v1.3/cli-public-api.snapshot.json`. To merge a drifting
+  # PR, the contributor must regenerate the snapshot, commit the diff, and
+  # apply the `api-additive` (new flag/cmd/env) or `api-breaking` (removed,
+  # renamed, semantically changed) PR label.
+  cli-public-api-snapshot:
+    name: CLI public-API snapshot drift
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: cargo build -p stealth-cli
+        run: cargo build -p stealth-cli
+      - name: regenerate + check snapshot
+        run: ./scripts/cli-public-api-snapshot.sh --check
+
+  # I.2: cargo-public-api Rust API diff gate. Failures here flag pub-item
+  # changes in any workspace member. Reviewer requires `api-additive` or
+  # `api-breaking` label on PRs that mutate the diff. Job is non-blocking
+  # in v1.3 (continue-on-error) — it will be hardened to a hard gate in v1.4
+  # once the baseline is stable. The diff artifact stays attached to every PR.
+  cargo-public-api-diff:
+    name: cargo-public-api diff (advisory)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # cargo-public-api consumes rustdoc JSON, whose schema changes per
+      # nightly. Pin the nightly to the date that cargo-public-api 0.39.x is
+      # validated against (see
+      # https://github.com/cargo-public-api/cargo-public-api/blob/main/scripts/release-helper/src/version_info.rs).
+      # Floating `nightly` can break this job between cargo-public-api
+      # releases. Re-pin in lockstep when bumping cargo-public-api in v1.4.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-10-13
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-nightly-2024-10-13
+          workspaces: |
+            . -> target
+      - name: install cargo-public-api
+        run: cargo install cargo-public-api --locked --version 0.39.0
+      - name: fetch base ref
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin "$BASE_REF"
+      - name: diff against base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # cargo-public-api 0.39+ expects a commit range `<base>..<head>`,
+          # NOT a bare ref. We materialize the range explicitly so the gate
+          # actually runs (a syntax error here would silently no-op the diff).
+          BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          for crate in stealth-core stealth-auth stealth-sanitize \
+                       stealth-agent-contracts stealth-parse stealth-mcp; do
+            echo "::group::cargo public-api diff -p $crate"
+            # Job-level `continue-on-error: true` already makes this advisory in
+            # v1.3; we deliberately do NOT mask the per-crate exit code so a
+            # genuine tool failure (missing crate, build break) surfaces.
+            cargo public-api --package "$crate" diff "$BASE_SHA..$HEAD_SHA"
+            echo "::endgroup::"
+          done
+
+  # I.5: MCP tool-schema breaking-change detector. Mirrors mcp-schema-lint
+  # but specifically asserts the canonical 16-tool list (Lane I.1 snapshot)
+  # has not been mutated. Drift requires `mcp-schema-breaking` PR label.
+  mcp-schema-breaking-detector:
+    name: MCP tool schema breaking-change
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: gen_reference freshness
+        run: cargo run -q -p stealth-mcp --bin gen_reference -- --check
+      - name: fetch base ref
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags --depth=200 origin "$BASE_REF"
+      - name: mcp-schema-breaking diff vs base
+        env:
+          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+        run: ./scripts/mcp-schema-breaking.sh --check
+
+  # I.6: see crates/stealth-cli/tests/deprecated_completeness.rs (unit test).

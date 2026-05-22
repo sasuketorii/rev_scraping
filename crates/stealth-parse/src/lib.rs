@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Source: design adapted from Scrapling adaptive selector (BSD-3-Clause), https://github.com/D4Vinci/Scrapling
 
+#![forbid(unsafe_code)]
+
 //! `stealth-parse` — Adaptive element relocation + SQLite WAL cache.
 //!
 //! Provides element fingerprint persistence and similarity-based relocation

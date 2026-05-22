@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Source: rev_scraping Lane C P1 (stealth-agent-contracts crate, original work)
+//
+// Lane J.5 note (v1.3): this crate is the first crate to reach the
+// `#![deny(missing_docs)]` bar (already in force at line ~20 below). Other
+// stealth-* crates remain on the implicit-warn default during the staged
+// rollout, and vendored crates (`obscura-bridge`) stay permanently exempt.
+// Promote stealth-sanitize next once its in-flight Lane K changes settle.
+
 //! # stealth-agent-contracts
 //!
 //! Shared type contracts between `stealth-cli`, `stealth-mcp`, and other

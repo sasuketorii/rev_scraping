@@ -1,0 +1,86 @@
+# syntax=docker/dockerfile:1.7
+#
+# Lane H.4 — Distroless multi-arch image for rev-stealth.
+#
+# Build (local, single arch):
+#   docker build -f Dockerfile.distroless -t rev-stealth:dev .
+#
+# Build (release, multi-arch via buildx):
+#   docker buildx build \
+#     --platform linux/amd64,linux/arm64 \
+#     -f Dockerfile.distroless \
+#     -t ghcr.io/sasuketorii/rev-stealth:${VERSION} \
+#     --push .
+#
+# Why distroless:
+#   - Minimal attack surface (no shell, no package manager).
+#   - `trivy image --severity HIGH,CRITICAL --exit-code 1` PASS target.
+#   - Final image is ~25 MB (static musl binary + cc base).
+#
+# Chromium handling:
+#   This image does NOT bundle Chromium. The rev-stealth binary in this
+#   image is for `mcp`, `sanitize`, `auth`, `recipe`, `config`, `vpn`,
+#   `hermes`, `doctor`, and similar non-browser subcommands.
+#
+#   For `browser` / Cloudflare-bypass workflows that need a live Chrome,
+#   a separate image will be published at
+#     `ghcr.io/sasuketorii/rev-stealth-browser:${VERSION}`
+#   built from a different Dockerfile (`Dockerfile.browser`, deferred to
+#   the release cut). Splitting the images keeps the distroless target
+#   trivy-clean and avoids inheriting Chromium CVE churn for users who
+#   never touch the browser subcommands.
+
+# -----------------------------------------------------------------------------
+# Stage 1 — builder (musl static)
+# -----------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM rust:1.83-slim-bookworm AS builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETARCH
+
+# musl target per arch.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        musl-tools \
+        pkg-config \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN case "${TARGETARCH}" in \
+        amd64) RUST_TARGET=x86_64-unknown-linux-musl ;; \
+        arm64) RUST_TARGET=aarch64-unknown-linux-musl ;; \
+        *) echo "unsupported TARGETARCH: ${TARGETARCH}"; exit 1 ;; \
+    esac \
+    && rustup target add "${RUST_TARGET}" \
+    && cargo build --release --target "${RUST_TARGET}" \
+        --bin rev-stealth --bin stealth-mcp --bin rev-auth \
+    && mkdir -p /out \
+    && cp "target/${RUST_TARGET}/release/rev-stealth" /out/rev-stealth \
+    && cp "target/${RUST_TARGET}/release/stealth-mcp" /out/stealth-mcp \
+    && cp "target/${RUST_TARGET}/release/rev-auth"    /out/rev-auth
+
+# -----------------------------------------------------------------------------
+# Stage 2 — distroless runtime
+# -----------------------------------------------------------------------------
+# `cc` includes libc + ca-certs; `static-debian12` is even smaller but breaks
+# any future opt-in to dynamic-linking features. `cc` is the safe default.
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+
+LABEL org.opencontainers.image.title="rev-stealth" \
+      org.opencontainers.image.description="Stealth scraping & MCP CLI" \
+      org.opencontainers.image.source="https://github.com/sasuketorii/rev_scraping" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Sasuke Torii"
+
+COPY --from=builder --chown=nonroot:nonroot /out/rev-stealth  /usr/local/bin/rev-stealth
+COPY --from=builder --chown=nonroot:nonroot /out/stealth-mcp  /usr/local/bin/stealth-mcp
+COPY --from=builder --chown=nonroot:nonroot /out/rev-auth     /usr/local/bin/rev-auth
+
+USER nonroot:nonroot
+WORKDIR /home/nonroot
+
+ENTRYPOINT ["/usr/local/bin/rev-stealth"]
+CMD ["--help"]

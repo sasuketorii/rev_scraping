@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
+# Workspace-internal Lane F crate. Marked `publish = false` so the Lane H
+# release preflight (`cargo package -p rev-stealth-cli`) reflects the
+# actual publish policy: only the `rev-stealth-cli` wrapper goes to
+# crates.io; every other workspace member is internal-only.
+publish = false
 description = "Prompt-injection defense sanitizer for RevHarness MCP surface (L2 envelope + L3 canary + L4 unicode + L5 clamp + L7 meta)."
 
 [dependencies]
@@ -17,3 +22,12 @@ aho-corasick = "1"
 
 [dev-dependencies]
 serde_json = { workspace = true }
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "sanitize_hotpath"
+harness = false
+
+[lints]
+workspace = true

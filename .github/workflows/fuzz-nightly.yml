@@ -1,0 +1,69 @@
+name: Fuzz nightly
+
+# Lane K K.5 — nightly cargo-fuzz cron.
+#
+# Runs each fuzz target for ~20 min/day (3 targets x ~20 min ≈ 1h
+# wall-clock budget per spec). Crash artifacts are uploaded as job
+# artifacts; reviewers may then commit them under
+# crates/stealth-sanitize/fuzz/corpus/<target>/ as seed corpus.
+#
+# Manual trigger via workflow_dispatch supports running with a custom
+# max_total_time for ad-hoc investigation.
+
+on:
+  schedule:
+    # Daily at 02:00 UTC. Offset from cross-platform-nightly (04:00).
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      max_total_time:
+        description: "Per-target wall clock (seconds)"
+        default: "1200"
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    name: cargo fuzz ${{ matrix.target }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - sanitize_full
+          - sanitize_l4_unicode
+          - mcp_jsonrpc_frame
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-nightly-fuzz
+          workspaces: |
+            crates/stealth-sanitize/fuzz -> target
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: cargo fuzz run
+        env:
+          FUZZ_TIME: ${{ inputs.max_total_time || '1200' }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          cd crates/stealth-sanitize/fuzz
+          cargo +nightly fuzz run "$TARGET" -- \
+            -max_total_time="$FUZZ_TIME" \
+            -timeout=10
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: |
+            crates/stealth-sanitize/fuzz/artifacts/${{ matrix.target }}/**
+            crates/stealth-sanitize/fuzz/corpus/${{ matrix.target }}/**
+          if-no-files-found: ignore
+          retention-days: 30

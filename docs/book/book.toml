@@ -1,0 +1,39 @@
+[book]
+title = "rev_scraping — The Black-Belt CLI for AI Agents"
+description = "Agent-first documentation for rev-stealth: install, integrate, scrape — without the Crawl4AI / Playwright MCP friction."
+authors = ["rev_scraping contributors"]
+language = "en"
+src = "src"
+# Note: full i18n via `mdbook-i18n-helpers` PO files is deferred to v1.4
+# (Lane O). For v1.3 we ship EN + JA as parallel page trees under src/en/
+# and src/ja/, both linked from SUMMARY.md.
+
+[build]
+build-dir = "../../target/book"
+create-missing = false
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/sasuketorii/rev_scraping"
+edit-url-template = "https://github.com/sasuketorii/rev_scraping/edit/main/docs/book/{path}"
+mathjax-support = false
+no-section-label = false
+site-url = "/rev_scraping/"
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[output.html.playground]
+runnable = false

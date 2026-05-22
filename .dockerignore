@@ -1,0 +1,55 @@
+# Lane H.4 — keep docker build context lean & private.
+# Anything not strictly required to compile + bundle docs/license should
+# be excluded so multi-arch buildx (amd64+arm64) stays fast and we never
+# leak local state into a published image.
+
+# Build outputs / caches
+/target
+**/target
+**/*.rlib
+**/*.rmeta
+
+# Local agent / harness state
+/.agent
+/.claude
+/.cursor
+/.codex
+**/node_modules
+
+# VCS
+.git
+.gitignore
+.gitattributes
+.github
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Secrets — defense in depth (CI shouldn't have these, but belt+braces).
+.env
+.env.*
+*.pem
+*.key
+secrets/
+**/credentials.json
+
+# Docs that don't need to be in the image
+/docs
+/_refs
+/vendor/obscura/.git
+/vendor/obscura/target
+
+# Test fixtures
+**/tests/fixtures/*.bin
+**/proptest-regressions
+
+# Tooling not needed in image
+Dockerfile.distroless
+.dockerignore
+Formula/
+install.sh

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Source: design adapted from Scrapling (BSD-3-Clause), https://github.com/D4Vinci/Scrapling
 // No verbatim code copy; only the detection/click/polling algorithm pattern is adapted.
-//
+
+#![forbid(unsafe_code)]
+
 // stealth-cf — Cloudflare Turnstile/Interstitial challenge **resilience evaluator**.
 //
 // This crate is defender-facing: it measures how a target site's Cloudflare

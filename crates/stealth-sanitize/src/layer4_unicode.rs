@@ -65,8 +65,7 @@ fn walk(value: &mut Value, pointer: &str, policy: &UnicodePolicy, acc: &mut Laye
                     // include bidi/zero-width tokens that the report is
                     // explicitly stripping). Use positional id.
                     let key_pointer = format!("{pointer}/_k{idx}#key");
-                    let (new_key, modified, mut hits) =
-                        scrub_str(&k, &key_pointer, policy);
+                    let (new_key, modified, mut hits) = scrub_str(&k, &key_pointer, policy);
                     if modified {
                         acc.modified = true;
                     }
@@ -120,7 +119,10 @@ fn key_needs_scrub(s: &str, policy: &UnicodePolicy) -> bool {
 }
 
 fn is_zero_width(c: char) -> bool {
-    matches!(c, '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{2060}' | '\u{FEFF}')
+    matches!(
+        c,
+        '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{2060}' | '\u{FEFF}'
+    )
 }
 
 fn is_tag_char(c: char) -> bool {
@@ -136,11 +138,7 @@ fn is_bidi_override(c: char) -> bool {
 }
 
 /// Scrub a single string. Returns (new_string, modified, bidi_hits).
-fn scrub_str(
-    input: &str,
-    pointer: &str,
-    policy: &UnicodePolicy,
-) -> (String, bool, Vec<CanaryHit>) {
+fn scrub_str(input: &str, pointer: &str, policy: &UnicodePolicy) -> (String, bool, Vec<CanaryHit>) {
     // Step 1: NFKC. NFKC is idempotent on already-normalized text, so
     // running it unconditionally is safe and keeps the pipeline simple.
     let normalized: String = if policy.nfkc {
@@ -289,7 +287,11 @@ mod tests {
         let mut v = json!({"hid\u{200B}den": 1, "clean": 2});
         let r = apply_l4(&mut v, &default_policy());
         let obj = v.as_object().unwrap();
-        assert!(obj.contains_key("hidden"), "key not scrubbed: keys={:?}", obj.keys().collect::<Vec<_>>());
+        assert!(
+            obj.contains_key("hidden"),
+            "key not scrubbed: keys={:?}",
+            obj.keys().collect::<Vec<_>>()
+        );
         assert!(obj.contains_key("clean"));
         assert!(r.modified);
     }
