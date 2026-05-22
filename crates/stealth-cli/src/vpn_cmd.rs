@@ -15,6 +15,24 @@ use crate::OutputFormat;
 pub(crate) enum VpnAction {
     /// Trigger a VPN rotation. With `lazy-on-fail`, rotation is skipped
     /// unless the failure counter has crossed the threshold.
+    #[command(
+        long_about = "Trigger a VPN exit-IP rotation through the configured provider \
+(Surfshark / Gluetun). Strategy `lazy-on-fail` skips when the failure counter is \
+under threshold; `every-n` / `interval` rotate unconditionally on cadence. \
+The action is recorded to the audit log with the supplied --reason.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth vpn rotate\n  \
+$ rev-stealth vpn rotate --strategy every-n --region jp --reason scheduled\n  \
+$ rev-stealth vpn rotate --provider surfshark --strategy interval --reason failover\n\n\
+EXIT CODES:\n  \
+0  Ok               Rotation completed (or correctly skipped under lazy-on-fail).\n  \
+1  UserError        Unknown --provider / --strategy.\n  \
+2  TransientError   Provider/container transient failure.\n  \
+3  PermanentError   Provider unsupported in this build.\n  \
+7  Leak             Post-rotation leak check failed (fail-closed).\n\n\
+ENV:\n  \
+REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard policy-wide."
+    )]
     Rotate {
         /// VPN provider slug (currently only `surfshark`).
         #[arg(long, default_value = "surfshark")]
@@ -31,6 +49,23 @@ pub(crate) enum VpnAction {
         reason: String,
     },
     /// Show the current public IP and the VPN container state.
+    #[command(
+        long_about = "Probe the current public IP via ipinfo.io and report the VPN \
+container state (running / exit country / exit ASN) for the chosen provider. \
+Useful as a 'before-rotate' diagnostic; pairs with `doctor` for leak checks.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth vpn status\n  \
+$ rev-stealth vpn status --provider surfshark\n  \
+$ rev-stealth --format json vpn status\n\n\
+EXIT CODES:\n  \
+0  Ok               Status probe completed.\n  \
+1  UserError        Unknown --provider slug.\n  \
+2  TransientError   ipinfo / provider transient failure.\n  \
+3  PermanentError   Provider unsupported in this build.\n  \
+7  Leak             Exit-IP probe revealed a leak (fail-closed).\n\n\
+ENV:\n  \
+(none consumed directly by this subcommand.)"
+    )]
     Status {
         /// Provider slug to scope the status query.
         #[arg(long, default_value = "surfshark")]

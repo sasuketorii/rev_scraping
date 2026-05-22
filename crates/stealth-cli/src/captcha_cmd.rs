@@ -15,6 +15,26 @@ use crate::OutputFormat;
 #[derive(Subcommand, Debug)]
 pub(crate) enum CaptchaAction {
     /// Solve a CAPTCHA challenge.
+    ///
+    /// Drives the captcha-bypass solver against a target site for the
+    /// chosen challenge type. Used for defender-side resilience evaluation
+    /// on authorized targets only.
+    #[command(
+        long_about = "Solve a CAPTCHA challenge by delegating to the configured \
+captcha-bypass solver. Supports reCAPTCHA v2/v3, hCaptcha, and Turnstile. \
+Token output is JSON when --format=json. AUTHORIZED TARGETS ONLY.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth captcha solve --type recaptcha-v2 --site-url https://example.com\n  \
+$ rev-stealth captcha solve --type turnstile --site-url https://x.test --site-key 0x4 --dry-run\n  \
+$ rev-stealth --format json captcha solve --type hcaptcha --site-url https://h.test\n\n\
+EXIT CODES:\n  \
+0  Ok               Token solved successfully.\n  \
+1  UserError        Bad args (unknown --type, malformed --site-url).\n  \
+2  TransientError   Solver network/provider transient failure.\n  \
+3  PermanentError   Solver not configured or challenge unsupported.\n\n\
+ENV:\n  \
+REV_STEALTH_CAPTCHA_SECRET  Provider secret used by `verify` (see captcha verify --help)."
+    )]
     Solve {
         /// Challenge type: `recaptcha-v2`, `recaptcha-v3`, `hcaptcha`, `turnstile`.
         #[arg(long, value_name = "TYPE")]
@@ -35,6 +55,22 @@ pub(crate) enum CaptchaAction {
     },
     /// Verify a previously-issued token (round-trips through the
     /// challenge provider's verify endpoint).
+    #[command(
+        long_about = "Verify a CAPTCHA token by calling the challenge provider's \
+server-side verify endpoint. Returns the provider's structured verdict; the \
+exit code reflects RPC outcome only (not the verdict itself).",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth captcha verify --type recaptcha-v2 --token <TOKEN>\n  \
+$ rev-stealth captcha verify --type hcaptcha --token <TOKEN> --secret <SECRET>\n  \
+$ REV_STEALTH_CAPTCHA_SECRET=... rev-stealth captcha verify --type turnstile --token <TOKEN>\n\n\
+EXIT CODES:\n  \
+0  Ok               Verify RPC completed (read verdict from output).\n  \
+1  UserError        Bad args (unknown --type, missing --secret).\n  \
+2  TransientError   Provider network/timeout (retryable).\n  \
+3  PermanentError   Provider permanently rejected (unsupported type, bad config).\n\n\
+ENV:\n  \
+REV_STEALTH_CAPTCHA_SECRET  Provider secret. Preferred over `--secret` for ops use."
+    )]
     Verify {
         /// Challenge type, same vocabulary as `solve --type`.
         #[arg(long, value_name = "TYPE")]

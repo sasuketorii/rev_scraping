@@ -42,16 +42,112 @@ pub struct AuthArgs {
 #[derive(Subcommand, Debug)]
 pub enum AuthAction {
     /// Spawn `rev-auth` for interactive login; AUP-gated.
+    #[command(
+        long_about = "Spawn the rev-auth helper to perform an interactive login \
+against --url for the given --profile. The captured cookie blob is sealed and \
+written to AuthStore. AUP-gated; --i-have-authorization is required for hosts \
+outside the authorized.toml allowlist.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth auth login --profile work --url https://x.test\n  \
+$ rev-stealth auth login --profile work --url https://x.test --domain x.test --require-vpn\n  \
+$ rev-stealth auth login --profile demo --url https://x.test --rev-auth-bin /usr/local/bin/rev-auth\n\n\
+EXIT CODES:\n  \
+0  Ok               Profile saved.\n  \
+1  UserError        Bad args / AUP rejection / unknown profile mode.\n  \
+3  PermanentError   rev-auth missing / AuthStore IO failure.\n  \
+4  AuthExpired      Captured profile is empty/unusable.\n\n\
+ENV:\n  \
+REV_OBSCURA_BIN              Override the obscura binary path.\n  \
+REV_AUTH_BIN                 Override the rev-auth helper binary.\n  \
+REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.\n  \
+REV_SCRAPING_AUTH_PASSPHRASE Sealed-store passphrase (else keystore-derived).\n  \
+REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN-required guard."
+    )]
     Login(LoginArgs),
     /// List saved profiles (metadata only, cookie values never disclosed).
+    #[command(
+        long_about = "List every saved AuthStore profile. Only metadata is emitted \
+(profile name, domain, created_at, expires_at, source); cookie values are \
+never disclosed.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth auth list\n  \
+$ rev-stealth --format json auth list\n\n\
+EXIT CODES:\n  \
+0  Ok               Listing emitted.\n  \
+1  UserError        Bad args.\n  \
+3  PermanentError   AuthStore unavailable.\n\n\
+ENV:\n  \
+REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
+    )]
     List(ListArgs),
     /// Show a single profile's metadata (redacted).
+    #[command(
+        long_about = "Show a single profile's metadata. Cookie values are redacted; \
+only domain / timestamps / source / AAD context are returned.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth auth show --profile work\n  \
+$ rev-stealth --format json auth show --profile work\n\n\
+EXIT CODES:\n  \
+0  Ok               Metadata emitted.\n  \
+1  UserError        Bad args / unknown profile.\n  \
+3  PermanentError   AuthStore unavailable.\n\n\
+ENV:\n  \
+REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
+    )]
     Show(ShowArgs),
     /// Delete a profile with shred-on-delete.
+    #[command(
+        long_about = "Delete a profile with best-effort shred-on-delete (overwrite \
+then unlink). Refuses without --force when stdin is a TTY; --force is required \
+for non-interactive use.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth auth delete --profile work\n  \
+$ rev-stealth auth delete --profile work --force\n\n\
+EXIT CODES:\n  \
+0  Ok               Profile removed.\n  \
+1  UserError        Bad args / user declined / unknown profile.\n  \
+3  PermanentError   AuthStore unavailable / shred IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
+    )]
     Delete(DeleteArgs),
     /// Report freshness/expiry status for a profile.
+    #[command(
+        long_about = "Report freshness / expiry status for the given profile. \
+Returns exit 4 when the stored profile is expired or empty, so callers can \
+distinguish refresh-needed from hard failures.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth auth status --profile work\n  \
+$ rev-stealth --format json auth status --profile work\n\n\
+EXIT CODES:\n  \
+0  Ok               Profile is fresh.\n  \
+1  UserError        Bad args / unknown profile.\n  \
+3  PermanentError   AuthStore unavailable.\n  \
+4  AuthExpired      Profile expired / unusable.\n\n\
+ENV:\n  \
+REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
+    )]
     Status(StatusArgs),
     /// Re-run interactive login, overwriting an existing profile.
+    #[command(
+        long_about = "Re-run the rev-auth interactive login flow, overwriting an \
+existing profile. Same surface as `auth login` but treats an existing profile \
+as expected.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth auth refresh --profile work --url https://x.test\n  \
+$ rev-stealth auth refresh --profile work --url https://x.test --require-vpn\n\n\
+EXIT CODES:\n  \
+0  Ok               Profile refreshed.\n  \
+1  UserError        Bad args / AUP rejection.\n  \
+3  PermanentError   rev-auth missing / AuthStore IO failure.\n  \
+4  AuthExpired      Captured profile is empty/unusable after refresh.\n\n\
+ENV:\n  \
+REV_OBSCURA_BIN              Override the obscura binary path.\n  \
+REV_AUTH_BIN                 Override the rev-auth helper binary.\n  \
+REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.\n  \
+REV_SCRAPING_AUTH_PASSPHRASE Sealed-store passphrase (else keystore-derived).\n  \
+REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN-required guard."
+    )]
     Refresh(RefreshArgs),
 }
 

@@ -20,6 +20,22 @@ pub(crate) enum BrowserAction {
     /// Launch a stealth browser, navigate to a URL, and emit JSON about
     /// the resulting page (UA / viewport / title / final URL). Useful as
     /// a smoke test that the launcher works on this host.
+    #[command(
+        long_about = "Launch a chromiumoxide-driven stealth browser with the \
+chosen profile and stealth level, navigate to --url, and dump page metadata \
+(UA / viewport / title / final URL). Use for launcher smoke tests on a new host.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth browser launch\n  \
+$ rev-stealth browser launch --profile desktop --url https://example.com --dwell 3\n  \
+$ rev-stealth browser launch --headed --stealth full --chrome /usr/bin/google-chrome\n\n\
+EXIT CODES:\n  \
+0  Ok               Launch + navigation succeeded.\n  \
+1  UserError        Unknown --profile / --stealth slug.\n  \
+2  TransientError   Chrome launch/CDP transient failure.\n  \
+3  PermanentError   Chrome binary missing or stealth level unsupported.\n\n\
+ENV:\n  \
+REV_STEALTH_CHROME  Override the chrome executable path (else auto-detect)."
+    )]
     Launch {
         /// Profile slug. One of:
         /// `desktop`, `mobile-ios`, `mobile-android`, `ipad`, `galaxy-ultra`.
@@ -47,6 +63,23 @@ pub(crate) enum BrowserAction {
     /// Run a stealth self-test: launch a stealth browser, navigate to
     /// the target detection page (defaults to bot.sannysoft.com), wait
     /// briefly, then dump UA / viewport / title.
+    #[command(
+        long_about = "Run a stealth self-test against a detection page \
+(default: bot.sannysoft.com). Launches the browser with the chosen profile + \
+stealth level, dwells N seconds, then dumps UA / viewport / title for offline \
+inspection. AUTHORIZED TARGETS ONLY.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth browser stealth-test\n  \
+$ rev-stealth browser stealth-test --profile desktop --dwell 8\n  \
+$ rev-stealth browser stealth-test --target https://bot.sannysoft.com/ --headed\n\n\
+EXIT CODES:\n  \
+0  Ok               Stealth probe completed.\n  \
+1  UserError        Unknown --profile / --stealth slug.\n  \
+2  TransientError   Chrome launch/CDP transient failure.\n  \
+3  PermanentError   Chrome binary missing or unsupported stealth level.\n\n\
+ENV:\n  \
+REV_STEALTH_CHROME  Override the chrome executable path (else auto-detect)."
+    )]
     StealthTest {
         /// Detection page to probe.
         #[arg(long, default_value = "https://bot.sannysoft.com/")]

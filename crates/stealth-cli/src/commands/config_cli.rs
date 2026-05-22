@@ -76,15 +76,73 @@ pub enum ConfigAction {
     /// Print the merged effective config from all 4 source layers
     /// (policy.toml / authorized.toml / sites/* / env). Secret-looking
     /// env values are replaced with `<redacted>`.
+    #[command(
+        long_about = "Print the merged effective config across the 4 source layers \
+(policy.toml / authorized.toml / sites/* / env). Secret-looking env values are \
+replaced with `<redacted>`.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config show\n  \
+$ rev-stealth config --output-format json show\n  \
+$ rev-stealth config --output-format yaml show\n\n\
+EXIT CODES:\n  \
+0  Ok               Config emitted.\n  \
+1  UserError        Bad args / parse error.\n  \
+3  PermanentError   Config IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME        Override `~/.rev_scraping/` base.\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Show,
     /// List each config file path (absolute), its existence, and permission
     /// bits (unix mode).
+    #[command(
+        long_about = "List each layered-config file path (absolute), its existence, \
+and its unix permission bits. Useful for ops debugging 0600 / 0700 expectations.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config paths\n  \
+$ rev-stealth config --output-format json paths\n\n\
+EXIT CODES:\n  \
+0  Ok               Paths emitted.\n  \
+1  UserError        Bad args.\n  \
+3  PermanentError   stat() failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME        Override `~/.rev_scraping/` base."
+    )]
     Paths,
     /// Run the P5.1 validate engine over the live config files. Exit 0 on
     /// LGTM; exit 1 with structured issue list on violations.
+    #[command(
+        long_about = "Run the P5.1 validate engine over the live config files. \
+Exit 0 on LGTM; exit 1 with a structured issue list on violations.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config validate\n  \
+$ rev-stealth config --output-format json validate\n\n\
+EXIT CODES:\n  \
+0  Ok               No violations.\n  \
+1  UserError        Validation violations (issue list emitted).\n  \
+3  PermanentError   Config IO / parse failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME            Override `~/.rev_scraping/` base.\n  \
+REV_SCRAPING_CONFIG_LENIENT  Loosen strictness for test/CI."
+    )]
     Validate,
     /// Print a unified diff between the live `<path>` and the in-repo
     /// `templates/policy.toml` baseline. Headers use `---` / `+++`.
+    #[command(
+        long_about = "Print a unified diff between the live <path> and a baseline \
+(default: in-repo templates/policy.toml). Headers use `---` / `+++` so the \
+output drops cleanly into `patch`.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config diff ~/.rev_scraping/policy.toml\n  \
+$ rev-stealth config diff ~/.rev_scraping/policy.toml --against ./templates/policy.toml\n\n\
+EXIT CODES:\n  \
+0  Ok               Diff emitted (no change is still exit 0).\n  \
+1  UserError        Bad <path>.\n  \
+3  PermanentError   IO failure.\n\n\
+ENV:\n  \
+(none consumed directly; baseline path resolves via the binary's compile-time root.)"
+    )]
     Diff {
         /// Path to the live config file (e.g. `~/.rev_scraping/policy.toml`).
         path: PathBuf,
@@ -94,6 +152,23 @@ pub enum ConfigAction {
     },
     /// Resolve a dotted key path (e.g. `policy.require_vpn`) against the
     /// merged config and print the value. Secret-looking values redacted.
+    #[command(
+        long_about = "Resolve a dotted key (e.g. `policy.require_vpn`, \
+`env.VPN_INSTANCES`) against the merged effective config. Secret-looking values \
+are replaced with `<redacted>`.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config get policy.require_vpn\n  \
+$ rev-stealth config get env.VPN_INSTANCES\n  \
+$ rev-stealth config --output-format json get policy.require_vpn\n\n\
+EXIT CODES:\n  \
+0  Ok               Value emitted.\n  \
+1  UserError        Bad key / unknown path.\n  \
+3  PermanentError   Config IO / parse failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME        Override `~/.rev_scraping/` base.\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Get {
         /// Dotted key, e.g. `policy.require_vpn` or `env.VPN_INSTANCES`.
         key: String,
@@ -103,17 +178,66 @@ pub enum ConfigAction {
     /// bool, all-digits → int, otherwise string). The value is written
     /// through the atomic ConfigWriter only after the resulting document
     /// passes strict validation. Secret values are NOT echoed back.
+    #[command(
+        long_about = "Set a dotted-path key on policy.toml (or another target file). \
+Type is inferred from the literal text. Writes go through the atomic ConfigWriter \
+after strict validation. Secret values are NOT echoed back.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config set policy.require_vpn true\n  \
+$ rev-stealth config set vpn.cooldown_seconds 30 --target policy\n  \
+$ rev-stealth config set hosts.allow_x_test true --target authorized\n\n\
+EXIT CODES:\n  \
+0  Ok               Key set and file committed.\n  \
+1  UserError        Bad key / type mismatch / validation failure.\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Set(SetArgs),
     /// P6.3: Open the target file in `$EDITOR` (falling back to `vi`).
     /// On editor exit, the candidate is validated. If validation succeeds
     /// the file is committed via ConfigWriter (atomic 0600 + `.bak.<epoch>`).
     /// If validation fails, the original file is left untouched and the
     /// temp file is preserved so the operator can recover their edits.
+    #[command(
+        long_about = "Open the target config file in $EDITOR (default vi). \
+On exit, the candidate is validated; on LGTM the file is committed via \
+ConfigWriter (atomic 0600 + .bak.<epoch>). On validation failure the original \
+is untouched and the temp file is preserved.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config edit\n  \
+$ rev-stealth config edit --target authorized\n  \
+$ EDITOR=nano rev-stealth config edit\n\n\
+EXIT CODES:\n  \
+0  Ok               Edit committed.\n  \
+1  UserError        Editor exit / candidate validation failure.\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+EDITOR                   Editor used (fallback: vi).\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Edit(EditArgs),
     /// P6.3: Migrate `policy.toml` (and authorized.toml) from its current
     /// `schema_version` to the latest known version. v1 → v1 is a no-op
     /// (returns exit 0 + an audit-trail line). The harness is in place
     /// for future v2+ migrations to plug into.
+    #[command(
+        long_about = "Migrate policy.toml + authorized.toml from their current \
+schema_version to the latest known version. v1 → v1 is a no-op (exit 0 + \
+audit-trail line). --dry-run prints the migration plan without writing.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config migrate\n  \
+$ rev-stealth config migrate --dry-run\n\n\
+EXIT CODES:\n  \
+0  Ok               Migration completed (or no-op).\n  \
+1  UserError        Schema not migratable / unsupported version.\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Migrate(MigrateArgs),
     /// P6.2: Initialize the per-user config tree under
     /// `~/.rev_scraping/` (or `$REV_SCRAPING_HOME`). Creates
@@ -121,36 +245,141 @@ pub enum ConfigAction {
     /// `sites/` (0700) via the atomic ConfigWriter. Existing files
     /// are preserved unless `--force` is passed (which routes the
     /// overwrite through `.bak.<epoch>` backup).
+    #[command(
+        long_about = "Initialize the per-user config tree under ~/.rev_scraping/ \
+(or $REV_SCRAPING_HOME). Creates policy.toml (0600), authorized.toml (0600), \
+and sites/ (0700) atomically. --force routes overwrites through .bak.<epoch>.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config init\n  \
+$ rev-stealth config init --target policy --force\n  \
+$ rev-stealth config init --target all --non-interactive\n\n\
+EXIT CODES:\n  \
+0  Ok               Init completed.\n  \
+1  UserError        Existing files present (use --force).\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME        Override `~/.rev_scraping/` base."
+    )]
     Init(InitArgs),
     /// P6.4: List the `.bak.<epoch>` backups for the target config
     /// file in newest→oldest order (sorted by mtime, tie-broken by
     /// filename desc to match the epoch-ms suffix).
+    #[command(
+        long_about = "List the .bak.<epoch> backups for the target config file \
+in newest→oldest order. Sorted by mtime, ties broken by filename desc \
+(matching the epoch-ms suffix).",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config history\n  \
+$ rev-stealth config history --target authorized\n\n\
+EXIT CODES:\n  \
+0  Ok               Listing emitted.\n  \
+1  UserError        Unknown target.\n  \
+3  PermanentError   directory IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     History(HistoryArgs),
     /// P6.4: Restore a previously captured `.bak.<epoch>` backup
     /// onto the target's current path. The current file (if any)
     /// is preserved as a fresh `.bak.<epoch>` by routing the
     /// restore write through `ConfigWriter::write_with_backup`.
+    #[command(
+        long_about = "Restore a previously captured .bak.<epoch> backup onto the \
+target's current path. The current file (if any) is preserved as a fresh \
+.bak.<epoch> via ConfigWriter::write_with_backup. Path traversal is rejected.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config rollback policy.toml.bak.1700000000000\n  \
+$ rev-stealth config rollback authorized.toml.bak.1700000000000 --target authorized\n\n\
+EXIT CODES:\n  \
+0  Ok               Rollback committed.\n  \
+1  UserError        Bad backup name / path traversal / not found.\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Rollback(RollbackArgs),
     /// P6.4: Garbage-collect `.bak.<epoch>` backups for the target
     /// config file, keeping the newest `--keep` (default 5). All
     /// older backups are deleted; the current file is untouched.
+    #[command(
+        long_about = "Garbage-collect .bak.<epoch> backups for the target config \
+file, keeping the newest --keep (default 5). Older backups are deleted; the \
+current file is never touched.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config gc\n  \
+$ rev-stealth config gc --keep 10\n  \
+$ rev-stealth config gc --target authorized --keep 3\n\n\
+EXIT CODES:\n  \
+0  Ok               GC completed.\n  \
+1  UserError        Bad --keep / unknown target.\n  \
+3  PermanentError   directory IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_POLICY      Override the policy.toml path.\n  \
+REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
+    )]
     Gc(GcArgs),
     /// P6.5: Manage per-profile config trees under
     /// `<base>/profiles/<name>/`. Profiles share the same internal
     /// layout as the top-level config (`policy.toml`, `authorized.toml`,
     /// `sites/`) and are activated by exporting
     /// `REV_SCRAPING_HOME=<base>/profiles/<name>`.
-    #[command(subcommand)]
+    #[command(
+        subcommand,
+        long_about = "Manage per-profile config trees under <base>/profiles/<name>/. \
+Each profile mirrors the top-level config layout; activation is by exporting \
+REV_SCRAPING_HOME=<base>/profiles/<name>.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config profile list\n  \
+$ rev-stealth config profile create work\n  \
+$ rev-stealth config profile switch work\n  \
+$ rev-stealth config profile delete work --yes\n\n\
+EXIT CODES:\n  \
+0  Ok               Action completed.\n  \
+1  UserError        Bad name / active profile / missing --yes.\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME            Override `~/.rev_scraping/` base.\n  \
+REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
+    )]
     Profile(ProfileAction),
 }
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum ProfileAction {
     /// List every profile directory under `<base>/profiles/`.
+    #[command(
+        long_about = "List every profile directory under <base>/profiles/. Output \
+is the bare set of profile names (no metadata).",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config profile list\n  \
+$ rev-stealth config --output-format json profile list\n\n\
+EXIT CODES:\n  \
+0  Ok               Listing emitted.\n  \
+1  UserError        Bad args.\n  \
+3  PermanentError   directory IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
+    )]
     List,
     /// Create a new profile directory and seed `policy.toml`,
     /// `authorized.toml`, and `sites/` via ConfigWriter (same skeleton
     /// as `config init`). Refuses if the profile already exists.
+    #[command(
+        long_about = "Create a new profile directory and seed policy.toml + \
+authorized.toml + sites/ via ConfigWriter (same skeleton as `config init`). \
+Refuses if the profile already exists. Name must match [A-Za-z0-9_-]{1,64}.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config profile create work\n  \
+$ rev-stealth config profile create demo-2026\n\n\
+EXIT CODES:\n  \
+0  Ok               Profile created.\n  \
+1  UserError        Bad name / path traversal / already exists.\n  \
+3  PermanentError   ConfigWriter IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
+    )]
     Create {
         /// Profile name. Must match `[A-Za-z0-9_-]{1,64}` (no `/`,
         /// `\`, `.`, whitespace, control chars). Path-traversal is
@@ -160,6 +389,20 @@ pub enum ProfileAction {
     /// Print the shell-export line needed to activate the profile.
     /// We never mutate the operator's environment from inside the
     /// process — the operator must eval/source the printed line.
+    #[command(
+        long_about = "Print the shell-export line needed to activate the profile. \
+We never mutate the operator's environment from inside the process — the \
+operator must eval/source the printed line.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config profile switch work\n  \
+$ eval \"$(rev-stealth config profile switch work)\"\n\n\
+EXIT CODES:\n  \
+0  Ok               Export line emitted.\n  \
+1  UserError        Bad name / profile not found.\n  \
+3  PermanentError   resolution failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
+    )]
     Switch {
         /// Profile name (must already exist).
         name: String,
@@ -167,6 +410,21 @@ pub enum ProfileAction {
     /// Best-effort overwrite-then-delete (`shred-like`) for the profile
     /// directory. Refuses if the profile is currently active per
     /// `$REV_SCRAPING_HOME` resolution.
+    #[command(
+        long_about = "Best-effort overwrite-then-delete (shred-like) for the \
+profile directory. Refuses if the profile is currently active (per \
+$REV_SCRAPING_HOME resolution). --yes is required for non-interactive deletion.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth config profile delete work --yes\n  \
+$ rev-stealth config profile delete demo-2026 --yes\n\n\
+EXIT CODES:\n  \
+0  Ok               Profile removed.\n  \
+1  UserError        Missing --yes / active profile / name not found.\n  \
+3  PermanentError   shred IO failure.\n\n\
+ENV:\n  \
+REV_SCRAPING_HOME            Override `~/.rev_scraping/` base.\n  \
+REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
+    )]
     Delete {
         /// Profile name to remove.
         name: String,

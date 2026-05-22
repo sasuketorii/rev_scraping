@@ -43,10 +43,54 @@ pub struct HermesArgs {
 #[derive(Subcommand, Debug, Clone)]
 pub enum HermesAction {
     /// Install the Hermes plugin scaffold into `<prefix>`.
+    #[command(
+        long_about = "Install the bundled Hermes MCP plugin scaffold into <prefix> \
+(default: $HOME/.hermes/plugins/rev-scraping-mcp). --source overrides the \
+scaffold origin. --force overwrites a non-empty destination.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth hermes install\n  \
+$ rev-stealth hermes install --prefix /opt/hermes/plugins/rev-scraping-mcp\n  \
+$ rev-stealth hermes install --force --source ./dist/hermes/rev-scraping-mcp\n\n\
+EXIT CODES:\n  \
+0  Ok               Install completed.\n  \
+1  UserError        Destination non-empty (use --force) / bad --source.\n  \
+3  PermanentError   scaffold IO failure.\n\n\
+ENV:\n  \
+(none consumed directly; respects HOME for default --prefix.)"
+    )]
     Install(InstallArgs),
     /// Remove a previously installed Hermes plugin.
+    #[command(
+        long_about = "Remove a previously installed Hermes plugin directory at \
+<prefix> (default: $HOME/.hermes/plugins/rev-scraping-mcp). No-op if the \
+directory is absent.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth hermes uninstall\n  \
+$ rev-stealth hermes uninstall --prefix /opt/hermes/plugins/rev-scraping-mcp\n\n\
+EXIT CODES:\n  \
+0  Ok               Uninstall completed (or no-op).\n  \
+1  UserError        Bad --prefix.\n  \
+3  PermanentError   directory IO failure.\n\n\
+ENV:\n  \
+(none consumed directly; respects HOME for default --prefix.)"
+    )]
     Uninstall(UninstallArgs),
     /// Verify a Hermes plugin install on disk.
+    #[command(
+        long_about = "Verify a Hermes plugin install on disk. Checks the required \
+files are present and (by default) runs a python3 ast.parse syntax probe on \
+__init__.py. Use --skip-python-check on hosts without python3.",
+        after_help = "EXAMPLES:\n  \
+$ rev-stealth hermes verify\n  \
+$ rev-stealth hermes verify --prefix /opt/hermes/plugins/rev-scraping-mcp\n  \
+$ rev-stealth hermes verify --skip-python-check\n\n\
+EXIT CODES:\n  \
+0  Ok               Plugin verified.\n  \
+1  UserError        Bad --prefix.\n  \
+3  PermanentError   Required files missing or python3 ast.parse failed.\n\n\
+ENV:\n  \
+(none consumed directly; respects HOME for default --prefix.)"
+    )]
     Verify(VerifyArgs),
 }
 
