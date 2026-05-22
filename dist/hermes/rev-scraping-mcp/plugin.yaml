@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+# Hermes plugin manifest for rev-scraping-mcp.
+# Bridges the stealth-mcp (Rust) JSON-RPC 2.0 stdio server into a Hermes
+# plugin that exposes its 16 MCP tools as Hermes ctx callables.
+name: rev-scraping-mcp
+version: 1.2.0
+description: >
+  Hermes adapter for the rev_scraping stealth-mcp server. Spawns the
+  `stealth-mcp` Rust binary as a subprocess, performs the MCP initialize
+  + tools/list handshake, and proxies each tools/call invocation as a
+  Hermes ctx tool. Restart-with-backoff on child crashes.
+
+# Hermes plugin entrypoint module.
+entrypoint: __init__:register
+
+# Allow-list of environment variables forwarded to the stealth-mcp child.
+# All other host env (including ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+# is stripped before spawn. This is enforced in mcp_client.py.
+env_allowlist:
+  - REV_SCRAPING_HOME
+  - REV_SCRAPING_REQUIRE_VPN
+  - REV_SCRAPING_CONFIG_LENIENT
+  - REV_SCRAPING_PROFILE
+  - VPN_INSTANCES
+  - VPN_PROFILE_FILE
+  - VPN_CREDENTIALS_FILE
+  - VPN_AUTH_FILE
+  - PATH
+  - HOME
+  - LANG
+  - LC_ALL
+
+# Binary the adapter expects on $PATH (or REV_SCRAPING_MCP_BIN override).
+child_binary: stealth-mcp
+
+# MCP protocol version we negotiate with the child.
+mcp_protocol_version: "2024-11-05"

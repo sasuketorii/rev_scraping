@@ -35,6 +35,15 @@ pub struct MeasureArgs {
     #[arg(long, default_value_t = false)]
     pub enable_external: bool,
 
+    /// P10.5: Opt-in to a VPS egress probe (HEAD request against a
+    /// minimal endpoint) to measure exit IP / TLS / DNS leak after
+    /// deploy. Even with this flag set, the probe is only active when
+    /// the binary was built with the `vps-egress-probe` Cargo feature;
+    /// otherwise a deterministic `disabled` stub is returned. Default:
+    /// disabled.
+    #[arg(long, default_value_t = false)]
+    pub enable_egress_probe: bool,
+
     /// Optional override for the User-Agent we attribute the measurement
     /// to. When omitted we use a neutral rev-stealth placeholder.
     #[arg(long)]
@@ -58,6 +67,8 @@ pub async fn run(format: OutputFormat, args: MeasureArgs) -> i32 {
 
     let ua = args.user_agent.clone().unwrap_or_else(default_user_agent);
     let measurement = build_local_measurement(&parsed, &ua);
+    // P10.5: egress probe is double-opt-in (cli flag + cargo feature).
+    let egress = super::egress::run_probe(args.enable_egress_probe).await;
 
     if args.enable_external {
         // External SaaS calls are explicitly opted into. We never enable
@@ -75,6 +86,7 @@ pub async fn run(format: OutputFormat, args: MeasureArgs) -> i32 {
                 "user_agent": ua,
                 "local": measurement,
                 "external": external,
+                "egress": egress,
             }),
         );
     } else {
@@ -86,6 +98,7 @@ pub async fn run(format: OutputFormat, args: MeasureArgs) -> i32 {
                 "user_agent": ua,
                 "local": measurement,
                 "external": { "enabled": false },
+                "egress": egress,
             }),
         );
     }

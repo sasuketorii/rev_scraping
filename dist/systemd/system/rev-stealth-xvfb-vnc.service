@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-xvfb-vnc.service (system scope, OPTIONAL emergency fallback)
+#
+# Purpose:
+#   Provide a headful-equivalent X server (Xvfb on :99) plus an x11vnc bridge
+#   bound to localhost only, so an operator can attach via SSH local
+#   forwarding (e.g. `ssh -L 5900:127.0.0.1:5900 operator@vps`) for emergency
+#   interactive Chrome inspection. NOT a substitute for the headless / Xvfb
+#   automation path used by stealth-mcp.
+#
+# Default state: installed by `dist/systemd/install.sh --with-vnc-fallback`,
+# but left disabled (no `enable --now`). Operator must explicitly start it.
+#
+# Security:
+#   - x11vnc binds to 127.0.0.1 only (`-localhost`); never reachable from the
+#     public interface.
+#   - No password file is shipped; access is gated entirely by SSH auth on the
+#     forwarding hop. If you need an extra layer, add `-rfbauth` via a
+#     drop-in override and a root-owned passwd file under
+#     /etc/rev-stealth/vncpasswd.
+#   - Runs as the unprivileged `rev-stealth` user under the same hardening
+#     profile as the MCP unit.
+
+[Unit]
+Description=REV Stealth Xvfb + x11vnc emergency fallback (localhost only)
+Documentation=https://github.com/sasuketorii/rev_scraping
+After=network-online.target
+Wants=network-online.target
+# Intentionally NOT WantedBy=multi-user.target by default: opt-in only.
+
+[Service]
+Type=simple
+User=rev-stealth
+Group=rev-stealth
+WorkingDirectory=/var/lib/rev-stealth
+Environment=DISPLAY=:99
+# Xvfb provides :99, x11vnc attaches to it and binds to loopback only.
+# Both run under a single sh -c so the unit fails as a whole if either dies.
+ExecStartPre=/bin/sh -c 'command -v Xvfb >/dev/null && command -v x11vnc >/dev/null'
+ExecStart=/bin/sh -c 'Xvfb :99 -screen 0 1280x1024x24 -nolisten tcp & XVFB_PID=$!; sleep 1; exec x11vnc -display :99 -localhost -rfbport 5900 -forever -shared -nopw -quiet'
+Restart=on-failure
+RestartSec=5s
+
+# Hardening (parity with rev-stealth-mcp.service)
+LimitNOFILE=65536
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/rev-stealth /var/log/rev-stealth
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# Explicitly refuse any non-loopback bind by removing AF_INET / AF_INET6
+# is too restrictive (x11vnc still needs AF_UNIX + loopback), so we rely on
+# the `-localhost` flag above and document the contract here.
+
+[Install]
+WantedBy=multi-user.target

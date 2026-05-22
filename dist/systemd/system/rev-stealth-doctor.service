@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-doctor.service - one-shot health probe, driven by rev-stealth-doctor.timer.
+# Writes JSON lines to /var/log/rev-stealth/doctor.jsonl.
+
+[Unit]
+Description=REV Stealth doctor probe (VPS mode)
+Documentation=https://github.com/sasuketorii/rev_scraping
+After=network-online.target rev-stealth-mcp.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=rev-stealth
+Group=rev-stealth
+WorkingDirectory=/var/lib/rev-stealth
+Environment=REV_STEALTH_BIN=/usr/local/bin/stealth-cli
+ExecStart=/bin/sh -c 'exec "${REV_STEALTH_BIN:-/usr/local/bin/stealth-cli}" doctor --vps --format json >> /var/log/rev-stealth/doctor.jsonl'
+Restart=on-failure
+RestartSec=5s
+
+LimitNOFILE=65536
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadWritePaths=/var/log/rev-stealth
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

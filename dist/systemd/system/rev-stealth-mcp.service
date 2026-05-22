@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-mcp.service (system scope)
+# Runs the stealth-mcp daemon as the unprivileged "rev-stealth" system user.
+# Operator override: drop a unit file in /etc/systemd/system/rev-stealth-mcp.service.d/override.conf
+# to set REV_STEALTH_BIN, additional Environment=, or LoadCredentialEncrypted= entries.
+#
+# Credentials placeholder (wired in P10.2):
+#   LoadCredentialEncrypted=surfshark.env:/etc/credstore.encrypted/surfshark.env
+
+[Unit]
+Description=REV Stealth MCP daemon (system scope)
+Documentation=https://github.com/sasuketorii/rev_scraping
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rev-stealth
+Group=rev-stealth
+WorkingDirectory=/var/lib/rev-stealth
+Environment=REV_STEALTH_BIN=/usr/local/bin/stealth-mcp
+Environment=RUST_LOG=info
+# Absolute path with env override fallback.
+ExecStart=/bin/sh -c 'exec "${REV_STEALTH_BIN:-/usr/local/bin/stealth-mcp}" serve --config /etc/rev-stealth/mcp.toml'
+Restart=on-failure
+RestartSec=5s
+
+# Resource and hardening
+LimitNOFILE=65536
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/rev-stealth /var/log/rev-stealth
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

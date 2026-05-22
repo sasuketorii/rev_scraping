@@ -17,6 +17,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use crate::config_io::{default_schema_version_v1, KnownConfig};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use vpn_rotate::proxy_resolver::{FallbackChain, RawTierConfig};
@@ -30,7 +31,10 @@ pub const ENV_REQUIRE_VPN: &str = "REV_SCRAPING_REQUIRE_VPN";
 pub const ENV_VPN_INSTANCES: &str = "VPN_INSTANCES";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Policy {
+    #[serde(default = "default_schema_version_v1")]
+    pub schema_version: u32,
     #[serde(default = "default_require_vpn")]
     pub require_vpn: bool,
     #[serde(default)]
@@ -44,6 +48,7 @@ pub struct Policy {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct VpnInstance {
     pub name: String,
     pub http_proxy_port: u16,
@@ -61,12 +66,32 @@ fn default_vpn_instances() -> Vec<VpnInstance> {
 impl Default for Policy {
     fn default() -> Self {
         Self {
+            schema_version: default_schema_version_v1(),
             require_vpn: default_require_vpn(),
             vpn_required_country: None,
             vpn_instances: default_vpn_instances(),
             proxies: BTreeMap::new(),
             fallback_chain: FallbackChain::default(),
         }
+    }
+}
+
+impl KnownConfig for Policy {
+    const SCHEMA_VERSION_FIELD: &'static str = "schema_version";
+
+    fn supported_versions() -> &'static [u32] {
+        &[1]
+    }
+
+    fn known_fields() -> &'static [&'static str] {
+        &[
+            "schema_version",
+            "require_vpn",
+            "vpn_required_country",
+            "vpn_instances",
+            "proxies",
+            "fallback_chain",
+        ]
     }
 }
 

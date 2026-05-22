@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-soak.service (user scope)
+# Runs scripts/run_soak.sh under the invoking user. Intended for staged soak runs.
+# Override REV_STEALTH_BIN / SOAK_SCRIPT via ~/.config/systemd/user/rev-stealth-soak.service.d/override.conf
+
+[Unit]
+Description=REV Stealth soak runner (user scope)
+Documentation=https://github.com/sasuketorii/rev_scraping
+After=default.target
+
+[Service]
+Type=simple
+Environment=REV_STEALTH_BIN=%h/dev/rev_scraping/scripts/run_soak.sh
+Environment=RUST_LOG=info
+WorkingDirectory=%h/dev/rev_scraping
+ExecStart=/bin/sh -c 'exec "${REV_STEALTH_BIN:-%h/dev/rev_scraping/scripts/run_soak.sh}"'
+Restart=on-failure
+RestartSec=5s
+
+LimitNOFILE=65536
+PrivateTmp=yes
+ProtectSystem=strict
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

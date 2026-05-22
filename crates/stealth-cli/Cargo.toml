@@ -12,6 +12,16 @@ description = "rev-stealth CLI front-end (captcha / browser / vpn subcommands)"
 name = "rev-stealth"
 path = "src/main.rs"
 
+[features]
+# P10.5: opt-in VPS egress probe. When DISABLED (the default), the
+# `egress` module returns a deterministic stub and performs no network
+# I/O. When enabled, `rev-stealth measure --enable-egress-probe` issues
+# an HTTP HEAD against a configurable endpoint to measure exit IP / TLS
+# behavior after a VPS deploy. The runtime `--enable-egress-probe` flag
+# is still required (double opt-in).
+default = []
+vps-egress-probe = []
+
 [dependencies]
 stealth-core = { workspace = true }
 captcha-bypass = { workspace = true }
@@ -35,11 +45,14 @@ uuid = { workspace = true }
 url = { workspace = true }
 regex = { workspace = true }
 toml = "0.8"
+serde_yaml = "0.9"
 dirs = "5"
 sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 reqwest = { workspace = true }
 secrecy = { workspace = true }
+# P7.3: structured errors for `rev-stealth hermes`.
+thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

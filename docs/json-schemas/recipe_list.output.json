@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "recipe_list.output",
+  "description": "Response from `recipe_list`. Enumerates SiteRecipe summaries under ~/.rev_scraping/sites/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recipes",
+    "total"
+  ],
+  "properties": {
+    "recipes": {
+      "type": "array",
+      "description": "Per-recipe summary entries. Each entry carries enough to drive a follow-up `recipe_show` call without leaking secrets.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Recipe domain key (filename stem).",
+            "examples": [
+              "example.com"
+            ]
+          },
+          "rendering": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Site rendering mode (lower-cased Debug of the enum). Null when recipe failed to load.",
+            "examples": [
+              "spa",
+              "ssr",
+              "static"
+            ]
+          },
+          "last_verified": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO-8601 timestamp of the recipe's most recent verification run. Null when never verified.",
+            "examples": [
+              "2026-04-12T08:30:00Z"
+            ]
+          },
+          "endpoint_count": {
+            "type": "integer",
+            "description": "Number of API endpoints declared on the recipe (0 when no [api] block).",
+            "examples": [
+              0,
+              3
+            ]
+          }
+        }
+      },
+      "examples": [
+        [
+          {
+            "domain": "example.com",
+            "rendering": "spa",
+            "last_verified": null,
+            "endpoint_count": 1
+          }
+        ]
+      ]
+    },
+    "total": {
+      "type": "integer",
+      "description": "Total number of recipes returned. Equals `recipes.length`.",
+      "examples": [
+        0,
+        1,
+        42
+      ]
+    },
+    "_meta": {
+      "type": "object",
+      "description": "P13.4: sanitize-pass metadata attached by stealth-mcp before this payload becomes LLM-visible. Always present; agents can ignore it unless inspecting prompt-injection telemetry. Shape stable per `stealth-sanitize::SanitizationReport` (schema_version=1).",
+      "additionalProperties": true,
+      "properties": {
+        "sanitize": {
+          "type": "object",
+          "description": "Resolved sanitize report. See `stealth_sanitize::SanitizationReport` for the canonical shape.",
+          "additionalProperties": true,
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "examples": [
+                1
+              ]
+            },
+            "policy_name": {
+              "type": "string",
+              "examples": [
+                "strict",
+                "balanced",
+                "passthrough"
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "enforce"
+              ],
+              "examples": [
+                "warn"
+              ]
+            },
+            "bytes_in": {
+              "type": "integer",
+              "examples": [
+                128
+              ]
+            },
+            "bytes_out": {
+              "type": "integer",
+              "examples": [
+                180
+              ]
+            },
+            "truncated": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "aborted": {
+              "type": "boolean",
+              "examples": [
+                false
+              ]
+            },
+            "layers_applied": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "examples": [
+                [
+                  "L4:unicode",
+                  "L2:envelope",
+                  "L7:meta"
+                ]
+              ]
+            },
+            "canary_hits": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "examples": [
+                []
+              ]
+            },
+            "sanitize_id": {
+              "type": "string",
+              "description": "64-bit hex nonce.",
+              "examples": [
+                "a1b2c3d4e5f60718"
+              ]
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "sanitize": {
+            "schema_version": 1,
+            "policy_name": "balanced",
+            "mode": "warn",
+            "bytes_in": 12,
+            "bytes_out": 60,
+            "truncated": false,
+            "aborted": false,
+            "layers_applied": [
+              "L2:envelope",
+              "L7:meta"
+            ],
+            "canary_hits": [],
+            "sanitize_id": "a1b2c3d4e5f60718"
+          }
+        }
+      ]
+    }
+  }
+}

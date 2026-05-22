@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-vpn@.service - templated VPN container instance
+# Usage: systemctl start rev-stealth-vpn@1.service  (spawns the "vpn-1" compose stack)
+# %i expands to the instance suffix (e.g. "1", "2", ...).
+#
+# Credentials (P10.2): systemd decrypts these at unit start and exposes them
+# read-only under ${CREDENTIALS_DIRECTORY} (i.e. %d). The Rust side reads
+# VPN_USER / VPN_PASSWORD via CredentialResolver::resolve, which prefers
+# <KEY>_FILE over <KEY>. Generate the .cred blobs with
+# `dist/systemd/setup-credentials.sh` (uses `systemd-creds encrypt`).
+
+[Unit]
+Description=REV Stealth VPN instance vpn-%i (docker compose)
+Documentation=https://github.com/sasuketorii/rev_scraping
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+PartOf=rev-stealth.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=rev-stealth
+Group=rev-stealth
+WorkingDirectory=/var/lib/rev-stealth/vpn/vpn-%i
+Environment=REV_STEALTH_BIN=/usr/bin/docker
+EnvironmentFile=-/etc/rev-stealth/vpn-%i.env
+LoadCredentialEncrypted=surfshark_user:/etc/credstore.encrypted/surfshark_user.cred
+LoadCredentialEncrypted=surfshark_password:/etc/credstore.encrypted/surfshark_password.cred
+Environment=VPN_USER_FILE=%d/surfshark_user
+Environment=VPN_PASSWORD_FILE=%d/surfshark_password
+# docker-compose (src/infra/docker-compose.vpn.yml) interpolates
+# ${VPN_USER}/${VPN_PASSWORD} into OPENVPN_USER/OPENVPN_PASSWORD, so ExecStart
+# hydrates them from the credential files. *_FILE remain source of truth;
+# raw creds live only in this child process, never written to disk.
+#
+# systemd expands $VAR / ${VAR} in ExecStart= before invoking /bin/sh. To
+# pass a literal $ to the shell we write $$, so $$(cat "$${VPN_USER_FILE}")
+# reaches sh as $(cat "${VPN_USER_FILE}"). systemd has no ${VAR:-default}
+# form, so REV_STEALTH_BIN is set explicitly via Environment= above and
+# referenced as $${REV_STEALTH_BIN}.
+ExecStart=/bin/sh -c 'set -eu; VPN_USER="$$(cat "$${VPN_USER_FILE}")"; VPN_PASSWORD="$$(cat "$${VPN_PASSWORD_FILE}")"; export VPN_USER VPN_PASSWORD; exec "$${REV_STEALTH_BIN}" compose --project-name rev-stealth-vpn-%i up -d'
+ExecStop=/bin/sh -c 'exec "$${REV_STEALTH_BIN}" compose --project-name rev-stealth-vpn-%i down'
+Restart=on-failure
+RestartSec=5s
+
+LimitNOFILE=65536
+PrivateTmp=yes
+ProtectSystem=strict
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/rev-stealth /var/log/rev-stealth
+
+[Install]
+WantedBy=multi-user.target

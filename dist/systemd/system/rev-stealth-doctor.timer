@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# rev-stealth-doctor.timer - fires rev-stealth-doctor.service every 30 minutes.
+
+[Unit]
+Description=Run REV Stealth doctor probe every 30 minutes
+Documentation=https://github.com/sasuketorii/rev_scraping
+Requires=rev-stealth-doctor.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+Persistent=true
+Unit=rev-stealth-doctor.service
+
+[Install]
+WantedBy=timers.target

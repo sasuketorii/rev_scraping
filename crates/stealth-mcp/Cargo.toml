@@ -12,6 +12,10 @@ description = "MCP (stdio transport) server exposing rev_scraping CLI tools to A
 name = "stealth-mcp"
 path = "src/main.rs"
 
+[[bin]]
+name = "gen_reference"
+path = "src/bin/gen_reference.rs"
+
 [lib]
 path = "src/lib.rs"
 
@@ -24,6 +28,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 which = "6"
+stealth-agent-contracts = { workspace = true }
+stealth-sanitize = { workspace = true }
 stealth-sites = { workspace = true }
 stealth-auth = { workspace = true }
 base64 = "0.22"

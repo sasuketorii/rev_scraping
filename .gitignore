@@ -28,8 +28,25 @@ workspace/
 
 # Node build artifacts (semantic-mcp-server)
 node_modules/
-dist/
+# P10.5: top-level dist/ is globally excluded for build outputs, EXCEPT the
+# hand-authored systemd deploy package which must ship with the repo.
+# The bare `dist/` form would prevent nested un-ignore, so the top-level
+# entries are listed explicitly and nested package dist/ trees are
+# re-ignored under their specific package paths instead of with `**/dist/`
+# (which would re-shadow `/dist/systemd`).
+/dist/*
+!/dist/systemd
+# P7.1: hand-authored Hermes plugin scaffold ships with the repo for
+# `rev-stealth hermes install` to consume.
+!/dist/hermes
+# Nested package build outputs.
+scripts/semantic-mcp-server/dist/
 build/
+
+# P10.5: VPS deploy runbooks are not under dist/ but are listed here so
+# future moves of dist-style ignore rules cannot accidentally shadow them.
+!docs/deploy/
+!docs/deploy/**
 .semantic-mcp/*/semantic.db
 .agent/project_id
 .agent/tmp/
@@ -37,7 +54,13 @@ build/
 !.agent/context/.gitkeep
 .agent/registry/*.jsonl
 .agent-write-test-*
+
+# v1.2.0: per-round Codex reviewer transcripts are large (8MB+) and ephemeral.
+# Prompts (~256K) remain committed as scope evidence; reviews are excluded.
+.agent/active/reviews/
 .ask-readonly-*
 harness-rust/target/
 harness-rust/target
 **/target/
+__pycache__/
+*.pyc

@@ -26,6 +26,8 @@ pub mod docker;
 #[cfg(feature = "docker")]
 pub mod leak_guard;
 
+pub mod credentials;
+
 pub mod instance_pool;
 
 pub mod leak_monitor;
