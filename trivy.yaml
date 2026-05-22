@@ -1,0 +1,26 @@
+# Lane H.4 — trivy configuration for the distroless image scan.
+#
+# Used by `release.yml` job `trivy-scan`:
+#   trivy --config trivy.yaml image ghcr.io/sasuketorii/rev-stealth:${VERSION}
+
+severity:
+  - HIGH
+  - CRITICAL
+
+# Fail the CI step if any unignored finding at the listed severity exists.
+exit-code: 1
+
+# `.trivyignore` is consulted automatically; listing it here for clarity.
+ignorefile: .trivyignore
+
+# Skip dirs that don't exist in the distroless image but show up in fs scans.
+skip-dirs:
+  - vendor
+  - _refs
+  - target
+
+# Vulnerability DB cache lives in the runner cache layer.
+cache-dir: .trivy-cache
+
+# Output: SARIF for GH code-scanning + table for human review.
+format: table

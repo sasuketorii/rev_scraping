@@ -21,9 +21,7 @@
 //! generated each invocation by design).
 
 use serde_json::{json, Value};
-use stealth_sanitize::{
-    sanitize_for_agent, CanarySeverity, Preset, SanitizePolicy,
-};
+use stealth_sanitize::{sanitize_for_agent, CanarySeverity, Preset, SanitizePolicy};
 
 // ---------------------------------------------------------------------
 // Malicious corpus — 20 fixtures covering the 20-canary set + adversarial
@@ -178,46 +176,86 @@ fn malicious_corpus() -> Vec<MaliciousFixture> {
 
 fn benign_corpus() -> Vec<(&'static str, Value)> {
     vec![
-        ("b01_wikipedia_paragraph",
-         json!({"body": "The Pacific Ocean is the largest and deepest of Earth's five oceanic divisions. It extends from the Arctic Ocean in the north to the Southern Ocean in the south."})),
-        ("b02_mdn_javascript",
-         json!({"body": "The Array.prototype.map() method creates a new array populated with the results of calling a provided function on every element in the calling array."})),
-        ("b03_github_readme",
-         json!({"body": "## Installation\n\nClone the repo and run `npm install`. Then start the dev server with `npm run dev`."})),
-        ("b04_japanese_news",
-         json!({"body": "東京の桜は今週末に満開を迎える見込みです。例年より一週間早い開花で、各地の公園では花見客で賑わっています。"})),
-        ("b05_russian_text",
-         json!({"body": "Москва — столица Российской Федерации. Население города составляет около 13 миллионов человек по данным переписи."})),
-        ("b06_stack_overflow_code_python",
-         json!({"body": "Use a dict comprehension: `{k: v for k, v in items.items() if v is not None}`. This filters out None values cleanly."})),
-        ("b07_recipe_card",
-         json!({"body": "Mix flour, sugar, and butter. Bake at 350F for 20 minutes. Let cool before serving with whipped cream."})),
-        ("b08_news_headline",
-         json!({"title": "Central Bank Holds Rates Steady", "summary": "Officials cited stable employment and easing inflation as reasons to maintain the benchmark rate."})),
-        ("b09_product_listing",
-         json!({"name": "Ergonomic Office Chair", "price": 249.99, "description": "Adjustable lumbar support and breathable mesh back."})),
-        ("b10_arabic_text",
-         json!({"body": "اللغة العربية هي إحدى أكثر اللغات تحدثاً في العالم، ويتحدثها أكثر من ثلاثمئة مليون شخص كلغة أم."})),
-        ("b11_korean_text",
-         json!({"body": "한국의 전통 음식인 김치는 세계적으로 유명한 발효 식품입니다. 다양한 채소로 만들 수 있습니다."})),
-        ("b12_simplified_chinese",
-         json!({"body": "长城是中国古代的军事防御工程,绵延数千公里,是世界文化遗产之一。"})),
-        ("b13_legal_text",
-         json!({"body": "This agreement shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict of law provisions."})),
-        ("b14_html_snippet",
-         json!({"html": "<p>Hello, <strong>world</strong>. This is a benign paragraph.</p>"})),
-        ("b15_url_listing",
-         json!({"urls": ["https://en.wikipedia.org/wiki/Pacific_Ocean", "https://example.com/about", "https://docs.example.org/"]})),
-        ("b16_markdown_doc",
-         json!({"body": "# Title\n\nThis is a normal markdown document with **bold** and _italic_ text. No injection here."})),
-        ("b17_sql_snippet",
-         json!({"sql": "SELECT id, name FROM users WHERE active = true ORDER BY created_at DESC LIMIT 100;"})),
-        ("b18_log_line",
-         json!({"line": "2026-05-21T12:34:56Z INFO request=42 ms=127 status=200 path=/health"})),
-        ("b19_email_signature",
-         json!({"body": "Best regards,\nJane Doe\nSenior Engineer\nExample Corp.\njane@example.com"})),
-        ("b20_emoji_text",
-         json!({"body": "Lunch was great today! 🍣🍜 The team enjoyed the new restaurant downtown."})),
+        (
+            "b01_wikipedia_paragraph",
+            json!({"body": "The Pacific Ocean is the largest and deepest of Earth's five oceanic divisions. It extends from the Arctic Ocean in the north to the Southern Ocean in the south."}),
+        ),
+        (
+            "b02_mdn_javascript",
+            json!({"body": "The Array.prototype.map() method creates a new array populated with the results of calling a provided function on every element in the calling array."}),
+        ),
+        (
+            "b03_github_readme",
+            json!({"body": "## Installation\n\nClone the repo and run `npm install`. Then start the dev server with `npm run dev`."}),
+        ),
+        (
+            "b04_japanese_news",
+            json!({"body": "東京の桜は今週末に満開を迎える見込みです。例年より一週間早い開花で、各地の公園では花見客で賑わっています。"}),
+        ),
+        (
+            "b05_russian_text",
+            json!({"body": "Москва — столица Российской Федерации. Население города составляет около 13 миллионов человек по данным переписи."}),
+        ),
+        (
+            "b06_stack_overflow_code_python",
+            json!({"body": "Use a dict comprehension: `{k: v for k, v in items.items() if v is not None}`. This filters out None values cleanly."}),
+        ),
+        (
+            "b07_recipe_card",
+            json!({"body": "Mix flour, sugar, and butter. Bake at 350F for 20 minutes. Let cool before serving with whipped cream."}),
+        ),
+        (
+            "b08_news_headline",
+            json!({"title": "Central Bank Holds Rates Steady", "summary": "Officials cited stable employment and easing inflation as reasons to maintain the benchmark rate."}),
+        ),
+        (
+            "b09_product_listing",
+            json!({"name": "Ergonomic Office Chair", "price": 249.99, "description": "Adjustable lumbar support and breathable mesh back."}),
+        ),
+        (
+            "b10_arabic_text",
+            json!({"body": "اللغة العربية هي إحدى أكثر اللغات تحدثاً في العالم، ويتحدثها أكثر من ثلاثمئة مليون شخص كلغة أم."}),
+        ),
+        (
+            "b11_korean_text",
+            json!({"body": "한국의 전통 음식인 김치는 세계적으로 유명한 발효 식품입니다. 다양한 채소로 만들 수 있습니다."}),
+        ),
+        (
+            "b12_simplified_chinese",
+            json!({"body": "长城是中国古代的军事防御工程,绵延数千公里,是世界文化遗产之一。"}),
+        ),
+        (
+            "b13_legal_text",
+            json!({"body": "This agreement shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict of law provisions."}),
+        ),
+        (
+            "b14_html_snippet",
+            json!({"html": "<p>Hello, <strong>world</strong>. This is a benign paragraph.</p>"}),
+        ),
+        (
+            "b15_url_listing",
+            json!({"urls": ["https://en.wikipedia.org/wiki/Pacific_Ocean", "https://example.com/about", "https://docs.example.org/"]}),
+        ),
+        (
+            "b16_markdown_doc",
+            json!({"body": "# Title\n\nThis is a normal markdown document with **bold** and _italic_ text. No injection here."}),
+        ),
+        (
+            "b17_sql_snippet",
+            json!({"sql": "SELECT id, name FROM users WHERE active = true ORDER BY created_at DESC LIMIT 100;"}),
+        ),
+        (
+            "b18_log_line",
+            json!({"line": "2026-05-21T12:34:56Z INFO request=42 ms=127 status=200 path=/health"}),
+        ),
+        (
+            "b19_email_signature",
+            json!({"body": "Best regards,\nJane Doe\nSenior Engineer\nExample Corp.\njane@example.com"}),
+        ),
+        (
+            "b20_emoji_text",
+            json!({"body": "Lunch was great today! 🍣🍜 The team enjoyed the new restaurant downtown."}),
+        ),
     ]
 }
 
@@ -366,8 +404,17 @@ fn sanitize_critical_fixtures_abort_and_second_pass_is_stable() {
         assert_eq!(once.payload, Value::Null);
 
         let twice = sanitize_for_agent(once.payload.clone(), &policy);
-        assert_eq!(twice.payload, Value::Null, "{}: second pass not Null", fx.id);
-        assert!(twice.report.canary_hits.is_empty(), "{}: second pass emitted hits on Null payload", fx.id);
+        assert_eq!(
+            twice.payload,
+            Value::Null,
+            "{}: second pass not Null",
+            fx.id
+        );
+        assert!(
+            twice.report.canary_hits.is_empty(),
+            "{}: second pass emitted hits on Null payload",
+            fx.id
+        );
     }
 }
 
@@ -390,14 +437,12 @@ fn sanitize_l2_envelope_self_canary_excluded_from_high_critical() {
         .report
         .canary_hits
         .iter()
-        .filter(|h| {
-            matches!(
-                h.severity,
-                CanarySeverity::Critical | CanarySeverity::High
-            )
-        })
+        .filter(|h| matches!(h.severity, CanarySeverity::Critical | CanarySeverity::High))
         .count();
-    assert_eq!(hi_or_crit, 0, "first pass on benign string emitted High/Critical: {env:?}");
+    assert_eq!(
+        hi_or_crit, 0,
+        "first pass on benign string emitted High/Critical: {env:?}"
+    );
 }
 
 #[test]

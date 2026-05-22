@@ -1,0 +1,65 @@
+name: Cross-platform nightly
+
+# Lane K K.6 — extended cross-platform test matrix.
+#
+# The default ci.yml covers ubuntu-22.04 (x86_64 stable + 1.83 MSRV)
+# and macos-14 (Apple Silicon arm64 stable + 1.83 MSRV) on every push
+# and PR.
+#
+# This workflow extends coverage to aarch64-unknown-linux-gnu via QEMU
+# user-mode emulation on a nightly cadence (cron + manual dispatch).
+# Per the v1.3 ExecPlan rev1 risk note, aarch64 Linux under QEMU runs
+# 5-10x slower than native, so it is NOT in the PR critical path.
+#
+# When GitHub-hosted ubuntu-22.04-arm runners reach general availability
+# across our org plan, flip the matrix from cross / QEMU to a native
+# arm64 runner and promote this to per-PR.
+
+on:
+  schedule:
+    # Nightly at 04:00 UTC. Offset from audit-cron.yml (06:00 Mon).
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  linux-aarch64-qemu:
+    name: cargo test aarch64-unknown-linux-gnu (QEMU, nightly)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-aarch64-cross
+          workspaces: |
+            . -> target
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: cross test --workspace --release
+        run: |
+          set -euo pipefail
+          cross test --workspace --release --no-fail-fast \
+            --target aarch64-unknown-linux-gnu -- --test-threads=2
+
+  macos-x86_64:
+    name: cargo test macos-13 (x86_64 Intel, nightly)
+    runs-on: macos-13
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: macos-13-x86_64
+          workspaces: |
+            . -> target
+      - name: cargo test --workspace --release
+        run: cargo test --workspace --release --no-fail-fast

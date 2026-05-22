@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 //! `stealth-sanitize` — RevHarness prompt-injection defense (P13).
 //!
 //! This crate provides the public API for the sanitizer layer that wraps
@@ -21,17 +23,12 @@ mod layer2_envelope;
 mod layer3_canary;
 mod layer4_unicode;
 mod layer5_clamp;
+mod nonce;
 mod policy;
 mod report;
-mod nonce;
 
-pub use policy::{
-    CanaryPolicy, LimitPolicy, Mode, Preset, SanitizePolicy, UnicodePolicy,
-};
-pub use report::{
-    CanaryHit, CanarySeverity, ErrorEnvelope, SanitizationReport,
-    SanitizedEnvelope,
-};
+pub use policy::{CanaryPolicy, LimitPolicy, Mode, Preset, SanitizePolicy, UnicodePolicy};
+pub use report::{CanaryHit, CanarySeverity, ErrorEnvelope, SanitizationReport, SanitizedEnvelope};
 
 /// Schema version for `SanitizationReport.schema_version` (`_meta.sanitize.schema_version`).
 ///
@@ -48,7 +45,10 @@ pub struct WrapContext<'a> {
 
 impl<'a> Default for WrapContext<'a> {
     fn default() -> Self {
-        Self { origin: "unknown", tool: "unknown" }
+        Self {
+            origin: "unknown",
+            tool: "unknown",
+        }
     }
 }
 
@@ -139,12 +139,7 @@ pub fn sanitize_for_agent_with(
     // skip wrapping when the payload was aborted (Null) — no value in
     // wrapping null.
     if !report.aborted {
-        let l2 = layer2_envelope::apply_l2(
-            &mut payload,
-            ctx.origin,
-            ctx.tool,
-            &sanitize_id,
-        );
+        let l2 = layer2_envelope::apply_l2(&mut payload, ctx.origin, ctx.tool, &sanitize_id);
         if l2.wrapped > 0 {
             report.layers_applied.push("L2:envelope");
         }
@@ -168,16 +163,8 @@ pub fn sanitize_for_agent_with(
 /// In P13.1 no layer work runs; the report still records `policy_name`,
 /// `mode`, byte accounting, and `sanitize_id` so downstream consumers can
 /// rely on shape stability before P13.2-P13.5 wire the layers.
-pub fn sanitize_error_envelope(
-    mut env: ErrorEnvelope,
-    policy: &SanitizePolicy,
-) -> ErrorEnvelope {
-    let bytes_in = env
-        .data
-        .as_ref()
-        .map(estimate_bytes)
-        .unwrap_or(0)
-        + env.message.len();
+pub fn sanitize_error_envelope(mut env: ErrorEnvelope, policy: &SanitizePolicy) -> ErrorEnvelope {
+    let bytes_in = env.data.as_ref().map(estimate_bytes).unwrap_or(0) + env.message.len();
     let sanitize_id = nonce::new_nonce();
 
     let mut report = SanitizationReport {
@@ -276,7 +263,10 @@ mod tests {
         // 64-bit hex nonce → 16 lowercase hex chars.
         assert_eq!(env.report.sanitize_id.len(), 16);
         assert!(
-            env.report.sanitize_id.chars().all(|c| c.is_ascii_hexdigit()),
+            env.report
+                .sanitize_id
+                .chars()
+                .all(|c| c.is_ascii_hexdigit()),
             "nonce must be ascii hex: {}",
             env.report.sanitize_id
         );
@@ -294,10 +284,15 @@ mod tests {
         let data = out.data.expect("data must be populated");
         let meta = data.get("_meta").expect("_meta present");
         let san = meta.get("sanitize").expect("_meta.sanitize present");
-        assert_eq!(san.get("policy_name").and_then(|v| v.as_str()), Some("balanced"));
+        assert_eq!(
+            san.get("policy_name").and_then(|v| v.as_str()),
+            Some("balanced")
+        );
         assert_eq!(san.get("mode").and_then(|v| v.as_str()), Some("warn"));
         assert_eq!(
-            san.get("layers_applied").and_then(|v| v.as_array()).map(|a| a.len()),
+            san.get("layers_applied")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len()),
             Some(1)
         );
         let nonce = san.get("sanitize_id").and_then(|v| v.as_str()).unwrap();
@@ -308,15 +303,25 @@ mod tests {
     #[test]
     fn error_envelope_off_mode_has_empty_layers_but_meta_still_present() {
         let policy = SanitizePolicy::preset(Preset::PassThrough);
-        let env = ErrorEnvelope { code: 1, message: "x".into(), data: None };
+        let env = ErrorEnvelope {
+            code: 1,
+            message: "x".into(),
+            data: None,
+        };
         let out = sanitize_error_envelope(env, &policy);
         let san = out
-            .data.as_ref().unwrap()
-            .get("_meta").unwrap()
-            .get("sanitize").unwrap();
+            .data
+            .as_ref()
+            .unwrap()
+            .get("_meta")
+            .unwrap()
+            .get("sanitize")
+            .unwrap();
         assert_eq!(san.get("mode").and_then(|v| v.as_str()), Some("off"));
         assert_eq!(
-            san.get("layers_applied").and_then(|v| v.as_array()).map(|a| a.len()),
+            san.get("layers_applied")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len()),
             Some(0)
         );
     }
@@ -331,7 +336,10 @@ mod tests {
         };
         let out = sanitize_error_envelope(env, &policy);
         let data = out.data.expect("data present");
-        assert_eq!(data.get("detail").and_then(|v| v.as_str()), Some("preexisting"));
+        assert_eq!(
+            data.get("detail").and_then(|v| v.as_str()),
+            Some("preexisting")
+        );
         assert_eq!(data.get("n").and_then(|v| v.as_u64()), Some(7));
         assert!(data.get("_meta").and_then(|m| m.get("sanitize")).is_some());
     }
@@ -411,7 +419,10 @@ mod tests {
         let env = sanitize_for_agent_with(
             json!("payload"),
             &policy,
-            WrapContext { origin: "https://x.test", tool: "spider" },
+            WrapContext {
+                origin: "https://x.test",
+                tool: "spider",
+            },
         );
         let s = env.payload.as_str().unwrap();
         assert!(s.contains("origin=https://x.test"));

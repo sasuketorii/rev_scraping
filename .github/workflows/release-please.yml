@@ -1,0 +1,27 @@
+name: release-please
+
+# Lane H.7 - release-please PR automation.
+# Runs on every push to main and opens / updates a release PR. Merging
+# that PR pushes a v* tag, which triggers release.yml to build and sign
+# artifacts.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: release-please
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

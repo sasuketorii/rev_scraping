@@ -39,6 +39,7 @@
 - [FAQ / debugging](#faq--debugging)
 - [Limitations &amp; v1.2.1 backlog](#limitations--v121-backlog)
 - [Project process](#project-process)
+- [Compatibility & semver policy](docs/compat.md)
 - [License](#license)
 
 ---

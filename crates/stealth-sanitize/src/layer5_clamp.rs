@@ -74,10 +74,7 @@ fn head_tail_clamp(s: &str, limit: usize) -> String {
     let marker_len = TRUNCATED_MARKER.len();
     if limit <= marker_len {
         // Degenerate budget: return marker truncated to `limit`.
-        return TRUNCATED_MARKER
-            .chars()
-            .take(limit)
-            .collect();
+        return TRUNCATED_MARKER.chars().take(limit).collect();
     }
     let budget = limit - marker_len;
     let head_budget = (budget * 80) / 100;
@@ -174,7 +171,8 @@ mod tests {
         // bytes_kept must not exceed total_max_bytes by more than marker size.
         assert!(
             r.bytes_kept <= policy.total_max_bytes + TRUNCATED_MARKER.len(),
-            "bytes_kept={} > budget+marker", r.bytes_kept
+            "bytes_kept={} > budget+marker",
+            r.bytes_kept
         );
     }
 

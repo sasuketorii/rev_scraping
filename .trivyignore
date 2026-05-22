@@ -1,0 +1,12 @@
+# Lane H.4 — trivy allowlist for the distroless image.
+#
+# Policy:
+#   - Default scan command is:
+#       trivy image --severity HIGH,CRITICAL --exit-code 1 \
+#         ghcr.io/sasuketorii/rev-stealth:${VERSION}
+#   - This file lists CVEs intentionally accepted (must include expiry +
+#     justification). Empty by default; entries are reviewed quarterly.
+#
+# Format: one CVE ID per line; comments allowed.
+
+# (no exceptions as of v1.3.0 plumbing)
