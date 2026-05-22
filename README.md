@@ -19,6 +19,8 @@
 [![mcp](https://img.shields.io/badge/MCP-stdio_JSON--RPC_2.0-purple)](docs/MCP_REFERENCE.md)
 [![ci](https://img.shields.io/badge/CI-8_jobs-green)](.github/workflows/ci.yml)
 
+🇯🇵 日本語版: [README.ja.md](README.ja.md)
+
 ---
 
 ## Table of Contents
