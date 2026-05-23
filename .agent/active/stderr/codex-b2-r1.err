@@ -1,0 +1,1811 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+2026-05-22T23:23:04.207183Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e51ff-e195-7b13-854a-cff29fca2ca7
+--------
+user
+# Review request — Lane H Slice B-2 (install.sh POSIX unit test)
+
+You are the **reviewer (Codex)**. Verdict only: LGTM / NEEDS_CHANGES / BLOCK.
+Max 3 rounds. Cite file paths + line ranges for any concern.
+
+## Context
+
+- Slice A LGTM commit: `0ad1b7c2` (retire rev-stealth-cli wrapper)
+- Slice B-1 LGTM commit: `edc66bca` (release workflow hardening, workflow-only)
+- Slice B-2 (this) = Delta 3 residue from Slice A — POSIX unit test for `install.sh`
+- B-3 (Cargo mass rename + publish flips) is deliberately deferred to next driver
+- baseline test count: 838 PASS / 0 fail (workflow + shell test only, no Rust delta expected)
+
+## Scope of this slice
+
+Files touched (exactly):
+- `tests/install_sh_unit.sh` (new, 215 lines, pure POSIX sh)
+- `.github/workflows/ci.yml` (added `install-sh-unit` job, PR-only)
+
+Out of scope (do **not** require here):
+- Cargo workspace renames (B-3)
+- Brew formula / cosign / trivy workflow changes (already LGTM'd in B-1)
+
+## What the test asserts
+
+### `detect_target()` matrix (8 cases)
+- `Linux/x86_64`   -> `x86_64-unknown-linux-musl`
+- `Linux/aarch64`  -> `aarch64-unknown-linux-musl`
+- `Linux/arm64`    -> `aarch64-unknown-linux-musl`
+- `Darwin/x86_64`  -> `x86_64-apple-darwin`
+- `Darwin/arm64`   -> `aarch64-apple-darwin`
+- `FreeBSD/amd64`  -> die (unsupported)
+- `Linux/i686`     -> die (unsupported)
+- `MINGW64_NT/x86_64` -> die (windows unsupported)
+
+### End-to-end with fake PATH (5 cases)
+a. sha256 sidecar 404 -> warn + install ok (with `--no-verify`)
+b. sha256 mismatch    -> die
+c. cosign absent + default verify -> die ("cosign not installed")
+d. cosign absent + `--no-verify` -> install ok (with SKIPPED warn)
+e. cosign present + valid sig -> install ok ("cosign verification PASS")
+
+## Technique
+
+`install.sh` runs top-level code on source, so the test:
+1. Carves function defs out via `awk` into a sourceable snippet for unit-level `detect_target` tests.
+2. For e2e, builds a per-case sandbox with fake `uname`, `curl`, `cosign` on PATH and a real tarball fixture, then invokes `install.sh --version v0.0.0-test --prefix <sandbox>/prefix` so `resolve_version` is short-circuited and no sudo is needed.
+
+`curl` parsing in the fake honors `-o <path>` and trailing URL; it serves fixtures based on URL suffix (`*.tar.gz` / `*.sha256` / `*.sig` / `*-keyless.pem`). The `bad_sha` mode produces a well-formed sidecar with a zero digest to drive `sha256 mismatch`.
+
+## Local results (driver host: darwin-arm64)
+
+```
+$ shellcheck -s sh install.sh tests/install_sh_unit.sh
+(no output; rc=0)
+
+$ sh tests/install_sh_unit.sh
+[1/2] detect_target() matrix
+  ok   detect_target linux-x86_64
+  ok   detect_target linux-aarch64
+  ok   detect_target linux-arm64
+  ok   detect_target darwin-x86_64
+  ok   detect_target darwin-arm64
+  ok   detect_target freebsd-amd64 (expected die)
+  ok   detect_target linux-i686 (expected die)
+  ok   detect_target windows-x86_64 (expected die)
+[2/2] end-to-end behavior with fake PATH
+  ok   sha256 sidecar missing -> warn + install ok
+  ok   sha256 mismatch -> die
+  ok   cosign absent + default verify -> die
+  ok   cosign absent + --no-verify -> install ok
+  ok   cosign present + valid sig -> install ok
+
+Ran 13 tests, 0 failed.
+
+$ dash tests/install_sh_unit.sh   # CI shell parity
+Ran 13 tests, 0 failed.
+```
+
+YAML lint of `.github/workflows/ci.yml` via `python3 -c "import yaml; yaml.safe_load(...)"` passes.
+
+## Review checklist (please verify)
+
+1. **POSIX purity**: any bashism in `tests/install_sh_unit.sh`? (shellcheck `-s sh` + dash both pass locally)
+2. **Coverage adequacy**: are detect_target + the 5 e2e branches the right minimal set, or is something load-bearing untested (e.g. PREFIX-not-writable / sudo path, `--version=` with `=`)?
+3. **Test hygiene**: trap cleanup of `WORK_ROOT`, sandbox isolation per case (each in its own `${WORK_ROOT}/sb-<id>`), no leaking state across cases.
+4. **CI job correctness**: PR-only gate matches sibling jobs (`distroless-pr-scan`), no main-branch noise, `sh` invocation (not `bash`) so dash is the runner.
+5. **Risk to install.sh prod**: zero — install.sh is not modified.
+
+## Sign-off format
+
+If LGTM: respond exactly `LGTM` plus a one-line rationale.
+If NEEDS_CHANGES: bullet list of required diffs (cite paths + lines).
+If BLOCK: state the invariant violated.
+
+2026-05-22T23:23:05.326988Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T23:23:05.486604Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T23:23:05.716514Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+I’ll review this as a blocking code-review pass, using the staff-code-reviewer skill and then checking the actual diff plus the targeted commands.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc 'git status --short && git diff --stat && git diff -- .github/workflows/ci.yml tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 0ms:
+ M .github/workflows/ci.yml
+ M crates/stealth-cli/src/commands/mod.rs
+?? .agent/active/prompts/v1_3_h_fixup_slice_b2_review.md
+?? .agent/active/stderr/
+?? crates/stealth-cli/src/commands/idempotency.rs
+?? tests/install_sh_unit.sh
+ .github/workflows/ci.yml               | 20 ++++++++++++++++++++
+ crates/stealth-cli/src/commands/mod.rs |  2 ++
+ 2 files changed, 22 insertions(+)
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 196efea7..87eaac1e 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -885,3 +885,23 @@ jobs:
+             --exit-code 1 \
+             --no-progress \
+             local/rev-stealth-test:pr
++
++  install-sh-unit:
++    name: install.sh POSIX unit test (shellcheck + behavior)
++    if: github.event_name == 'pull_request'
++    runs-on: ubuntu-22.04
++    timeout-minutes: 10
++    steps:
++      - uses: actions/checkout@v4
++      - name: Install shellcheck
++        run: |
++          set -euo pipefail
++          sudo apt-get update
++          sudo apt-get install -y shellcheck
++          shellcheck --version
++      - name: shellcheck install.sh + tests/install_sh_unit.sh
++        run: shellcheck -s sh install.sh tests/install_sh_unit.sh
++      - name: Run install.sh POSIX unit test
++        # Pure /bin/sh (dash on ubuntu) to catch any latent bashism.
++        run: sh tests/install_sh_unit.sh
++
+
+codex
+The initial skill path listed in the session is stale, so I’m falling back to the duplicate local skill path. I also see unrelated worktree changes outside the stated slice; I’ll ignore those for the review unless they affect the two slice files.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+ exited 1 in 0ms:
+sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,260p' tests/install_sh_unit.sh" in $REPO_ROOT
+ succeeded in 0ms:
+#!/bin/sh
+# shellcheck shell=sh
+# SPDX-License-Identifier: MIT
+#
+# Lane H Slice B-2 — POSIX unit test for install.sh.
+#
+# Verifies:
+#   1. detect_target() returns the correct triple for every supported
+#      (os, arch) pair, and dies on unsupported combos.
+#   2. End-to-end script behavior under a PATH of fake binaries:
+#      a. sha256 sidecar missing -> warn, install succeeds (with --no-verify).
+#      b. sha256 mismatch -> die.
+#      c. cosign absent + verify on (default) -> die.
+#      d. cosign absent + --no-verify -> install succeeds (with warn).
+#      e. cosign present + valid sig -> install succeeds.
+#
+# Pure POSIX sh; no BATS, no bashisms. Validated by `shellcheck -s sh`.
+#
+# Run:
+#     sh tests/install_sh_unit.sh
+
+set -eu
+
+unset CDPATH
+REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+INSTALL_SH="${REPO_ROOT}/install.sh"
+
+# Discovery sanity --------------------------------------------------------
+[ -f "${INSTALL_SH}" ] || { echo "FAIL: ${INSTALL_SH} not found" >&2; exit 1; }
+
+# Test harness ------------------------------------------------------------
+TESTS_RUN=0
+TESTS_FAIL=0
+WORK_ROOT="$(mktemp -d)"
+trap 'rm -rf "${WORK_ROOT}"' EXIT INT TERM
+
+pass() { TESTS_RUN=$((TESTS_RUN + 1)); printf '  ok   %s\n' "$1"; }
+fail() {
+    TESTS_RUN=$((TESTS_RUN + 1))
+    TESTS_FAIL=$((TESTS_FAIL + 1))
+    printf '  FAIL %s\n' "$1" >&2
+    if [ -n "${2:-}" ]; then
+        printf '       %s\n' "$2" >&2
+    fi
+}
+
+# ---------- Extract function definitions for unit-level testing ---------
+# install.sh has top-level executable code; we can't `.` it directly.
+# Carve out only the function blocks ("^log()", "^warn()", "^die()",
+# "^need()", "^detect_target()", "^resolve_version()") into a sourceable
+# snippet. The carving uses sed with awk-like ranges over function braces.
+extract_functions() {
+    snippet="${WORK_ROOT}/install_sh_funcs.sh"
+    awk '
+        /^log\(\)/  || /^warn\(\)/ || /^die\(\)/ ||
+        /^need\(\)/ || /^detect_target\(\)/ || /^resolve_version\(\)/ {
+            in_fn = 1
+        }
+        in_fn { print }
+        in_fn && /^\}$/ { in_fn = 0 }
+    ' "${INSTALL_SH}" > "${snippet}"
+    echo "${snippet}"
+}
+
+FUNCS_SNIPPET="$(extract_functions)"
+
+# Sanity: snippet must define detect_target.
+grep -q '^detect_target()' "${FUNCS_SNIPPET}" \
+    || { echo "FAIL: could not extract functions from install.sh" >&2; exit 1; }
+
+# ---------- detect_target() table-driven test ---------------------------
+check_target() {
+    label="$1"
+    fake_os="$2"
+    fake_arch="$3"
+    expected="$4"   # empty => expect die()
+
+    sandbox="${WORK_ROOT}/sandbox-detect-$$-${TESTS_RUN}"
+    mkdir -p "${sandbox}/bin"
+    # Fake uname that honors -s and -m
+    cat > "${sandbox}/bin/uname" <<EOF
+#!/bin/sh
+case "\$1" in
+    -s) printf '%s\n' "${fake_os}"  ;;
+    -m) printf '%s\n' "${fake_arch}" ;;
+    *)  printf '%s\n' "${fake_os}"  ;;
+esac
+EOF
+    chmod +x "${sandbox}/bin/uname"
+
+    # tr / sed must remain available; prepend sandbox.
+    out="$(PATH="${sandbox}/bin:${PATH}" sh -c ". '${FUNCS_SNIPPET}'; detect_target" 2>&1)" \
+        && rc=0 || rc=$?
+
+    if [ -n "${expected}" ]; then
+        if [ "${rc}" -eq 0 ] && [ "${out}" = "${expected}" ]; then
+            pass "detect_target ${label}"
+        else
+            fail "detect_target ${label}" "rc=${rc} out=${out} expected=${expected}"
+        fi
+    else
+        # Expect failure (die).
+        if [ "${rc}" -ne 0 ]; then
+            pass "detect_target ${label} (expected die)"
+        else
+            fail "detect_target ${label}" "expected die, got rc=0 out=${out}"
+        fi
+    fi
+    rm -rf "${sandbox}"
+}
+
+echo "[1/2] detect_target() matrix"
+check_target "linux-x86_64"    "Linux"   "x86_64"  "x86_64-unknown-linux-musl"
+check_target "linux-aarch64"   "Linux"   "aarch64" "aarch64-unknown-linux-musl"
+check_target "linux-arm64"     "Linux"   "arm64"   "aarch64-unknown-linux-musl"
+check_target "darwin-x86_64"   "Darwin"  "x86_64"  "x86_64-apple-darwin"
+check_target "darwin-arm64"    "Darwin"  "arm64"   "aarch64-apple-darwin"
+check_target "freebsd-amd64"   "FreeBSD" "amd64"   ""
+check_target "linux-i686"      "Linux"   "i686"    ""
+check_target "windows-x86_64"  "MINGW64_NT-10.0" "x86_64" ""
+
+# ---------- End-to-end behavior with fake PATH --------------------------
+# Build a per-case sandbox with:
+#   - fake curl that copies fixture bytes into the requested output path
+#   - fake tar that materializes ${BIN_NAME} at the extraction root
+#   - optional fake cosign that either succeeds or is absent
+#   - PREFIX writable temp dir so no sudo
+#
+# We invoke install.sh with --version vX.Y.Z to short-circuit resolve_version,
+# and with --prefix pointing into the sandbox.
+
+ARCHIVE_FIXTURE_BIN_CONTENT='#!/bin/sh
+echo "rev-stealth fake"
+'
+
+setup_e2e_sandbox() {
+    sb="$1"
+    mkdir -p "${sb}/bin" "${sb}/prefix" "${sb}/fixture"
+
+    # Build a real tar.gz with a fake rev-stealth binary inside the expected dir.
+    fixture_root="${sb}/fixture"
+    inner_dir="${fixture_root}/rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl"
+    mkdir -p "${inner_dir}"
+    printf '%s' "${ARCHIVE_FIXTURE_BIN_CONTENT}" > "${inner_dir}/rev-stealth"
+    chmod +x "${inner_dir}/rev-stealth"
+    ( cd "${fixture_root}" && tar -czf archive.tar.gz "$(basename "${inner_dir}")" )
+    # Pre-compute sha256 for the archive (use shasum if sha256sum missing).
+    if command -v sha256sum >/dev/null 2>&1; then
+        ( cd "${fixture_root}" && sha256sum archive.tar.gz \
+            | sed 's| archive\.tar\.gz| rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz|' \
+            > archive.sha256 )
+    else
+        ( cd "${fixture_root}" && shasum -a 256 archive.tar.gz \
+            | sed 's| archive\.tar\.gz| rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz|' \
+            > archive.sha256 )
+    fi
+
+    # Force the target triple to one we built the fixture for: a fake
+    # uname that always reports linux/x86_64.
+    cat > "${sb}/bin/uname" <<'EOF'
+#!/bin/sh
+case "$1" in
+    -s) echo "Linux"   ;;
+    -m) echo "x86_64"  ;;
+    *)  echo "Linux"   ;;
+esac
+EOF
+    chmod +x "${sb}/bin/uname"
+}
+
+# Mode selector: $1 = mode for fake curl behavior
+#   "ok"           -> serve archive + sha256 sidecar (matching)
+#   "no_sha"       -> serve archive but 404 on sha256
+#   "bad_sha"      -> serve archive + sha256 sidecar with wrong digest
+make_fake_curl() {
+    sb="$1"
+    mode="$2"
+    cat > "${sb}/bin/curl" <<EOF
+#!/bin/sh
+# Fake curl: parses -o <out> and trailing URL, then serves from fixture/.
+set -eu
+out=""
+url=""
+while [ \$# -gt 0 ]; do
+    case "\$1" in
+        -o)        out="\$2"; shift 2 ;;
+        -f|-s|-S|-L|-fsSL) shift ;;
+        --proto|--tlsv1.2) shift ;;
+        --proto=*|--tlsv1.2=*) shift ;;
+        -*)        shift ;;
+        *)         url="\$1"; shift ;;
+    esac
+done
+fx='${sb}/fixture'
+case "\$url" in
+    *.tar.gz)         cp "\$fx/archive.tar.gz" "\$out" ;;
+    *.tar.gz.sha256)
+        case "${mode}" in
+            ok)      cp "\$fx/archive.sha256" "\$out" ;;
+            bad_sha)
+                # Wrong digest, but well-formed.
+                printf '0000000000000000000000000000000000000000000000000000000000000000  rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz\n' > "\$out"
+                ;;
+            no_sha)  exit 22 ;;
+        esac
+        ;;
+    *.sig)            : > "\$out" ;;
+    *-keyless.pem)    : > "\$out" ;;
+    *)                exit 22 ;;
+esac
+EOF
+    chmod +x "${sb}/bin/curl"
+}
+
+make_fake_cosign_ok() {
+    sb="$1"
+    cat > "${sb}/bin/cosign" <<'EOF'
+#!/bin/sh
+# Pretend verify-blob always passes.
+exit 0
+EOF
+    chmod +x "${sb}/bin/cosign"
+}
+
+# Run install.sh inside sandbox; capture rc + combined output.
+run_install() {
+    sb="$1"
+    shift
+    PATH="${sb}/bin:/usr/bin:/bin" \
+        sh "${INSTALL_SH}" \
+            --version v0.0.0-test \
+            --prefix "${sb}/prefix" \
+            "$@" \
+        > "${sb}/out.log" 2>&1
+}
+
+echo "[2/2] end-to-end behavior with fake PATH"
+
+# (a) sha256 sidecar missing -> warn, but install succeeds (with --no-verify).
+SB="${WORK_ROOT}/sb-a"
+setup_e2e_sandbox "${SB}"
+make_fake_curl "${SB}" "no_sha"
+if run_install "${SB}" --no-verify; then
+    if [ -x "${SB}/prefix/rev-stealth" ]; then
+        if grep -q "no sha256 sidecar" "${SB}/out.log"; then
+            pass "sha256 sidecar missing -> warn + install ok"
+        else
+            fail "sha256 sidecar missing" "expected warn line; log=$(cat "${SB}/out.log")"
+        fi
+    else
+        fail "sha256 sidecar missing" "binary not installed; log=$(cat "${SB}/out.log")"
+    fi
+else
+    fail "sha256 sidecar missing" "install exited non-zero; log=$(cat "${SB}/out.log")"
+fi
+
+# (b) sha256 mismatch -> die.
+SB="${WORK_ROOT}/sb-b"
+setup_e2e_sandbox "${SB}"
+make_fake_curl "${SB}" "bad_sha"
+
+exec
+/bin/bash -lc "nl -ba .github/workflows/ci.yml | sed -n '860,925p'" in $REPO_ROOT
+ succeeded in 0ms:
+   860	      - name: Build distroless image (linux/amd64, --load)
+   861	        uses: docker/build-push-action@v6
+   862	        with:
+   863	          context: .
+   864	          file: ./Dockerfile.distroless
+   865	          platforms: linux/amd64
+   866	          load: true
+   867	          push: false
+   868	          tags: local/rev-stealth-test:pr
+   869	      - name: Self-pull smoke (image is locally addressable)
+   870	        run: |
+   871	          set -euo pipefail
+   872	          docker image inspect local/rev-stealth-test:pr >/dev/null
+   873	          docker image ls local/rev-stealth-test:pr
+   874	      - name: Install trivy
+   875	        uses: aquasecurity/setup-trivy@v0.2.0
+   876	      - name: trivy image (HIGH,CRITICAL --exit-code 1)
+   877	        run: |
+   878	          set -euo pipefail
+   879	          # `--ignore-unfixed` is intentionally OFF: an unfixed
+   880	          # HIGH/CRITICAL on a distroless base is signal we want to act
+   881	          # on (rebase the base), not silence. If we later need a
+   882	          # waiver path, add a .trivyignore with a documented expiry.
+   883	          trivy image \
+   884	            --severity HIGH,CRITICAL \
+   885	            --exit-code 1 \
+   886	            --no-progress \
+   887	            local/rev-stealth-test:pr
+   888	
+   889	  install-sh-unit:
+   890	    name: install.sh POSIX unit test (shellcheck + behavior)
+   891	    if: github.event_name == 'pull_request'
+   892	    runs-on: ubuntu-22.04
+   893	    timeout-minutes: 10
+   894	    steps:
+   895	      - uses: actions/checkout@v4
+   896	      - name: Install shellcheck
+   897	        run: |
+   898	          set -euo pipefail
+   899	          sudo apt-get update
+   900	          sudo apt-get install -y shellcheck
+   901	          shellcheck --version
+   902	      - name: shellcheck install.sh + tests/install_sh_unit.sh
+   903	        run: shellcheck -s sh install.sh tests/install_sh_unit.sh
+   904	      - name: Run install.sh POSIX unit test
+   905	        # Pure /bin/sh (dash on ubuntu) to catch any latent bashism.
+   906	        run: sh tests/install_sh_unit.sh
+   907	
+
+exec
+/bin/bash -lc "sed -n '1,260p' install.sh" in $REPO_ROOT
+ succeeded in 0ms:
+#!/usr/bin/env sh
+# shellcheck shell=sh
+# SPDX-License-Identifier: MIT
+#
+# Lane H.6 — `curl | sh` installer for rev-stealth.
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --version v1.3.0
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --prefix /opt/rev-stealth/bin
+#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --no-verify  # skip cosign
+#
+# Security model:
+#   - Downloads the release artifact + its `*.sig` + `*-keyless.pem` from
+#     `https://github.com/sasuketorii/rev_scraping/releases/download/${VERSION}/`.
+#   - Verifies with `cosign verify-blob` using a fixed certificate-identity
+#     (GitHub Actions OIDC issuer pinned to the release workflow).
+#   - Refuses to install if cosign is unavailable AND `--no-verify` was not
+#     explicitly passed (fail-closed default).
+#   - Tries `sha256` checksum as a secondary integrity gate.
+#
+# Strict POSIX sh; no bashisms. Validated under `shellcheck -s sh`.
+
+set -eu
+
+# ---------- defaults -------------------------------------------------------
+REPO_OWNER="sasuketorii"
+REPO_NAME="rev_scraping"
+BIN_NAME="rev-stealth"
+DEFAULT_VERSION="latest"
+DEFAULT_PREFIX="/usr/local/bin"
+
+# Cosign identity pin (matches release.yml workflow file path + ref).
+# `release-please` rewrites the ref pin on each tag.
+COSIGN_IDENTITY="https://github.com/${REPO_OWNER}/${REPO_NAME}/.github/workflows/release.yml@refs/tags/v"
+COSIGN_OIDC_ISSUER="https://token.actions.githubusercontent.com"
+
+VERSION="${REV_STEALTH_VERSION:-${DEFAULT_VERSION}}"
+PREFIX="${REV_STEALTH_PREFIX:-${DEFAULT_PREFIX}}"
+VERIFY="1"
+
+# ---------- arg parse ------------------------------------------------------
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --version)   VERSION="$2"; shift 2 ;;
+        --version=*) VERSION="${1#*=}"; shift ;;
+        --prefix)    PREFIX="$2"; shift 2 ;;
+        --prefix=*)  PREFIX="${1#*=}"; shift ;;
+        --no-verify) VERIFY="0"; shift ;;
+        -h|--help)
+            sed -n '/^# Usage:/,/^# Security model:/p' "$0" | sed 's/^# //; s/^#$//'
+            exit 0
+            ;;
+        *)
+            echo "install.sh: unknown arg: $1" >&2
+            exit 64
+            ;;
+    esac
+done
+
+# ---------- helpers --------------------------------------------------------
+log()  { printf '[install.sh] %s\n' "$*"; }
+warn() { printf '[install.sh] WARN: %s\n' "$*" >&2; }
+die()  { printf '[install.sh] ERROR: %s\n' "$*" >&2; exit 1; }
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"
+}
+
+detect_target() {
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+    case "${os}-${arch}" in
+        linux-x86_64)   echo "x86_64-unknown-linux-musl" ;;
+        linux-aarch64)  echo "aarch64-unknown-linux-musl" ;;
+        linux-arm64)    echo "aarch64-unknown-linux-musl" ;;
+        darwin-x86_64)  echo "x86_64-apple-darwin" ;;
+        darwin-arm64)   echo "aarch64-apple-darwin" ;;
+        *) die "unsupported platform: ${os}-${arch}" ;;
+    esac
+}
+
+resolve_version() {
+    if [ "${VERSION}" = "latest" ]; then
+        need curl
+        VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" \
+            | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | head -n 1)
+        [ -n "${VERSION}" ] || die "could not resolve latest version"
+    fi
+    echo "${VERSION}"
+}
+
+# ---------- main -----------------------------------------------------------
+need curl
+need uname
+need tar
+
+TARGET="$(detect_target)"
+VERSION="$(resolve_version)"
+log "installing ${BIN_NAME} ${VERSION} for ${TARGET}"
+
+TMPDIR_REAL="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR_REAL}"' EXIT INT TERM
+
+BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${VERSION}"
+ARCHIVE="${BIN_NAME}-${VERSION}-${TARGET}.tar.gz"
+
+log "fetching ${BASE_URL}/${ARCHIVE}"
+curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}"     "${BASE_URL}/${ARCHIVE}"
+curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sha256" "${BASE_URL}/${ARCHIVE}.sha256" || warn "no sha256 sidecar"
+
+# sha256 check (best-effort, soft-fail if sidecar absent).
+if [ -s "${TMPDIR_REAL}/${ARCHIVE}.sha256" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        ( cd "${TMPDIR_REAL}" && sha256sum -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+    elif command -v shasum >/dev/null 2>&1; then
+        ( cd "${TMPDIR_REAL}" && shasum -a 256 -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+    else
+        warn "no sha256sum / shasum available; skipping checksum gate"
+    fi
+    log "sha256 OK"
+fi
+
+# Cosign verification (fail-closed unless --no-verify).
+if [ "${VERIFY}" = "1" ]; then
+    if command -v cosign >/dev/null 2>&1; then
+        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sig" "${BASE_URL}/${ARCHIVE}.sig"
+        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.cert" "${BASE_URL}/${ARCHIVE}-keyless.pem"
+        # Pin to the *exact* tag in the identity to prevent workflow-rename
+        # spoofing. Tag format is `v<semver>`.
+        cosign verify-blob \
+            --certificate-identity "${COSIGN_IDENTITY}${VERSION#v}" \
+            --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" \
+            --signature "${TMPDIR_REAL}/${ARCHIVE}.sig" \
+            --certificate "${TMPDIR_REAL}/${ARCHIVE}.cert" \
+            "${TMPDIR_REAL}/${ARCHIVE}" \
+            || die "cosign verify-blob FAILED — refusing to install"
+        log "cosign verification PASS"
+    else
+        die "cosign not installed; install cosign (https://docs.sigstore.dev/cosign/installation/) or rerun with --no-verify"
+    fi
+else
+    warn "cosign verification SKIPPED (--no-verify). Not recommended."
+fi
+
+# Extract + install. The release tarball is laid out as
+#   rev-stealth-${VERSION}-${TARGET}/{rev-stealth,stealth-mcp,rev-auth,README,LICENSE}
+# so we resolve the binary by find (handles dirname variations).
+tar -xzf "${TMPDIR_REAL}/${ARCHIVE}" -C "${TMPDIR_REAL}"
+EXTRACTED_BIN="$(find "${TMPDIR_REAL}" -type f -name "${BIN_NAME}" -perm -u+x -print -quit)"
+[ -n "${EXTRACTED_BIN}" ] && [ -x "${EXTRACTED_BIN}" ] \
+    || die "archive missing expected binary: ${BIN_NAME}"
+
+if [ -w "${PREFIX}" ]; then
+    install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+else
+    log "PREFIX ${PREFIX} not writable; using sudo"
+    need sudo
+    sudo install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+fi
+
+log "installed ${PREFIX}/${BIN_NAME}"
+log "next steps: ${BIN_NAME} --help"
+
+exec
+/bin/bash -lc "nl -ba tests/install_sh_unit.sh | sed -n '1,260p'" in $REPO_ROOT
+ succeeded in 0ms:
+     1	#!/bin/sh
+     2	# shellcheck shell=sh
+     3	# SPDX-License-Identifier: MIT
+     4	#
+     5	# Lane H Slice B-2 — POSIX unit test for install.sh.
+     6	#
+     7	# Verifies:
+     8	#   1. detect_target() returns the correct triple for every supported
+     9	#      (os, arch) pair, and dies on unsupported combos.
+    10	#   2. End-to-end script behavior under a PATH of fake binaries:
+    11	#      a. sha256 sidecar missing -> warn, install succeeds (with --no-verify).
+    12	#      b. sha256 mismatch -> die.
+    13	#      c. cosign absent + verify on (default) -> die.
+    14	#      d. cosign absent + --no-verify -> install succeeds (with warn).
+    15	#      e. cosign present + valid sig -> install succeeds.
+    16	#
+    17	# Pure POSIX sh; no BATS, no bashisms. Validated by `shellcheck -s sh`.
+    18	#
+    19	# Run:
+    20	#     sh tests/install_sh_unit.sh
+    21	
+    22	set -eu
+    23	
+    24	unset CDPATH
+    25	REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+    26	INSTALL_SH="${REPO_ROOT}/install.sh"
+    27	
+    28	# Discovery sanity --------------------------------------------------------
+    29	[ -f "${INSTALL_SH}" ] || { echo "FAIL: ${INSTALL_SH} not found" >&2; exit 1; }
+    30	
+    31	# Test harness ------------------------------------------------------------
+    32	TESTS_RUN=0
+    33	TESTS_FAIL=0
+    34	WORK_ROOT="$(mktemp -d)"
+    35	trap 'rm -rf "${WORK_ROOT}"' EXIT INT TERM
+    36	
+    37	pass() { TESTS_RUN=$((TESTS_RUN + 1)); printf '  ok   %s\n' "$1"; }
+    38	fail() {
+    39	    TESTS_RUN=$((TESTS_RUN + 1))
+    40	    TESTS_FAIL=$((TESTS_FAIL + 1))
+    41	    printf '  FAIL %s\n' "$1" >&2
+    42	    if [ -n "${2:-}" ]; then
+    43	        printf '       %s\n' "$2" >&2
+    44	    fi
+    45	}
+    46	
+    47	# ---------- Extract function definitions for unit-level testing ---------
+    48	# install.sh has top-level executable code; we can't `.` it directly.
+    49	# Carve out only the function blocks ("^log()", "^warn()", "^die()",
+    50	# "^need()", "^detect_target()", "^resolve_version()") into a sourceable
+    51	# snippet. The carving uses sed with awk-like ranges over function braces.
+    52	extract_functions() {
+    53	    snippet="${WORK_ROOT}/install_sh_funcs.sh"
+    54	    awk '
+    55	        /^log\(\)/  || /^warn\(\)/ || /^die\(\)/ ||
+    56	        /^need\(\)/ || /^detect_target\(\)/ || /^resolve_version\(\)/ {
+    57	            in_fn = 1
+    58	        }
+    59	        in_fn { print }
+    60	        in_fn && /^\}$/ { in_fn = 0 }
+    61	    ' "${INSTALL_SH}" > "${snippet}"
+    62	    echo "${snippet}"
+    63	}
+    64	
+    65	FUNCS_SNIPPET="$(extract_functions)"
+    66	
+    67	# Sanity: snippet must define detect_target.
+    68	grep -q '^detect_target()' "${FUNCS_SNIPPET}" \
+    69	    || { echo "FAIL: could not extract functions from install.sh" >&2; exit 1; }
+    70	
+    71	# ---------- detect_target() table-driven test ---------------------------
+    72	check_target() {
+    73	    label="$1"
+    74	    fake_os="$2"
+    75	    fake_arch="$3"
+    76	    expected="$4"   # empty => expect die()
+    77	
+    78	    sandbox="${WORK_ROOT}/sandbox-detect-$$-${TESTS_RUN}"
+    79	    mkdir -p "${sandbox}/bin"
+    80	    # Fake uname that honors -s and -m
+    81	    cat > "${sandbox}/bin/uname" <<EOF
+    82	#!/bin/sh
+    83	case "\$1" in
+    84	    -s) printf '%s\n' "${fake_os}"  ;;
+    85	    -m) printf '%s\n' "${fake_arch}" ;;
+    86	    *)  printf '%s\n' "${fake_os}"  ;;
+    87	esac
+    88	EOF
+    89	    chmod +x "${sandbox}/bin/uname"
+    90	
+    91	    # tr / sed must remain available; prepend sandbox.
+    92	    out="$(PATH="${sandbox}/bin:${PATH}" sh -c ". '${FUNCS_SNIPPET}'; detect_target" 2>&1)" \
+    93	        && rc=0 || rc=$?
+    94	
+    95	    if [ -n "${expected}" ]; then
+    96	        if [ "${rc}" -eq 0 ] && [ "${out}" = "${expected}" ]; then
+    97	            pass "detect_target ${label}"
+    98	        else
+    99	            fail "detect_target ${label}" "rc=${rc} out=${out} expected=${expected}"
+   100	        fi
+   101	    else
+   102	        # Expect failure (die).
+   103	        if [ "${rc}" -ne 0 ]; then
+   104	            pass "detect_target ${label} (expected die)"
+   105	        else
+   106	            fail "detect_target ${label}" "expected die, got rc=0 out=${out}"
+   107	        fi
+   108	    fi
+   109	    rm -rf "${sandbox}"
+   110	}
+   111	
+   112	echo "[1/2] detect_target() matrix"
+   113	check_target "linux-x86_64"    "Linux"   "x86_64"  "x86_64-unknown-linux-musl"
+   114	check_target "linux-aarch64"   "Linux"   "aarch64" "aarch64-unknown-linux-musl"
+   115	check_target "linux-arm64"     "Linux"   "arm64"   "aarch64-unknown-linux-musl"
+   116	check_target "darwin-x86_64"   "Darwin"  "x86_64"  "x86_64-apple-darwin"
+   117	check_target "darwin-arm64"    "Darwin"  "arm64"   "aarch64-apple-darwin"
+   118	check_target "freebsd-amd64"   "FreeBSD" "amd64"   ""
+   119	check_target "linux-i686"      "Linux"   "i686"    ""
+   120	check_target "windows-x86_64"  "MINGW64_NT-10.0" "x86_64" ""
+   121	
+   122	# ---------- End-to-end behavior with fake PATH --------------------------
+   123	# Build a per-case sandbox with:
+   124	#   - fake curl that copies fixture bytes into the requested output path
+   125	#   - fake tar that materializes ${BIN_NAME} at the extraction root
+   126	#   - optional fake cosign that either succeeds or is absent
+   127	#   - PREFIX writable temp dir so no sudo
+   128	#
+   129	# We invoke install.sh with --version vX.Y.Z to short-circuit resolve_version,
+   130	# and with --prefix pointing into the sandbox.
+   131	
+   132	ARCHIVE_FIXTURE_BIN_CONTENT='#!/bin/sh
+   133	echo "rev-stealth fake"
+   134	'
+   135	
+   136	setup_e2e_sandbox() {
+   137	    sb="$1"
+   138	    mkdir -p "${sb}/bin" "${sb}/prefix" "${sb}/fixture"
+   139	
+   140	    # Build a real tar.gz with a fake rev-stealth binary inside the expected dir.
+   141	    fixture_root="${sb}/fixture"
+   142	    inner_dir="${fixture_root}/rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl"
+   143	    mkdir -p "${inner_dir}"
+   144	    printf '%s' "${ARCHIVE_FIXTURE_BIN_CONTENT}" > "${inner_dir}/rev-stealth"
+   145	    chmod +x "${inner_dir}/rev-stealth"
+   146	    ( cd "${fixture_root}" && tar -czf archive.tar.gz "$(basename "${inner_dir}")" )
+   147	    # Pre-compute sha256 for the archive (use shasum if sha256sum missing).
+   148	    if command -v sha256sum >/dev/null 2>&1; then
+   149	        ( cd "${fixture_root}" && sha256sum archive.tar.gz \
+   150	            | sed 's| archive\.tar\.gz| rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz|' \
+   151	            > archive.sha256 )
+   152	    else
+   153	        ( cd "${fixture_root}" && shasum -a 256 archive.tar.gz \
+   154	            | sed 's| archive\.tar\.gz| rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz|' \
+   155	            > archive.sha256 )
+   156	    fi
+   157	
+   158	    # Force the target triple to one we built the fixture for: a fake
+   159	    # uname that always reports linux/x86_64.
+   160	    cat > "${sb}/bin/uname" <<'EOF'
+   161	#!/bin/sh
+   162	case "$1" in
+   163	    -s) echo "Linux"   ;;
+   164	    -m) echo "x86_64"  ;;
+   165	    *)  echo "Linux"   ;;
+   166	esac
+   167	EOF
+   168	    chmod +x "${sb}/bin/uname"
+   169	}
+   170	
+   171	# Mode selector: $1 = mode for fake curl behavior
+   172	#   "ok"           -> serve archive + sha256 sidecar (matching)
+   173	#   "no_sha"       -> serve archive but 404 on sha256
+   174	#   "bad_sha"      -> serve archive + sha256 sidecar with wrong digest
+   175	make_fake_curl() {
+   176	    sb="$1"
+   177	    mode="$2"
+   178	    cat > "${sb}/bin/curl" <<EOF
+   179	#!/bin/sh
+   180	# Fake curl: parses -o <out> and trailing URL, then serves from fixture/.
+   181	set -eu
+   182	out=""
+   183	url=""
+   184	while [ \$# -gt 0 ]; do
+   185	    case "\$1" in
+   186	        -o)        out="\$2"; shift 2 ;;
+   187	        -f|-s|-S|-L|-fsSL) shift ;;
+   188	        --proto|--tlsv1.2) shift ;;
+   189	        --proto=*|--tlsv1.2=*) shift ;;
+   190	        -*)        shift ;;
+   191	        *)         url="\$1"; shift ;;
+   192	    esac
+   193	done
+   194	fx='${sb}/fixture'
+   195	case "\$url" in
+   196	    *.tar.gz)         cp "\$fx/archive.tar.gz" "\$out" ;;
+   197	    *.tar.gz.sha256)
+   198	        case "${mode}" in
+   199	            ok)      cp "\$fx/archive.sha256" "\$out" ;;
+   200	            bad_sha)
+   201	                # Wrong digest, but well-formed.
+   202	                printf '0000000000000000000000000000000000000000000000000000000000000000  rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz\n' > "\$out"
+   203	                ;;
+   204	            no_sha)  exit 22 ;;
+   205	        esac
+   206	        ;;
+   207	    *.sig)            : > "\$out" ;;
+   208	    *-keyless.pem)    : > "\$out" ;;
+   209	    *)                exit 22 ;;
+   210	esac
+   211	EOF
+   212	    chmod +x "${sb}/bin/curl"
+   213	}
+   214	
+   215	make_fake_cosign_ok() {
+   216	    sb="$1"
+   217	    cat > "${sb}/bin/cosign" <<'EOF'
+   218	#!/bin/sh
+   219	# Pretend verify-blob always passes.
+   220	exit 0
+   221	EOF
+   222	    chmod +x "${sb}/bin/cosign"
+   223	}
+   224	
+   225	# Run install.sh inside sandbox; capture rc + combined output.
+   226	run_install() {
+   227	    sb="$1"
+   228	    shift
+   229	    PATH="${sb}/bin:/usr/bin:/bin" \
+   230	        sh "${INSTALL_SH}" \
+   231	            --version v0.0.0-test \
+   232	            --prefix "${sb}/prefix" \
+   233	            "$@" \
+   234	        > "${sb}/out.log" 2>&1
+   235	}
+   236	
+   237	echo "[2/2] end-to-end behavior with fake PATH"
+   238	
+   239	# (a) sha256 sidecar missing -> warn, but install succeeds (with --no-verify).
+   240	SB="${WORK_ROOT}/sb-a"
+   241	setup_e2e_sandbox "${SB}"
+   242	make_fake_curl "${SB}" "no_sha"
+   243	if run_install "${SB}" --no-verify; then
+   244	    if [ -x "${SB}/prefix/rev-stealth" ]; then
+   245	        if grep -q "no sha256 sidecar" "${SB}/out.log"; then
+   246	            pass "sha256 sidecar missing -> warn + install ok"
+   247	        else
+   248	            fail "sha256 sidecar missing" "expected warn line; log=$(cat "${SB}/out.log")"
+   249	        fi
+   250	    else
+   251	        fail "sha256 sidecar missing" "binary not installed; log=$(cat "${SB}/out.log")"
+   252	    fi
+   253	else
+   254	    fail "sha256 sidecar missing" "install exited non-zero; log=$(cat "${SB}/out.log")"
+   255	fi
+   256	
+   257	# (b) sha256 mismatch -> die.
+   258	SB="${WORK_ROOT}/sb-b"
+   259	setup_e2e_sandbox "${SB}"
+   260	make_fake_curl "${SB}" "bad_sha"
+
+exec
+/bin/bash -lc 'git diff -- tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 0ms:
+exec
+/bin/bash -lc "find /Users/sasuketorii/.codex /Users/sasuketorii/.agents -path '*staff-code-reviewer/SKILL.md' -print 2>/dev/null | head -20" in $REPO_ROOT
+exec
+/bin/bash -lc 'git diff --name-only' in $REPO_ROOT
+ succeeded in 0ms:
+.github/workflows/ci.yml
+crates/stealth-cli/src/commands/mod.rs
+
+ succeeded in 450ms:
+codex
+The new test is untracked, so `git diff` only shows the workflow file unless I read the file directly. I’m checking the whole test by line number and comparing the fake-path behavior against `install.sh`.
+exec
+/bin/bash -lc "nl -ba tests/install_sh_unit.sh | sed -n '257,380p'" in $REPO_ROOT
+ succeeded in 0ms:
+   257	# (b) sha256 mismatch -> die.
+   258	SB="${WORK_ROOT}/sb-b"
+   259	setup_e2e_sandbox "${SB}"
+   260	make_fake_curl "${SB}" "bad_sha"
+   261	if run_install "${SB}" --no-verify; then
+   262	    fail "sha256 mismatch -> die" "install unexpectedly succeeded; log=$(cat "${SB}/out.log")"
+   263	else
+   264	    if grep -q "sha256 mismatch" "${SB}/out.log"; then
+   265	        pass "sha256 mismatch -> die"
+   266	    else
+   267	        fail "sha256 mismatch -> die" "wrong error; log=$(cat "${SB}/out.log")"
+   268	    fi
+   269	fi
+   270	
+   271	# (c) cosign absent + verify on (default) -> die.
+   272	SB="${WORK_ROOT}/sb-c"
+   273	setup_e2e_sandbox "${SB}"
+   274	make_fake_curl "${SB}" "ok"
+   275	# Intentionally no cosign in sandbox.
+   276	if run_install "${SB}"; then
+   277	    fail "cosign absent default -> die" "install unexpectedly succeeded; log=$(cat "${SB}/out.log")"
+   278	else
+   279	    if grep -q "cosign not installed" "${SB}/out.log"; then
+   280	        pass "cosign absent + default verify -> die"
+   281	    else
+   282	        fail "cosign absent + default verify -> die" "wrong error; log=$(cat "${SB}/out.log")"
+   283	    fi
+   284	fi
+   285	
+   286	# (d) cosign absent + --no-verify -> install ok (with warn).
+   287	SB="${WORK_ROOT}/sb-d"
+   288	setup_e2e_sandbox "${SB}"
+   289	make_fake_curl "${SB}" "ok"
+   290	if run_install "${SB}" --no-verify; then
+   291	    if [ -x "${SB}/prefix/rev-stealth" ] \
+   292	        && grep -q "cosign verification SKIPPED" "${SB}/out.log"; then
+   293	        pass "cosign absent + --no-verify -> install ok"
+   294	    else
+   295	        fail "cosign absent + --no-verify -> install ok" "log=$(cat "${SB}/out.log")"
+   296	    fi
+   297	else
+   298	    fail "cosign absent + --no-verify -> install ok" "install failed; log=$(cat "${SB}/out.log")"
+   299	fi
+   300	
+   301	# (e) cosign present + valid sig -> install ok.
+   302	SB="${WORK_ROOT}/sb-e"
+   303	setup_e2e_sandbox "${SB}"
+   304	make_fake_curl "${SB}" "ok"
+   305	make_fake_cosign_ok "${SB}"
+   306	if run_install "${SB}"; then
+   307	    if [ -x "${SB}/prefix/rev-stealth" ] \
+   308	        && grep -q "cosign verification PASS" "${SB}/out.log"; then
+   309	        pass "cosign present + valid sig -> install ok"
+   310	    else
+   311	        fail "cosign present + valid sig -> install ok" "log=$(cat "${SB}/out.log")"
+   312	    fi
+   313	else
+   314	    fail "cosign present + valid sig -> install ok" "install failed; log=$(cat "${SB}/out.log")"
+   315	fi
+   316	
+   317	# ---------- Report ------------------------------------------------------
+   318	echo ""
+   319	echo "Ran ${TESTS_RUN} tests, ${TESTS_FAIL} failed."
+   320	[ "${TESTS_FAIL}" -eq 0 ] || exit 1
+
+exec
+/bin/bash -lc "nl -ba install.sh | sed -n '1,210p'" in $REPO_ROOT
+ succeeded in 0ms:
+     1	#!/usr/bin/env sh
+     2	# shellcheck shell=sh
+     3	# SPDX-License-Identifier: MIT
+     4	#
+     5	# Lane H.6 — `curl | sh` installer for rev-stealth.
+     6	#
+     7	# Usage:
+     8	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh
+     9	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --version v1.3.0
+    10	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --prefix /opt/rev-stealth/bin
+    11	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --no-verify  # skip cosign
+    12	#
+    13	# Security model:
+    14	#   - Downloads the release artifact + its `*.sig` + `*-keyless.pem` from
+    15	#     `https://github.com/sasuketorii/rev_scraping/releases/download/${VERSION}/`.
+    16	#   - Verifies with `cosign verify-blob` using a fixed certificate-identity
+    17	#     (GitHub Actions OIDC issuer pinned to the release workflow).
+    18	#   - Refuses to install if cosign is unavailable AND `--no-verify` was not
+    19	#     explicitly passed (fail-closed default).
+    20	#   - Tries `sha256` checksum as a secondary integrity gate.
+    21	#
+    22	# Strict POSIX sh; no bashisms. Validated under `shellcheck -s sh`.
+    23	
+    24	set -eu
+    25	
+    26	# ---------- defaults -------------------------------------------------------
+    27	REPO_OWNER="sasuketorii"
+    28	REPO_NAME="rev_scraping"
+    29	BIN_NAME="rev-stealth"
+    30	DEFAULT_VERSION="latest"
+    31	DEFAULT_PREFIX="/usr/local/bin"
+    32	
+    33	# Cosign identity pin (matches release.yml workflow file path + ref).
+    34	# `release-please` rewrites the ref pin on each tag.
+    35	COSIGN_IDENTITY="https://github.com/${REPO_OWNER}/${REPO_NAME}/.github/workflows/release.yml@refs/tags/v"
+    36	COSIGN_OIDC_ISSUER="https://token.actions.githubusercontent.com"
+    37	
+    38	VERSION="${REV_STEALTH_VERSION:-${DEFAULT_VERSION}}"
+    39	PREFIX="${REV_STEALTH_PREFIX:-${DEFAULT_PREFIX}}"
+    40	VERIFY="1"
+    41	
+    42	# ---------- arg parse ------------------------------------------------------
+    43	while [ $# -gt 0 ]; do
+    44	    case "$1" in
+    45	        --version)   VERSION="$2"; shift 2 ;;
+    46	        --version=*) VERSION="${1#*=}"; shift ;;
+    47	        --prefix)    PREFIX="$2"; shift 2 ;;
+    48	        --prefix=*)  PREFIX="${1#*=}"; shift ;;
+    49	        --no-verify) VERIFY="0"; shift ;;
+    50	        -h|--help)
+    51	            sed -n '/^# Usage:/,/^# Security model:/p' "$0" | sed 's/^# //; s/^#$//'
+    52	            exit 0
+    53	            ;;
+    54	        *)
+    55	            echo "install.sh: unknown arg: $1" >&2
+    56	            exit 64
+    57	            ;;
+    58	    esac
+    59	done
+    60	
+    61	# ---------- helpers --------------------------------------------------------
+    62	log()  { printf '[install.sh] %s\n' "$*"; }
+    63	warn() { printf '[install.sh] WARN: %s\n' "$*" >&2; }
+    64	die()  { printf '[install.sh] ERROR: %s\n' "$*" >&2; exit 1; }
+    65	
+    66	need() {
+    67	    command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"
+    68	}
+    69	
+    70	detect_target() {
+    71	    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    72	    arch="$(uname -m)"
+    73	    case "${os}-${arch}" in
+    74	        linux-x86_64)   echo "x86_64-unknown-linux-musl" ;;
+    75	        linux-aarch64)  echo "aarch64-unknown-linux-musl" ;;
+    76	        linux-arm64)    echo "aarch64-unknown-linux-musl" ;;
+    77	        darwin-x86_64)  echo "x86_64-apple-darwin" ;;
+    78	        darwin-arm64)   echo "aarch64-apple-darwin" ;;
+    79	        *) die "unsupported platform: ${os}-${arch}" ;;
+    80	    esac
+    81	}
+    82	
+    83	resolve_version() {
+    84	    if [ "${VERSION}" = "latest" ]; then
+    85	        need curl
+    86	        VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" \
+    87	            | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+    88	            | head -n 1)
+    89	        [ -n "${VERSION}" ] || die "could not resolve latest version"
+    90	    fi
+    91	    echo "${VERSION}"
+    92	}
+    93	
+    94	# ---------- main -----------------------------------------------------------
+    95	need curl
+    96	need uname
+    97	need tar
+    98	
+    99	TARGET="$(detect_target)"
+   100	VERSION="$(resolve_version)"
+   101	log "installing ${BIN_NAME} ${VERSION} for ${TARGET}"
+   102	
+   103	TMPDIR_REAL="$(mktemp -d)"
+   104	trap 'rm -rf "${TMPDIR_REAL}"' EXIT INT TERM
+   105	
+   106	BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${VERSION}"
+   107	ARCHIVE="${BIN_NAME}-${VERSION}-${TARGET}.tar.gz"
+   108	
+   109	log "fetching ${BASE_URL}/${ARCHIVE}"
+   110	curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}"     "${BASE_URL}/${ARCHIVE}"
+   111	curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sha256" "${BASE_URL}/${ARCHIVE}.sha256" || warn "no sha256 sidecar"
+   112	
+   113	# sha256 check (best-effort, soft-fail if sidecar absent).
+   114	if [ -s "${TMPDIR_REAL}/${ARCHIVE}.sha256" ]; then
+   115	    if command -v sha256sum >/dev/null 2>&1; then
+   116	        ( cd "${TMPDIR_REAL}" && sha256sum -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+   117	    elif command -v shasum >/dev/null 2>&1; then
+   118	        ( cd "${TMPDIR_REAL}" && shasum -a 256 -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+   119	    else
+   120	        warn "no sha256sum / shasum available; skipping checksum gate"
+   121	    fi
+   122	    log "sha256 OK"
+   123	fi
+   124	
+   125	# Cosign verification (fail-closed unless --no-verify).
+   126	if [ "${VERIFY}" = "1" ]; then
+   127	    if command -v cosign >/dev/null 2>&1; then
+   128	        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sig" "${BASE_URL}/${ARCHIVE}.sig"
+   129	        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.cert" "${BASE_URL}/${ARCHIVE}-keyless.pem"
+   130	        # Pin to the *exact* tag in the identity to prevent workflow-rename
+   131	        # spoofing. Tag format is `v<semver>`.
+   132	        cosign verify-blob \
+   133	            --certificate-identity "${COSIGN_IDENTITY}${VERSION#v}" \
+   134	            --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" \
+   135	            --signature "${TMPDIR_REAL}/${ARCHIVE}.sig" \
+   136	            --certificate "${TMPDIR_REAL}/${ARCHIVE}.cert" \
+   137	            "${TMPDIR_REAL}/${ARCHIVE}" \
+   138	            || die "cosign verify-blob FAILED — refusing to install"
+   139	        log "cosign verification PASS"
+   140	    else
+   141	        die "cosign not installed; install cosign (https://docs.sigstore.dev/cosign/installation/) or rerun with --no-verify"
+   142	    fi
+   143	else
+   144	    warn "cosign verification SKIPPED (--no-verify). Not recommended."
+   145	fi
+   146	
+   147	# Extract + install. The release tarball is laid out as
+   148	#   rev-stealth-${VERSION}-${TARGET}/{rev-stealth,stealth-mcp,rev-auth,README,LICENSE}
+   149	# so we resolve the binary by find (handles dirname variations).
+   150	tar -xzf "${TMPDIR_REAL}/${ARCHIVE}" -C "${TMPDIR_REAL}"
+   151	EXTRACTED_BIN="$(find "${TMPDIR_REAL}" -type f -name "${BIN_NAME}" -perm -u+x -print -quit)"
+   152	[ -n "${EXTRACTED_BIN}" ] && [ -x "${EXTRACTED_BIN}" ] \
+   153	    || die "archive missing expected binary: ${BIN_NAME}"
+   154	
+   155	if [ -w "${PREFIX}" ]; then
+   156	    install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+   157	else
+   158	    log "PREFIX ${PREFIX} not writable; using sudo"
+   159	    need sudo
+   160	    sudo install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+   161	fi
+   162	
+   163	log "installed ${PREFIX}/${BIN_NAME}"
+   164	log "next steps: ${BIN_NAME} --help"
+
+exec
+/bin/bash -lc 'git ls-files --stage tests/install_sh_unit.sh .github/workflows/ci.yml install.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'rg -n "distroless-pr-scan|pull_request|install-sh-unit|shellcheck|install_sh_unit" .github/workflows/ci.yml tests install.sh' in $REPO_ROOT
+ succeeded in 0ms:
+install.sh:2:# shellcheck shell=sh
+install.sh:22:# Strict POSIX sh; no bashisms. Validated under `shellcheck -s sh`.
+.github/workflows/ci.yml:6:  pull_request:
+.github/workflows/ci.yml:536:        if: github.event_name == 'pull_request'
+.github/workflows/ci.yml:538:          BASE_REF: ${{ github.event.pull_request.base.ref }}
+.github/workflows/ci.yml:543:        if: github.event_name == 'pull_request'
+.github/workflows/ci.yml:545:          BASE_REF: ${{ github.event.pull_request.base.ref }}
+.github/workflows/ci.yml:547:          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+.github/workflows/ci.yml:645:            labels_csv="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/labels" --jq '[.[].name] | join(",")' || echo "")"
+.github/workflows/ci.yml:693:        if: github.event_name == 'pull_request'
+.github/workflows/ci.yml:695:          BASE_REF: ${{ github.event.pull_request.base.ref }}
+.github/workflows/ci.yml:699:          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+.github/workflows/ci.yml:700:          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+.github/workflows/ci.yml:719:          if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
+.github/workflows/ci.yml:845:  #   - Only runs on pull_request to keep main-branch CI fast.
+.github/workflows/ci.yml:852:  distroless-pr-scan:
+.github/workflows/ci.yml:854:    if: github.event_name == 'pull_request'
+.github/workflows/ci.yml:889:  install-sh-unit:
+.github/workflows/ci.yml:890:    name: install.sh POSIX unit test (shellcheck + behavior)
+.github/workflows/ci.yml:891:    if: github.event_name == 'pull_request'
+.github/workflows/ci.yml:896:      - name: Install shellcheck
+.github/workflows/ci.yml:900:          sudo apt-get install -y shellcheck
+.github/workflows/ci.yml:901:          shellcheck --version
+.github/workflows/ci.yml:902:      - name: shellcheck install.sh + tests/install_sh_unit.sh
+.github/workflows/ci.yml:903:        run: shellcheck -s sh install.sh tests/install_sh_unit.sh
+.github/workflows/ci.yml:906:        run: sh tests/install_sh_unit.sh
+tests/install_sh_unit.sh:2:# shellcheck shell=sh
+tests/install_sh_unit.sh:17:# Pure POSIX sh; no BATS, no bashisms. Validated by `shellcheck -s sh`.
+tests/install_sh_unit.sh:20:#     sh tests/install_sh_unit.sh
+
+ succeeded in 0ms:
+100644 196efea7613d695a92dc676e9eb41594b5f90515 0	.github/workflows/ci.yml
+100755 80e18ac90895c0bf7daf4cb05c104ce429416f67 0	install.sh
+
+exec
+/bin/bash -lc "nl -ba .github/workflows/ci.yml | sed -n '1,80p'" in $REPO_ROOT
+ succeeded in 0ms:
+     1	name: CI
+     2	
+     3	on:
+     4	  push:
+     5	    branches: [main]
+     6	  pull_request:
+     7	
+     8	env:
+     9	  CARGO_TERM_COLOR: always
+    10	  RUSTFLAGS: "-D warnings"
+    11	
+    12	jobs:
+    13	  fmt:
+    14	    name: cargo fmt
+    15	    runs-on: ubuntu-22.04
+    16	    timeout-minutes: 10
+    17	    steps:
+    18	      - uses: actions/checkout@v4
+    19	      - uses: dtolnay/rust-toolchain@stable
+    20	        with:
+    21	          components: rustfmt
+    22	      - uses: Swatinem/rust-cache@v2
+    23	        with:
+    24	          shared-key: ubuntu-22.04-stable
+    25	          workspaces: |
+    26	            . -> target
+    27	      - name: cargo fmt --all -- --check
+    28	        run: cargo fmt --all -- --check
+    29	
+    30	  check:
+    31	    name: cargo check (${{ matrix.os }}, ${{ matrix.toolchain }})
+    32	    runs-on: ${{ matrix.os }}
+    33	    timeout-minutes: 20
+    34	    strategy:
+    35	      fail-fast: false
+    36	      matrix:
+    37	        os: [macos-14, ubuntu-22.04]
+    38	        toolchain: ["1.83", stable]
+    39	    steps:
+    40	      - uses: actions/checkout@v4
+    41	      - uses: dtolnay/rust-toolchain@stable
+    42	        if: matrix.toolchain == 'stable'
+    43	      - uses: dtolnay/rust-toolchain@1.83.0
+    44	        if: matrix.toolchain == '1.83'
+    45	      - uses: Swatinem/rust-cache@v2
+    46	        with:
+    47	          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+    48	          workspaces: |
+    49	            . -> target
+    50	      - name: cargo check --workspace --all-targets
+    51	        run: cargo check --workspace --all-targets
+    52	
+    53	  clippy:
+    54	    name: cargo clippy (${{ matrix.os }}, ${{ matrix.toolchain }})
+    55	    runs-on: ${{ matrix.os }}
+    56	    timeout-minutes: 25
+    57	    strategy:
+    58	      fail-fast: false
+    59	      matrix:
+    60	        os: [macos-14, ubuntu-22.04]
+    61	        toolchain: ["1.83", stable]
+    62	    steps:
+    63	      - uses: actions/checkout@v4
+    64	      - uses: dtolnay/rust-toolchain@stable
+    65	        if: matrix.toolchain == 'stable'
+    66	        with:
+    67	          components: clippy
+    68	      - uses: dtolnay/rust-toolchain@1.83.0
+    69	        if: matrix.toolchain == '1.83'
+    70	        with:
+    71	          components: clippy
+    72	      - uses: Swatinem/rust-cache@v2
+    73	        with:
+    74	          shared-key: ${{ matrix.os }}-${{ matrix.toolchain }}
+    75	          workspaces: |
+    76	            . -> target
+    77	      - name: cargo clippy --workspace --all-targets -- -D warnings
+    78	        run: cargo clippy --workspace --all-targets -- -D warnings
+    79	
+    80	  test:
+
+exec
+/bin/bash -lc "command -v shellcheck || true; command -v dash || true; python3 - <<'PY'
+import sys
+try:
+    import yaml
+    print('pyyaml ok')
+except Exception as e:
+    print('pyyaml missing', e)
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+/opt/homebrew/bin/shellcheck
+/bin/dash
+pyyaml ok
+
+exec
+/bin/bash -lc 'git diff --check -- .github/workflows/ci.yml tests/install_sh_unit.sh' in $REPO_ROOT
+ exited 2 in 0ms:
+.github/workflows/ci.yml:907: new blank line at EOF.
+
+exec
+/bin/bash -lc 'git diff --cached --stat && git diff --cached -- .github/workflows/ci.yml tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 0ms:
+exec
+/bin/bash -lc 'tail -n 8 .github/workflows/ci.yml | nl -ba' in $REPO_ROOT
+ succeeded in 0ms:
+     1	          sudo apt-get install -y shellcheck
+     2	          shellcheck --version
+     3	      - name: shellcheck install.sh + tests/install_sh_unit.sh
+     4	        run: shellcheck -s sh install.sh tests/install_sh_unit.sh
+     5	      - name: Run install.sh POSIX unit test
+     6	        # Pure /bin/sh (dash on ubuntu) to catch any latent bashism.
+     7	        run: sh tests/install_sh_unit.sh
+     8	
+
+exec
+/bin/bash -lc "rg -n \"diff --check|trailing|blank line at EOF|whitespace\" .github scripts tests Makefile justfile . -g '"'!target'"' -g '"'!*.lock'"'" in $REPO_ROOT
+ exited 2 in 0ms:
+rg: Makefile: No such file or directory (os error 2)
+rg: justfile: No such file or directory (os error 2)
+tests/install_sh_unit.sh:180:# Fake curl: parses -o <out> and trailing URL, then serves from fixture/.
+scripts/harness-check-planner.sh:74:  diff_command="git diff --check --"
+./scripts/cli-public-api-snapshot.sh:165:                        # whitespace (clap convention).
+scripts/cli-public-api-snapshot.sh:165:                        # whitespace (clap convention).
+scripts/check_source_and_spdx.sh:29:    # Extract the expression after the colon, trim whitespace.
+scripts/project-id.sh:38:trim_trailing_slash() {
+scripts/project-id.sh:51:  path_value="$(trim_trailing_slash "$path_value")"
+scripts/project-id.sh:73:  path_value="$(trim_trailing_slash "$path_value")"
+./scripts/project-id.sh:38:trim_trailing_slash() {
+./scripts/project-id.sh:51:  path_value="$(trim_trailing_slash "$path_value")"
+./scripts/project-id.sh:73:  path_value="$(trim_trailing_slash "$path_value")"
+scripts/harness-active-artifact-pruner.sh:42:strip_trailing_slashes() {
+scripts/harness-active-artifact-pruner.sh:61:  abs="$(strip_trailing_slashes "$abs")"
+scripts/harness-active-artifact-pruner.sh:83:  abs="$(strip_trailing_slashes "$abs")"
+scripts/harness-active-artifact-pruner.sh:378:  archive_abs="$(strip_trailing_slashes "$archive_abs")"
+./scripts/harness-check-planner.sh:74:  diff_command="git diff --check --"
+./scripts/check_source_and_spdx.sh:29:    # Extract the expression after the colon, trim whitespace.
+scripts/rev-harness-janitor.sh:58:strip_trailing_slashes() {
+scripts/rev-harness-janitor.sh:77:  abs="$(strip_trailing_slashes "$abs")"
+scripts/rev-harness-janitor.sh:106:  abs="$(strip_trailing_slashes "$abs")"
+scripts/rev-harness-janitor.sh:138:  archive_abs="$(strip_trailing_slashes "$archive_abs")"
+./scripts/rev-harness-janitor.sh:58:strip_trailing_slashes() {
+./scripts/rev-harness-janitor.sh:77:  abs="$(strip_trailing_slashes "$abs")"
+./scripts/rev-harness-janitor.sh:106:  abs="$(strip_trailing_slashes "$abs")"
+./scripts/rev-harness-janitor.sh:138:  archive_abs="$(strip_trailing_slashes "$archive_abs")"
+./vendor/obscura/crates/obscura-cli/src/main.rs:888:        extract_readable_text(&dom, body).split_whitespace().collect::<Vec<_>>().join(" ")
+./vendor/obscura/crates/obscura-js/src/runtime.rs:128:        // Same trailing-semicolon trim as wrap_expression — Playwright's
+./vendor/obscura/crates/obscura-js/src/runtime.rs:133:            .trim_end_matches(|c: char| c == ';' || c.is_whitespace());
+./vendor/obscura/crates/obscura-js/src/runtime.rs:567:            // Strip trailing semicolons + whitespace before wrapping in
+./vendor/obscura/crates/obscura-js/src/runtime.rs:574:            let cleaned = trimmed.trim_end_matches(|c: char| c == ';' || c.is_whitespace());
+./scripts/semantic-review-queue.sh:120:trim_trailing_slash() {
+./scripts/semantic-review-queue.sh:128:trim_ascii_whitespace() {
+./scripts/semantic-review-queue.sh:140:  path_value="$(trim_trailing_slash "$path_value")"
+./scripts/semantic-review-queue.sh:162:  path_value="$(trim_trailing_slash "$path_value")"
+./scripts/semantic-review-queue.sh:194:  normalized_path="$(trim_ascii_whitespace "$raw_path")"
+./scripts/semantic-review-queue.sh:207:  normalized_path="$(trim_trailing_slash "$normalized_path")"
+./scripts/semantic-review-queue.sh:298:  home_dir="$(trim_trailing_slash "$(trusted_runtime_owner_home)")"
+./scripts/semantic-review-queue.sh:345:  normalized_path="$(trim_trailing_slash "$binary_path")"
+./scripts/semantic-review-queue.sh:507:  normalized_path="$(trim_trailing_slash "$path_entry")"
+./scripts/semantic-review-queue.sh:508:  canonical_path="$(trim_trailing_slash "$canonical_path")"
+./scripts/semantic-review-queue.sh:727:  home_dir="$(trim_trailing_slash "$(trusted_runtime_owner_home)")" || return 1
+scripts/semantic-review-queue.sh:120:trim_trailing_slash() {
+scripts/semantic-review-queue.sh:128:trim_ascii_whitespace() {
+scripts/semantic-review-queue.sh:140:  path_value="$(trim_trailing_slash "$path_value")"
+scripts/semantic-review-queue.sh:162:  path_value="$(trim_trailing_slash "$path_value")"
+scripts/semantic-review-queue.sh:194:  normalized_path="$(trim_ascii_whitespace "$raw_path")"
+scripts/semantic-review-queue.sh:207:  normalized_path="$(trim_trailing_slash "$normalized_path")"
+scripts/semantic-review-queue.sh:298:  home_dir="$(trim_trailing_slash "$(trusted_runtime_owner_home)")"
+scripts/semantic-review-queue.sh:345:  normalized_path="$(trim_trailing_slash "$binary_path")"
+scripts/semantic-review-queue.sh:507:  normalized_path="$(trim_trailing_slash "$path_entry")"
+scripts/semantic-review-queue.sh:508:  canonical_path="$(trim_trailing_slash "$canonical_path")"
+scripts/semantic-review-queue.sh:727:  home_dir="$(trim_trailing_slash "$(trusted_runtime_owner_home)")" || return 1
+./harness-rust/crates/semantic-mcp/src/db.rs:1157:        .split_whitespace()
+./tests/install_sh_unit.sh:180:# Fake curl: parses -o <out> and trailing URL, then serves from fixture/.
+./scripts/harness-active-artifact-pruner.sh:42:strip_trailing_slashes() {
+./scripts/harness-active-artifact-pruner.sh:61:  abs="$(strip_trailing_slashes "$abs")"
+./scripts/harness-active-artifact-pruner.sh:83:  abs="$(strip_trailing_slashes "$abs")"
+./scripts/harness-active-artifact-pruner.sh:378:  archive_abs="$(strip_trailing_slashes "$archive_abs")"
+./vendor/obscura/crates/obscura-js/js/bootstrap.js:2144:      .replace(/^\s+/, ''); // trim leading whitespace (before <body> content)
+./vendor/obscura/crates/obscura-dom/src/selector.rs:430:                            .split_whitespace()
+./scripts/semantic-mcp-server/src/__tests__/cli.test.ts:36:  it("project-id validate trims surrounding whitespace", () => {
+./scripts/semantic-mcp-server/src/__tests__/cli.test.ts:381:  it("queue lease rejects trailing junk in --lease-seconds fail-closed", () => {
+./docs/manual/verification-truth-matrix.md:261:| 純粋な説明文書のみ。コマンド、パス、ポリシー、受け入れ条件を変更しない | 用語整理、誤字修正、説明順の調整 | `git diff --check -- <files>` |
+./docs/manual/verification-truth-matrix.md:262:| ルール / role / skill / command policy docs | `.agent_rules/RULES.md`、`AGENTS.md`、`CLAUDE.md`、`docs/roles/*`、`.claude/skills/*`、`.claude/commands/README.md` | `git diff --check -- <files>` と、追加・変更した参照先ごとの `test -e <path>` |
+./docs/manual/verification-truth-matrix.md:263:| role boundary / specialty operating templates | `docs/roles/**/specialties/*.md` | `git diff --check -- <files>`、追加・変更した参照先ごとの `test -e <path>`、`cd harness-rust && cargo run -p agent-core -- specialty lint ../docs/roles/*/specialties/*.md` |
+./docs/manual/verification-truth-matrix.md:264:| README / manual docs | `README.md`、`docs/manual/*.md`、運用ガイド | `git diff --check -- <files>`、追加・変更した参照先ごとの `test -e <path>`、stable-vs-volatile placement check（stable truth を README / manual に置き、dated rerun / artifact / closeout を混在させないことの確認） |
+./docs/manual/verification-truth-matrix.md:265:| active orchestration docs | `.agent/active/plan_*`、`.agent/active/sow/*`、`.agent/active/prompts/*` | `git diff --check -- <files>`、task class profile に応じた envelope completeness check。`light` は `light-change-record`、`standard` は `standard-slice-contract`、`heavy` だけが Canonical Schema 全 field と handoff provenance completeness を要求する |
+./docs/manual/verification-truth-matrix.md:266:| prompt / context / plan など運用文書でコマンド、パス、gate、review 条件、運用例を追加・変更する | `.agent/PROJECT_CONTEXT.md`、handoff prompt、plan、SOW | `git diff --check -- <files>`、追加・変更した参照先ごとの `test -e <path>`、コマンドや script 契約に触れる場合は非破壊の help / syntax / existence probe |
+./docs/manual/verification-truth-matrix.md:267:| `.github/workflows/*.yml` / `.github/workflows/*.yaml` | GitHub Actions workflow | `git diff --check -- <files>`、YAML parse、`actionlint`、変更した workflow が属する relevant gate |
+./docs/manual/verification-truth-matrix.md:268:| wrapper / session / orchestrator shell | `scripts/*wrapper*.sh`、`.claude/commands/*.sh`、`.claude/commands/lib/*.sh` | `git diff --check -- <files>`、変更ファイルごとの `bash -n <file>`、`bash test/integration/cross_agent_wrapper_matrix_test.sh`、必要に応じて related smoke / coordination checks（例: phase / native-surface / semantic coordination 系の smoke） |
+./docs/manual/verification-truth-matrix.md:269:| durable authority / queue backend / release-gate surface | repo-local semantic-mcp backend（`scripts/semantic-mcp-server/**`、`harness-rust/crates/semantic-mcp/**`）、public shell ingress / adapter（`scripts/semantic-review-queue.sh`）、`test/integration/harness_release_gate.sh` | `git diff --check -- <files>`、変更 surface の relevant subset checks、semantic preflight / registry mutation hardening では `bash test/integration/semantic_registry_mutation_flow_test.sh`、`bash test/integration/semantic_coordination_test.sh`、`bash test/integration/semantic_project_id_contract_test.sh` を含める。acceptance boundary が release / closeout をまたぐ場合は `bash test/integration/harness_release_gate.sh` |
+./docs/manual/verification-truth-matrix.md:271:| build / test / CI / quality gate 設定（workflow 以外） | `Makefile`、quality gate script、test harness 設定 | `git diff --check -- <files>` と、その surface が所有する deterministic validation |
+./docs/manual/verification-truth-matrix.md:272:| 実装コード / テスト | `src/**`、`test/**`、アプリ実装 | `git diff --check -- <files>` と、変更 surface に対応する lint / typecheck / unit / integration などの deterministic checks |
+scripts/semantic-mcp-server/src/__tests__/cli.test.ts:36:  it("project-id validate trims surrounding whitespace", () => {
+scripts/semantic-mcp-server/src/__tests__/cli.test.ts:381:  it("queue lease rejects trailing junk in --lease-seconds fail-closed", () => {
+scripts/semantic-mcp-server/dist/__tests__/cli.test.js:22:    it("project-id validate trims surrounding whitespace", () => {
+scripts/semantic-mcp-server/dist/__tests__/cli.test.js:299:    it("queue lease rejects trailing junk in --lease-seconds fail-closed", () => {
+./vendor/obscura/crates/obscura-cdp/src/domains/accessibility.rs:289:            let ids: Vec<&str> = labelledby.value.split_whitespace().collect();
+./docs/manual/harness-release-gate.md:34:`--tier quick` delegates to `scripts/harness-doctor.sh --quick` before release-gate run initialization. It is read-only and advisory-only: it must not create release-gate run directories, refresh latest pointers, prune artifacts, perform network calls, perform deep scans, or claim acceptance, LGTM, completion, or release readiness. Quick may be cited as the gate tier for `light` tasks only when `scripts/rev-harness-task-classifier.sh` returns `task_class=light` and the light-change-record includes the relevant file-specific deterministic checks such as `git diff --check -- <files>`. Use `local` for `standard` scoped review evidence and `full` for `heavy` release/tag/merge-prep evidence.
+./harness-rust/crates/semantic-mcp/src/registry.rs:1343:    // Must be "module:name" format (no whitespace, no extra colons).
+./harness-rust/crates/semantic-mcp/src/registry.rs:1345:        && !value.chars().any(char::is_whitespace)
+./harness-rust/crates/semantic-mcp/src/registry.rs:1687:    let preserve_trailing_slash = replaced.ends_with('/') || replaced.ends_with('\\');
+./harness-rust/crates/semantic-mcp/src/registry.rs:1689:    if preserve_trailing_slash && !normalized.is_empty() && !normalized.ends_with('/') {
+./harness-rust/crates/semantic-mcp/src/registry.rs:2257:    fn registry_rejects_identifier_with_non_space_whitespace() {
+./harness-rust/crates/semantic-mcp/src/util.rs:31:/// Replaces whitespace with `_` and strips `\r`, `\n`, `=`.
+./harness-rust/crates/semantic-mcp/src/util.rs:35:        if ch.is_whitespace() || ch == '=' {
+./harness-rust/crates/semantic-mcp/src/util.rs:111:/// collapse slashes, remove leading `./`, remove trailing `/`, lowercase.
+./docs/manual/developer-customization-guide.md:38:5. `git diff --check` と relevant deterministic checks を回す
+./docs/manual/developer-customization-guide.md:79:- `git diff --check -- <files...>`
+./docs/manual/agent-maintainer-guide.md:56:- `git diff --check -- <files...>`
+./test/integration/common_task_contract_smoke.sh:358:- `git diff --check -- .claude/commands/auto_orchestrate.sh .claude/commands/lib/task_contract.sh docs/manual/common-task-contract.md test/integration/common_task_contract_smoke.sh test/integration/semantic_coordination_test.sh .agent/active/sow/20260415_support-surface-autonomy-and-product-surface-freshness.md .agent/active/prompts/handover_20260415_support-surface-autonomy-and-product-surface-freshness.md`
+./test/integration/common_task_contract_smoke.sh:387:- `git diff --check -- .claude/commands/auto_orchestrate.sh .claude/commands/lib/task_contract.sh .claude/commands/lib/state.sh test/integration/common_task_contract_smoke.sh`
+./test/integration/common_task_contract_smoke.sh:671:    "git diff --check -- .claude/commands/auto_orchestrate.sh .claude/commands/lib/task_contract.sh .claude/commands/lib/state.sh test/integration/common_task_contract_smoke.sh",
+./test/integration/common_task_contract_smoke.sh:718:    "git diff --check -- .claude/commands/auto_orchestrate.sh .claude/commands/lib/task_contract.sh docs/manual/common-task-contract.md test/integration/common_task_contract_smoke.sh test/integration/semantic_coordination_test.sh .agent/active/sow/20260415_support-surface-autonomy-and-product-surface-freshness.md .agent/active/prompts/handover_20260415_support-surface-autonomy-and-product-surface-freshness.md",
+./test/integration/common_task_contract_smoke.sh:1115:- bash -n .claude/commands/lib/task_contract.sh # trailing prose must fail closed
+./test/integration/common_task_contract_smoke.sh:1132:- git diff --check && echo sneaky
+./test/integration/common_task_contract_smoke.sh:1149:- git diff --check >/tmp/trace
+./test/integration/common_task_contract_smoke.sh:1200:- env GIT_CONFIG_GLOBAL=/tmp/evil git diff --check
+./test/integration/common_task_contract_smoke.sh:1217:- GIT_CONFIG_GLOBAL=/tmp/evil git diff --check
+./test/integration/common_task_contract_smoke.sh:1234:- git diff --check $TRACE_FILE
+./test/integration/common_task_contract_smoke.sh:1251:- git diff --check "${TRACE_FILE}"
+./test/integration/common_task_contract_smoke.sh:1334:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: bash -n .claude/commands/lib/task_contract.sh # trailing prose must fail closed'
+./test/integration/common_task_contract_smoke.sh:1365:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: git diff --check && echo sneaky'
+./test/integration/common_task_contract_smoke.sh:1380:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: git diff --check >/tmp/trace'
+./test/integration/common_task_contract_smoke.sh:1425:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: env GIT_CONFIG_GLOBAL=/tmp/evil git diff --check'
+./test/integration/common_task_contract_smoke.sh:1440:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: GIT_CONFIG_GLOBAL=/tmp/evil git diff --check'
+./test/integration/common_task_contract_smoke.sh:1455:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: git diff --check $TRACE_FILE'
+./test/integration/common_task_contract_smoke.sh:1470:  assert_file_contains "$build_stderr" 'required_checks entry must be an exact command: git diff --check "${TRACE_FILE}"'
+./test/integration/common_task_contract_smoke.sh:1537:payload=$(jq '.required_checks = ["git diff --check && echo sneaky"] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1539:jq --arg contract_id "$contract_id" '.required_checks = ["git diff --check && echo sneaky"] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1557:payload=$(jq '.required_checks = ["git diff --check >/tmp/trace"] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1559:jq --arg contract_id "$contract_id" '.required_checks = ["git diff --check >/tmp/trace"] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1597:payload=$(jq '.required_checks = ["env GIT_CONFIG_GLOBAL=/tmp/evil git diff --check"] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1599:jq --arg contract_id "$contract_id" '.required_checks = ["env GIT_CONFIG_GLOBAL=/tmp/evil git diff --check"] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1617:payload=$(jq '.required_checks = ["GIT_CONFIG_GLOBAL=/tmp/evil git diff --check"] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1619:jq --arg contract_id "$contract_id" '.required_checks = ["GIT_CONFIG_GLOBAL=/tmp/evil git diff --check"] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1657:payload=$(jq '.required_checks = ["git diff --check $TRACE_FILE"] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1659:jq --arg contract_id "$contract_id" '.required_checks = ["git diff --check $TRACE_FILE"] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1677:payload=$(jq '.required_checks = ["git diff --check \"${TRACE_FILE}\""] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1679:jq --arg contract_id "$contract_id" '.required_checks = ["git diff --check \"${TRACE_FILE}\""] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1697:payload=$(jq '.required_checks = ["bash -n .claude/commands/lib/task_contract.sh # trailing prose must fail closed"] | del(.contract_id)' "$2")
+./test/integration/common_task_contract_smoke.sh:1699:jq --arg contract_id "$contract_id" '.required_checks = ["bash -n .claude/commands/lib/task_contract.sh # trailing prose must fail closed"] | .contract_id = $contract_id' "$2" > "$3"
+./test/integration/common_task_contract_smoke.sh:1717:required_check=$'git diff --check\nrm -rf /'
+./test/integration/common_task_contract_smoke.sh:1738:required_check=$'git diff --check\t--cached'
+./test/integration/common_task_contract_smoke.sh:1929:  local whitespace_only_out_of_scope_plan="$repo/plan_whitespace_only_out_of_scope.md"
+./test/integration/common_task_contract_smoke.sh:1934:  local invalid_whitespace_contract="$repo/.claude/tmp/plan_common_task_contract/task-contract-whitespace-out-of-scope.json"
+./test/integration/common_task_contract_smoke.sh:1999:  write_file "$whitespace_only_out_of_scope_plan" '# ExecPlan: Whitespace Only Out-Of-Scope
+./test/integration/common_task_contract_smoke.sh:2009:  printf '%s\n' '-    ' >> "$whitespace_only_out_of_scope_plan"
+./test/integration/common_task_contract_smoke.sh:2015:- whitespace-only out-of-scope item must fail closed
+./test/integration/common_task_contract_smoke.sh:2016:' >> "$whitespace_only_out_of_scope_plan"
+./test/integration/common_task_contract_smoke.sh:2083:      --plan "$whitespace_only_out_of_scope_plan" \
+./test/integration/common_task_contract_smoke.sh:2085:      --task-id whitespace-only-out-of-scope \
+./test/integration/common_task_contract_smoke.sh:2090:    fail "task_contract emit unexpectedly accepted whitespace-only Out-Of-Scope list item"
+./test/integration/common_task_contract_smoke.sh:2140:    bash "$mutator_script" "$repo/.claude/commands/lib/task_contract.sh" "$contract_path" "$invalid_whitespace_contract"
+./test/integration/common_task_contract_smoke.sh:2143:  if bash "$repo/.claude/commands/lib/task_contract.sh" validate --file "$invalid_whitespace_contract" >/dev/null 2>&1; then
+./test/integration/common_task_contract_smoke.sh:2144:    fail "task_contract validate unexpectedly accepted whitespace-only out_of_scope entry"
+./test/integration/semantic_registry_mutation_flow_test.sh:49:    C23) echo "prepare blocks before writing preflight_input when authoritative project_id has internal whitespace" ;;
+./test/integration/semantic_registry_mutation_flow_test.sh:51:    C25) echo "helper-level project_id resolution trims edge whitespace only" ;;
+./test/integration/semantic_registry_mutation_flow_test.sh:52:    C26) echo "finalize normalizes edge whitespace in preflight project_id and proceeds when authoritative value matches" ;;
+./test/integration/semantic_registry_mutation_flow_test.sh:53:    C27) echo "finalize blocks when preflight project_id contains internal whitespace" ;;
+./test/integration/semantic_registry_mutation_flow_test.sh:54:    C28) echo "apply stage normalizes edge whitespace in payload project_id and proceeds when authoritative value matches" ;;
+./test/integration/semantic_registry_mutation_flow_test.sh:55:    C29) echo "apply stage blocks when payload project_id contains internal whitespace" ;;
+./test/integration/semantic_registry_mutation_flow_test.sh:1968:test_c23_prepare_internal_whitespace_authoritative_project_id_blocks() {
+./test/integration/semantic_registry_mutation_flow_test.sh:1982:    printf '{"task":{"id":"task_prepare_internal_whitespace_project_id"},"phases":[{"name":"impl","status":"running"}],"status":"running"}\n' > "$STATE_FILE"
+./test/integration/semantic_registry_mutation_flow_test.sh:1998:      prepare_coordination_context "$tmpdir" "impl" "prepare_internal_whitespace_project_id"
+./test/integration/semantic_registry_mutation_flow_test.sh:2002:      echo "detail: prepare_coordination_context unexpectedly succeeded with internal-whitespace authoritative project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2007:      echo "detail: state_set_error was not invoked for internal-whitespace authoritative project_id at prepare" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2010:      echo "detail: state error code mismatch for internal-whitespace authoritative project_id at prepare" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2015:      echo "detail: preflight_input artifact should not be written for internal-whitespace authoritative project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2020:      echo "detail: fail-closed preflight artifact missing for internal-whitespace authoritative project_id at prepare" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2023:      echo "detail: preflight artifact did not capture internal-whitespace authoritative project_id at prepare" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2213:test_c25_helper_resolution_trims_edge_whitespace_only() {
+./test/integration/semantic_registry_mutation_flow_test.sh:2264:        echo "detail: coordination helper did not trim edge whitespace from canonical resolver output" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2279:        echo "detail: registry helper did not trim edge whitespace from canonical resolver output" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2294:        echo "detail: capsule helper did not trim edge whitespace from canonical resolver output" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2304:test_c26_finalize_preflight_edge_whitespace_project_id_passes() {
+./test/integration/semantic_registry_mutation_flow_test.sh:2351:      echo "detail: finalize_coordination_context unexpectedly failed for edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2356:      echo "detail: state_set_error was invoked despite valid edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2361:      echo "detail: registry delta artifact missing for edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2364:      echo "detail: registry delta artifact did not normalize preflight project_id edge whitespace" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2369:      echo "detail: registry apply artifact missing for edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2372:      echo "detail: registry apply artifact did not record successful mutation for edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2377:      echo "detail: mutator was not called for edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2380:      echo "detail: mutator payload did not preserve normalized authoritative project_id for edge-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2389:test_c27_finalize_preflight_internal_whitespace_project_id_blocks() {
+./test/integration/semantic_registry_mutation_flow_test.sh:2440:      echo "detail: finalize_coordination_context unexpectedly succeeded with internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2445:      echo "detail: state_set_error was not invoked for internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2448:      echo "detail: state error code mismatch for internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2453:      echo "detail: registry delta error artifact missing for internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2456:      echo "detail: registry delta error artifact did not capture internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2461:      echo "detail: registry apply artifact should not exist for internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2466:      echo "detail: mutator should not be called for internal-whitespace preflight project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2475:test_c28_apply_stage_edge_whitespace_payload_project_id_passes() {
+./test/integration/semantic_registry_mutation_flow_test.sh:2500:      echo "detail: apply stage unexpectedly failed for edge-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2505:      echo "detail: apply artifact missing for edge-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2508:      echo "detail: apply artifact did not record successful mutation for edge-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2513:      echo "detail: mutator was not called for edge-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2516:      echo "detail: mutator payload did not preserve normalized authoritative project_id for edge-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2525:test_c29_apply_stage_internal_whitespace_payload_project_id_blocks() {
+./test/integration/semantic_registry_mutation_flow_test.sh:2550:      echo "detail: apply stage unexpectedly succeeded with internal-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2555:      echo "detail: apply-stage error artifact missing for internal-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2558:      echo "detail: apply-stage error artifact did not capture internal-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:2563:      echo "detail: mutator should not be called for internal-whitespace payload project_id" >&2
+./test/integration/semantic_registry_mutation_flow_test.sh:3229:run_test "C23" test_c23_prepare_internal_whitespace_authoritative_project_id_blocks
+./test/integration/semantic_registry_mutation_flow_test.sh:3231:run_test "C25" test_c25_helper_resolution_trims_edge_whitespace_only
+./test/integration/semantic_registry_mutation_flow_test.sh:3232:run_test "C26" test_c26_finalize_preflight_edge_whitespace_project_id_passes
+./test/integration/semantic_registry_mutation_flow_test.sh:3233:run_test "C27" test_c27_finalize_preflight_internal_whitespace_project_id_blocks
+./test/integration/semantic_registry_mutation_flow_test.sh:3234:run_test "C28" test_c28_apply_stage_edge_whitespace_payload_project_id_passes
+./test/integration/semantic_registry_mutation_flow_test.sh:3235:run_test "C29" test_c29_apply_stage_internal_whitespace_payload_project_id_blocks
+./test/integration/semantic_cli_contract_parity_test.sh:113:    || fail "node project-id validate did not normalize whitespace"
+./test/integration/semantic_cli_contract_parity_test.sh:115:    || fail "rust project-id validate did not normalize whitespace"
+./test/integration/harness_active_artifact_pruner_test.sh:336:  local symlink_trailing_stdout=""
+./test/integration/harness_active_artifact_pruner_test.sh:337:  local symlink_trailing_stderr=""
+./test/integration/harness_active_artifact_pruner_test.sh:349:  symlink_trailing_stdout="$(output_path harness-pruner-symlink-trailing.out)"
+./test/integration/harness_active_artifact_pruner_test.sh:350:  symlink_trailing_stderr="$(output_path harness-pruner-symlink-trailing.err)"
+./test/integration/harness_active_artifact_pruner_test.sh:367:  if run_pruner --root "$symlink_root/" >"$symlink_trailing_stdout" 2>"$symlink_trailing_stderr"; then
+./test/integration/harness_active_artifact_pruner_test.sh:369:    fail "trailing slash symlink root should fail closed"
+./test/integration/harness_active_artifact_pruner_test.sh:576:  archive_symlink_stdout="$(output_path harness-pruner-archive-symlink-trailing.out)"
+./test/integration/harness_active_artifact_pruner_test.sh:577:  archive_symlink_stderr="$(output_path harness-pruner-archive-symlink-trailing.err)"
+./test/integration/harness_active_artifact_pruner_test.sh:604:    fail "trailing slash symlink archive dir should fail closed"
+./test/integration/semantic_review_queue_runtime_test.sh:55:trim_trailing_slash() {
+./test/integration/semantic_review_queue_runtime_test.sh:116:    home_dir="$(trim_trailing_slash "$home_dir")"
+./test/integration/semantic_review_queue_runtime_test.sh:157:  normalized_path="$(trim_trailing_slash "$binary_path")"
+./test/integration/semantic_review_queue_runtime_test.sh:301:  normalized_path="$(trim_trailing_slash "$path_entry")"
+./test/integration/semantic_review_queue_runtime_test.sh:302:  canonical_path="$(trim_trailing_slash "$canonical_path")"
+./vendor/obscura/crates/obscura-net/src/cookies.rs:365:    let parts: Vec<&str> = s.split_whitespace().collect();
+./test/integration/auto_orchestrate_packet_preflight_test.sh:277:    "required_checks_surface": ["git diff --check"]
+./test/integration/auto_orchestrate_packet_preflight_test.sh:284:    "required_checks_surface": ["git diff --check"]
+./test/integration/auto_orchestrate_packet_preflight_test.sh:291:    "required_checks_surface": ["git diff --check"]
+./test/integration/auto_orchestrate_packet_preflight_test.sh:305:    "required_checks_surface": ["git diff --check"]
+./test/integration/auto_orchestrate_packet_preflight_test.sh:312:    "required_checks_surface": ["git diff --check"]
+./test/integration/auto_orchestrate_packet_preflight_test.sh:319:    "required_checks_surface": ["git diff --check"]
+./test/integration/auto_orchestrate_packet_preflight_test.sh:446:- `git diff --check -- .claude/commands/auto_orchestrate.sh .claude/commands/lib/task_contract.sh .claude/commands/lib/state.sh test/integration/common_task_contract_smoke.sh`
+./test/integration/orchestration_packet_validator_test.sh:183:    "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:190:    "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:197:    "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:211:    "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:218:    "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:225:    "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:245:- git diff --check
+./test/integration/orchestration_packet_validator_test.sh:454:    !replaced && $0 == "- git diff --check" {
+./test/integration/orchestration_packet_validator_test.sh:645:      "required_checks_surface": ["git diff --check"]
+./test/integration/orchestration_packet_validator_test.sh:671:      "required_checks_surface": ["git diff --check"]
+./test/integration/cross_family_live_artifact_smoke_test.sh:74:  '  "- git diff --check -- path/to/script.sh" \' \
+./test/integration/semantic_backend_contract_parity_test.sh:490:    ["semantic_id_internal_whitespace", { semantic_id: "mod:\tThing" }],
+./test/integration/semantic_backend_contract_parity_test.sh:491:    ["logical_id_internal_whitespace", { logical_id: "mod:\nThing" }]
+./docs/book/src/en/errors/RecipeNotFound.md:42:- Domain spelling mismatch (e.g. trailing slash).
+./test/unit/test-cursor-rules-frontmatter.sh:92:  pass "critical rule has trailing newline"
+./test/unit/test-cursor-rules-frontmatter.sh:94:  fail "critical rule has trailing newline"
+./harness-rust/crates/tree-sitter-index/src/extractors/typescript.rs:254:        .split_whitespace()
+./test/unit/test-cursor-wrapper.sh:146:# 17. Prompt body is forwarded as the trailing positional arg
+./test/integration/native_reviewer_surface_smoke.sh:267:- required checks: git diff --check on owned files; bash -n; targeted native reviewer smoke
+./test/integration/native_reviewer_surface_smoke.sh:605:- required checks: git diff --check on owned files; bash -n; targeted native reviewer smoke
+./test/integration/native_reviewer_surface_smoke.sh:764:- required checks: git diff --check on owned files; bash -n; targeted native reviewer smoke
+./test/integration/native_reviewer_surface_smoke.sh:907:- required checks: git diff --check on owned files; bash -n; targeted native reviewer smoke
+./test/integration/native_reviewer_surface_smoke.sh:1109:- required checks: git diff --check on owned files; bash -n; targeted native reviewer smoke
+./test/integration/native_reviewer_surface_smoke.sh:1638:- required checks: git diff --check on owned files; bash -n; targeted native reviewer smoke
+./test/integration/harness_check_planner_test.sh:27:  contains "$output" "git diff --check -- docs/manual/harness-user-guide.md" \
+./docs/roles/orchestrator/specialties/slice-designer.md:81:Slice 1: specialty authority file. Change surface is `docs/roles/<canonical>/specialties/<slug>.md`; required checks are `agent-core specialty lint <file>` and `git diff --check -- <file>`; completion boundary is a valid manifest and non-placeholder required sections.
+./docs/roles/orchestrator/specialties/slice-designer.md:108:git diff --check -- docs/roles/orchestrator/specialties/slice-designer.md docs/prompts/_archive/role-operating-templates-v0.md
+./test/integration/shadow_verify_harness_runtime_test.sh:242:  assert_json_field "$result" '(.harness_check_planner.commands | index("git diff --check -- docs/delete_me.md") != null)' "true"
+./test/integration/shadow_verify_harness_runtime_test.sh:247:test_planner_diff_check_fails_for_untracked_trailing_whitespace() {
+./test/integration/shadow_verify_harness_runtime_test.sh:254:  printf 'untracked trailing space \n' > "$tmpdir/repo/docs/untracked.md"
+./test/integration/shadow_verify_harness_runtime_test.sh:259:  [[ "$rc" -ne 0 ]] || fail "shadow verify should fail diff check for untracked trailing whitespace"
+./test/integration/shadow_verify_harness_runtime_test.sh:264:  assert_json_field "$result" '(.harness_check_planner.commands | index("git diff --check -- docs/untracked.md") != null)' "true"
+./test/integration/shadow_verify_harness_runtime_test.sh:265:  assert_json_field "$result" '.harness_check_planner.results[] | select(.command == "git diff --check -- docs/untracked.md") | .status' "fail"
+./test/integration/shadow_verify_harness_runtime_test.sh:266:  assert_json_field "$result" '.harness_check_planner.results[] | select(.command == "git diff --check -- docs/untracked.md") | .reason' "planned_check_failed"
+./test/integration/shadow_verify_harness_runtime_test.sh:494:test_planner_diff_check_fails_for_untracked_trailing_whitespace
+./harness-rust/crates/agent-core/src/cmd/worktree.rs:847:        .split_whitespace()
+./docs/roles/orchestrator.md:29:- `light`: Orchestrator が直接処理できる。`light-change-record`、quick checks、`git diff --check -- <files>` などの relevant deterministic check で完了でき、Reviewer / Final Reviewer gate / full release gate を要求しない
+./docs/roles/orchestrator.md:231:    "git diff --check -- docs/roles/orchestrator.md docs/manual/verification-truth-matrix.md",
+./harness-rust/crates/agent-core/src/cmd/project_id.rs:703:        assert_eq!(sanitize_project_name("trailing---"), "trailing");
+./harness-rust/crates/agent-core/src/cmd/contract.rs:123:    // Collapse consecutive hyphens and trim leading/trailing hyphens.
+./harness-rust/crates/agent-core/src/cmd/contract.rs:137:    // Trim trailing hyphen
+./harness-rust/crates/agent-core/src/cmd/contract.rs:488:        assert_eq!(slugify("trailing---"), "trailing");
+./harness-rust/crates/agent-core/src/cmd/envelope.rs:555:        .split_whitespace()
+./harness-rust/crates/agent-core/src/cmd/secret_scan.rs:309:        let fields: Vec<&str> = line.split_whitespace().collect();
+./harness-rust/crates/agent-core/src/cmd/secret_scan.rs:484:    compress_whitespace(&line.replacen(matched, &marker, 1))
+./harness-rust/crates/agent-core/src/cmd/secret_scan.rs:487:fn compress_whitespace(value: &str) -> String {
+./harness-rust/crates/agent-core/src/cmd/secret_scan.rs:488:    value.split_whitespace().collect::<Vec<_>>().join(" ")
+./crates/stealth-cli/src/commands/config_cli.rs:385:        /// `\`, `.`, whitespace, control chars). Path-traversal is
+./crates/stealth-cli/src/commands/config_cli.rs:1654:        let mut parts = editor_cmd.split_whitespace();
+./crates/stealth-cli/src/commands/config_cli.rs:2359:/// separators, `..`, dots, whitespace, and any control character. Returning
+./crates/obscura-bridge/src/page.rs:289:///    trailing slash and fragment.
+./crates/obscura-bridge/src/page.rs:299:/// and trailing slashes for tolerant comparison. Exposed for direct
+./crates/obscura-bridge/src/page.rs:327:    fn main_frame_url_matches_ignores_trailing_slash() {
+./crates/vpn-rotate/src/credentials.rs:125:    fn file_path_resolve_trims_trailing_newline() {
+./crates/vpn-rotate/src/docker.rs:323:        // whitespace + empty entry tolerated
+./crates/stealth-parse/src/fingerprint.rs:60:    s.split_whitespace().collect::<Vec<_>>().join(" ")
+./crates/stealth-parse/tests/golden_relocate.rs:62:                .split_whitespace()
+./crates/stealth-sanitize/tests/golden_corpus.rs:150:        // 18. canary #6 — SYSTEM: at line start with leading whitespace.
+./crates/stealth-cli/src/policy.rs:289:        // whitespace + empty entry tolerated
+./crates/stealth-cli/tests/completion_smoke.rs:120:                    .split_whitespace()
+./crates/stealth-cli/tests/deprecated_completeness.rs:115:                while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+./crates/stealth-cli/tests/deprecated_completeness.rs:123:                while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+./crates/stealth-cli/tests/deprecated_completeness.rs:274:        // Skip whitespace + commas.
+./crates/stealth-cli/tests/deprecated_completeness.rs:275:        while i < bytes.len() && (bytes[i].is_ascii_whitespace() || bytes[i] == b',') {
+./crates/stealth-cli/tests/deprecated_completeness.rs:291:        // Skip whitespace then expect `=`.
+./crates/stealth-cli/tests/deprecated_completeness.rs:292:        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+./crates/stealth-cli/tests/deprecated_completeness.rs:299:        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+
+exec
+/bin/bash -lc 'tail -c 80 .github/workflows/ci.yml | od -An -t x1c' in $REPO_ROOT
+ succeeded in 0ms:
+           20  75  62  75  6e  74  75  29  20  74  6f  20  63  61  74  63
+               u   b   u   n   t   u   )       t   o       c   a   t   c
+           68  20  61  6e  79  20  6c  61  74  65  6e  74  20  62  61  73
+           h       a   n   y       l   a   t   e   n   t       b   a   s
+           68  69  73  6d  2e  0a  20  20  20  20  20  20  20  20  72  75
+           h   i   s   m   .  \n                                   r   u
+           6e  3a  20  73  68  20  74  65  73  74  73  2f  69  6e  73  74
+           n   :       s   h       t   e   s   t   s   /   i   n   s   t
+           61  6c  6c  5f  73  68  5f  75  6e  69  74  2e  73  68  0a  0a
+           a   l   l   _   s   h   _   u   n   i   t   .   s   h  \n  \n
+
+
+codex
+The workflow surface has a required whitespace check in the repo’s truth matrix, and `git diff --check` is currently failing on the new workflow tail. I’m still running the behavioral checks to see whether there are any substantive test issues beyond that.
+exec
+/bin/bash -lc 'shellcheck -s sh install.sh tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 0ms:
+exec
+/bin/bash -lc 'command -v actionlint || true' in $REPO_ROOT
+ succeeded in 0ms:
+/opt/homebrew/bin/actionlint
+
+exec
+/bin/bash -lc "python3 - <<'PY'
+import yaml
+with open('.github/workflows/ci.yml', 'r', encoding='utf-8') as f:
+    yaml.safe_load(f)
+print('yaml ok')
+PY" in $REPO_ROOT
+ succeeded in 0ms:
+yaml ok
+
+exec
+/bin/bash -lc 'dash tests/install_sh_unit.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'sh tests/install_sh_unit.sh' in $REPO_ROOT
+ exited 1 in 423ms:
+  ok   detect_target linux-x86_64
+
+ exited 1 in 504ms:
+  ok   detect_target linux-x86_64
+
+codex
+The local run doesn’t match the supplied result: both `sh` and `dash` exit after the first detect_target case on this host. I’m tracing that path now; if it is environment-dependent, that matters because this test is meant to be the CI gate.
+exec
+/bin/bash -lc 'sh -x tests/install_sh_unit.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'dash -x tests/install_sh_unit.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'actionlint .github/workflows/ci.yml' in $REPO_ROOT
+ exited 1 in 0ms:
+.github/workflows/ci.yml:217:9: shellcheck reported issue in this script: SC2155:warning:1:8: Declare and assign separately to avoid masking return values [shellcheck]
+    |
+217 |         run: |
+    |         ^~~~
+.github/workflows/ci.yml:261:9: shellcheck reported issue in this script: SC2155:warning:1:8: Declare and assign separately to avoid masking return values [shellcheck]
+    |
+261 |         run: |
+    |         ^~~~
+.github/workflows/ci.yml:404:13: constant expression "false" in condition. remove the if: section [if-cond]
+    |
+404 |         if: false
+    |             ^~~~~
+.github/workflows/ci.yml:438:9: shellcheck reported issue in this script: SC2155:warning:1:8: Declare and assign separately to avoid masking return values [shellcheck]
+    |
+438 |         run: |
+    |         ^~~~
+
+ exited 1 in 398ms:
++ out=x86_64-unknown-linux-musl
++ rc=0
++ '[' -n x86_64-unknown-linux-musl ']'
++ '[' 0 -eq 0 ']'
+  ok   detect_target linux-x86_64
++ '[' x86_64-unknown-linux-musl = x86_64-unknown-linux-musl ']'
++ pass 'detect_target linux-x86_64'
++ TESTS_RUN=1
++ printf '  ok   %s\n' 'detect_target linux-x86_64'
++ rm -rf /var/folders/x4/_jv45qnn1nz2z6t61v4cz8dw0000gn/T/tmp.X76ojjHGMD/sandbox-detect-97129-0
++ rm -rf /var/folders/x4/_jv45qnn1nz2z6t61v4cz8dw0000gn/T/tmp.X76ojjHGMD
+
+ exited 1 in 368ms:
++ out=x86_64-unknown-linux-musl
++ rc=0
++ [ -n x86_64-unknown-linux-musl ]
++ [ 0 -eq 0 ]
++ [ x86_64-unknown-linux-musl = x86_64-unknown-linux-musl ]
++   ok   detect_target linux-x86_64
+pass detect_target linux-x86_64
++ TESTS_RUN=1
++ printf   ok   %s\n detect_target linux-x86_64
++ rm -rf /var/folders/x4/_jv45qnn1nz2z6t61v4cz8dw0000gn/T/tmp.nT1fbqc4KB/sandbox-detect-97146-0
++ rm -rf /var/folders/x4/_jv45qnn1nz2z6t61v4cz8dw0000gn/T/tmp.nT1fbqc4KB
+
+exec
+/bin/bash -lc "sh -c 'set -e; d="'$(mktemp -d); mkdir -p "$d/a"; rm -rf "$d/a"; echo ok; rm -rf "$d"'"'" in $REPO_ROOT
+exec
+/bin/bash -lc "dash -c 'set -e; d="'$(mktemp -d); mkdir -p "$d/a"; rm -rf "$d/a"; echo ok; rm -rf "$d"'"'" in $REPO_ROOT
+ exited 1 in 0ms:
+ exited 1 in 0ms:
+exec
+/bin/bash -lc "sh -c 'set -eu; TESTS_RUN=0; pass(){ TESTS_RUN="'$((TESTS_RUN + 1)); printf "ok %s'"\\n\" \""'$1"; }; f(){ pass x; rm -rf /tmp/does-not-exist; }; f; echo after'"'" in $REPO_ROOT
+exec
+/bin/bash -lc "bash --version | head -1; ls -l /bin/sh /bin/dash; /bin/sh --version 2>&1 | head -2 || true; /bin/dash -c 'echo dash ok'" in $REPO_ROOT
+ exited 1 in 0ms:
+ok x
+
+ succeeded in 0ms:
+GNU bash, version 5.3.9(1)-release (aarch64-apple-darwin25.1.0)
+-rwxr-xr-x  1 root  wheel  274288 May  1 04:33 /bin/dash
+-rwxr-xr-x  1 root  wheel  101232 May  1 04:33 /bin/sh
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+Copyright (C) 2007 Free Software Foundation, Inc.
+dash ok
+
+exec
+/bin/bash -lc "dash -c 'd="'$(mktemp -d); echo d=$d rc=$?; mkdir -p "$d/a"; echo mkdir=$?; rm -rf "$d/a"; echo rm1=$?; echo ok; rm -rf "$d"; echo rm2=$?'"'" in $REPO_ROOT
+exec
+/bin/bash -lc "sh -c 'd="'$(mktemp -d); echo d=$d rc=$?; mkdir -p "$d/a"; echo mkdir=$?; rm -rf "$d/a"; echo rm1=$?; echo ok; rm -rf "$d"; echo rm2=$?'"'" in $REPO_ROOT
+exec
+/bin/bash -lc "type rm; command -v rm; /bin/rm --version 2>&1 | head -2 || true; env | rg '"'^RM|''^GLOB|''^POSIX|''^SHELL|''^PATH'"'" in $REPO_ROOT
+ succeeded in 0ms:
+rm is /opt/homebrew/bin/rm
+/opt/homebrew/bin/rm
+/bin/rm: illegal option -- -
+usage: rm [-f | -i] [-dIPRrvWx] file ...
+SHELL=/bin/bash
+PATH=/Applications/Ghostty.app/Contents/MacOS:/Users/sasuketorii/.local/share/mise/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Ghostty.app/Contents/MacOS:/Users/sasuketorii/.cargo/bin:/Users/sasuketorii/.local/bin:/opt/homebrew/opt/trash/bin:/Users/sasuketorii/.lmstudio/bin:/Users/sasuketorii/.antigravity/antigravity/bin:/Users/sasuketorii/.nvm/versions/node/v20.19.3/bin:/Users/sasuketorii/.nvm/versions/node/v22.17.0/bin:/Users/sasuketorii/.nvm/versions/node/v24.11.1/bin:/Users/sasuketorii/.deno/bin:/Users/sasuketorii/Library/pnpm:/Users/sasuketorii/.pyenv/shims:/Users/sasuketorii/.local/share/mise/installs/go/1.26.3/bin:/Users/sasuketorii/.local/share/mise/installs/node/24.15.0/bin:/Users/sasuketorii/.local/share/mise/installs/python/3.14.5/bin:/Users/sasuketorii/.codex/tmp/arg0/codex-arg0lutVa5:/Users/sasuketorii/.local/share/mise/installs/node/24.15.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/path:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/079c94dc-c80a-445d-8896-cc3ea3d4696b/a4b894f9-6438-4a9b-adc0-842eb0412223/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01Eeb9y5m4iFuY3yRtytYfdc/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01FTLa86dhbVJ3HB1LdHdhN7/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01VTbvGZYaCVU2CNSvhDCnkg/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01XXJmxLXPEhPMmnxmrgntNw/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01SfWJSiw6JtGbsuW75PKvPK/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_012ABz1xjgtJYWKrcJkXW6ad/bin:/Users/sasuketorii/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/bin:/Users/sasuketorii/.claude/plugins/cache/claude-plugins-official/security-guidance/unknown/bin
+
+ succeeded in 200ms:
+rm2=1
+
+ succeeded in 203ms:
+rm2=1
+
+exec
+/bin/bash -lc 'ls -l /opt/homebrew/bin/rm; file /opt/homebrew/bin/rm; /opt/homebrew/bin/rm --help 2>&1 | head -20; /opt/homebrew/bin/rm -rf /tmp/nonexistent-test-dir; echo rc=$?' in $REPO_ROOT
+ succeeded in 0ms:
+lrwxr-xr-x@ 1 sasuketorii  admin  32 Dec 28 20:00 /opt/homebrew/bin/rm -> /Users/sasuketorii/.local/bin/rm
+/opt/homebrew/bin/rm: Bourne-Again shell script text executable, ASCII text
+/opt/homebrew/opt/trash/bin/trash: illegal option -- -
+rc=1
+
+exec
+/bin/bash -lc 'PATH=/usr/bin:/bin:/usr/sbin:/sbin dash tests/install_sh_unit.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'PATH=/usr/bin:/bin:/usr/sbin:/sbin sh tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 6233ms:
+  ok   detect_target linux-x86_64
+  ok   detect_target linux-aarch64
+  ok   detect_target linux-arm64
+  ok   detect_target darwin-x86_64
+  ok   detect_target darwin-arm64
+  ok   detect_target freebsd-amd64 (expected die)
+  ok   detect_target linux-i686 (expected die)
+  ok   detect_target windows-x86_64 (expected die)
+[2/2] end-to-end behavior with fake PATH
+  ok   sha256 sidecar missing -> warn + install ok
+  ok   sha256 mismatch -> die
+  ok   cosign absent + default verify -> die
+  ok   cosign absent + --no-verify -> install ok
+  ok   cosign present + valid sig -> install ok
+
+Ran 13 tests, 0 failed.
+
+ succeeded in 6341ms:
+  ok   detect_target linux-x86_64
+  ok   detect_target linux-aarch64
+  ok   detect_target linux-arm64
+  ok   detect_target darwin-x86_64
+  ok   detect_target darwin-arm64
+  ok   detect_target freebsd-amd64 (expected die)
+  ok   detect_target linux-i686 (expected die)
+  ok   detect_target windows-x86_64 (expected die)
+[2/2] end-to-end behavior with fake PATH
+  ok   sha256 sidecar missing -> warn + install ok
+  ok   sha256 mismatch -> die
+  ok   cosign absent + default verify -> die
+  ok   cosign absent + --no-verify -> install ok
+  ok   cosign present + valid sig -> install ok
+
+Ran 13 tests, 0 failed.
+
+codex
+NEEDS_CHANGES
+
+- [.github/workflows/ci.yml:889-907]($REPO_ROOT/.github/workflows/ci.yml:889): remove the extra blank line at EOF. `git diff --check -- .github/workflows/ci.yml tests/install_sh_unit.sh` fails with `.github/workflows/ci.yml:907: new blank line at EOF`.
+- [tests/install_sh_unit.sh:35]($REPO_ROOT/tests/install_sh_unit.sh:35), [tests/install_sh_unit.sh:109]($REPO_ROOT/tests/install_sh_unit.sh:109): cleanup uses ambient `rm` under `set -e`; `sh tests/install_sh_unit.sh` and `dash tests/install_sh_unit.sh` fail in this workspace after the first case when PATH resolves `rm` to a nonstandard wrapper. Sanitize PATH for harness cleanup or make cleanup non-fatal/deterministic.
+tokens used
+68,248
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"bce80f18-44c2-45cb-83f4-88c0ed44a397","timestamp":"2026-05-22T23:23:03Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":169441,"tokens_in":68248,"tokens_out":0,"total_tokens":68248,"dry_run":false,"specialty_status":"none"}

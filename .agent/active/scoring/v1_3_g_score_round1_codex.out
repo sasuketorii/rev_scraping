@@ -1,0 +1,18 @@
+| 軸 | スコア | 根拠 |
+|---|---:|---|
+| A | 8.6 | G.1/2/3/5/7/8 は実装・CI・テスト evidence が強い。ただし G.4 は ExecPlan の `{json,yaml,text}` 全 subcommand に対し、多くが `human/json` のみで `text/yaml` を拒否。G.6 も proptest 50-iter と auth login 二重実行=1 audit entry の直接 evidence が欠ける。 |
+| B | 9.0 | help/schema/completion/manpage/dry-run/error は CI gate と adversarial test が揃う。未達は text/yaml drift、G.6 proptest、G.1 inventory 再生成 gate の弱さ。 |
+| C | 8.5 | dry-run/idempotency/error doc_url は `ripgrep/fd/gh/wrangler` より agent-friendly。ただし出力形式 enum と envelope shape が揃い切らず、成熟 CLI に対して「明確に勝つ」までは届かない。 |
+| D | 9.0 | Claude/Cursor/Hermes が JSON pipe、dry-run、idempotency、統一 error を使える水準。`--output-format text/yaml` 不一致と一部 flat/独自 envelope が reject 要因。 |
+| E | 8.6 | clap 系依存と schema は安定寄り。負債は mixed envelope、committed `target/` artifacts、legacy message heuristic、idempotency dead-code warning。 |
+| F | 8.8 | ローカルで G 系 integration 74 件 + idempotency unit 14 件 PASS。欠けるのは proptest、auth-login idempotency audit、text/yaml emission validation。 |
+| G | 8.9 | help/man/schema/error docs は強い。だが G.4 docs が ExecPlan の `{json,yaml,text}` ではなく `human/json` 中心を正として固定しており、次担当への契約が少し割れている。 |
+
+overall = 8.78
+
+verdict: FAIL
+
+deltas to 9.0:
+- 全 11 top-level/subcommand surface で `--output-format text` と `yaml` を実装するか、ExecPlan 側を正式に `human/json` に変更して acceptance を再承認する。
+- G.6 に proptest 50-iter と、mocked `auth login --idempotency-key X` 二重実行で duplicate write/audit が増えない直接テストを追加する。
+- 可能なら G.1 inventory 再生成 drift gate も CI に入れる。

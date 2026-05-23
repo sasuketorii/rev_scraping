@@ -2494,7 +2494,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2537,7 +2537,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-agent-contracts"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "dashmap",
  "proptest",
@@ -2550,7 +2550,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-auth"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-captcha-bypass"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "reqwest",
@@ -2603,7 +2603,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-cf"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2618,7 +2618,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-core"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "chromiumoxide",
@@ -2633,7 +2633,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-mcp"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2659,7 +2659,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-mobile-fp"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2670,7 +2670,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-obscura-bridge"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2695,7 +2695,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-parse"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "ego-tree",
@@ -2714,7 +2714,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-sanitize"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aho-corasick",
  "criterion",
@@ -2728,7 +2728,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-sites"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "criterion",
@@ -2746,7 +2746,7 @@ dependencies = [
 
 [[package]]
 name = "rev-stealth-vpn-rotate"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",

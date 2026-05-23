@@ -1,0 +1,740 @@
+[codex-wrapper] INFO: Role: reviewer (--role)
+[codex-wrapper] INFO: Model: gpt-5.5
+[codex-wrapper] INFO: Reasoning Effort: xhigh
+[codex-wrapper] INFO: Web Search: cached
+[codex-wrapper] INFO: Sandbox Mode: workspace-write
+[codex-wrapper] INFO: Approval Policy: never
+[codex-wrapper] INFO: Specialty: none
+status: PASS
+api_fallback_allowed: false
+[codex-wrapper] INFO: Command: exec
+2026-05-22T23:27:04.262407Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
+OpenAI Codex v0.132.0
+--------
+workdir: $REPO_ROOT
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e5203-8a47-7cb3-bd18-a861b27a6f27
+--------
+user
+# Round 2 — Slice B-2 review
+
+## Round 1 findings (addressed)
+
+1. **Trailing blank line at EOF of `.github/workflows/ci.yml`** — removed.
+   `git diff --check -- .github/workflows/ci.yml tests/install_sh_unit.sh` now exits 0.
+
+2. **Ambient `rm` under `set -e`** — hardened in two places:
+   - **Outer shell PATH** is now pinned at top of script to standard system locations,
+     so trap/cleanup never resolves through workspace-injected wrappers:
+     ```sh
+     PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:${PATH}}"
+     export PATH
+     ```
+     (Comment notes the fake PATH used in e2e cases is scoped to the inner `sh -c` invocation only.)
+   - Cleanup `rm -rf` calls now non-fatal: `rm -rf "${path}" 2>/dev/null || :`
+     in both the trap on `WORK_ROOT` and the per-case sandbox cleanup inside `check_target`.
+
+## Diff (round 2 delta)
+
+```
+$ git diff tests/install_sh_unit.sh
+@@ -22,7 +22,15 @@
+ set -eu
+
+ unset CDPATH
++# Pin PATH to standard locations so that `rm`, `mkdir`, `awk`, `grep`, `tar`,
++# `mktemp`, and `sed` resolve to system tools even when this script is run
++# from a workspace that injects its own wrappers earlier on PATH. The fake
++# PATH used by the e2e cases is scoped to the inner `sh -c` invocation only;
++# the outer shell (including trap/cleanup) always uses the path below.
++PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:${PATH}}"
++export PATH
++
+ REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+ INSTALL_SH="${REPO_ROOT}/install.sh"
+@@ -33,7 +41,7 @@
+ TESTS_RUN=0
+ TESTS_FAIL=0
+ WORK_ROOT="$(mktemp -d)"
+-trap 'rm -rf "${WORK_ROOT}"' EXIT INT TERM
++trap 'rm -rf "${WORK_ROOT}" 2>/dev/null || :' EXIT INT TERM
+@@ check_target()
+-    rm -rf "${sandbox}"
++    rm -rf "${sandbox}" 2>/dev/null || :
+```
+
+`.github/workflows/ci.yml` lost only the trailing blank line.
+
+## Re-verification
+
+```
+$ git diff --check -- .github/workflows/ci.yml tests/install_sh_unit.sh
+(rc=0, no whitespace errors)
+
+$ shellcheck -s sh install.sh tests/install_sh_unit.sh
+(rc=0)
+
+$ sh tests/install_sh_unit.sh
+Ran 13 tests, 0 failed.
+
+$ dash tests/install_sh_unit.sh
+Ran 13 tests, 0 failed.
+```
+
+## Out-of-scope reminder
+
+B-3 (Cargo workspace mass rename + topological `publish = true` flips) is the next driver's slice and is deliberately not touched here.
+
+## Sign-off
+
+`LGTM` + 1-line rationale if both round-1 items are satisfied. Otherwise list remaining diffs with file:line.
+
+2026-05-22T23:27:05.122490Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T23:27:05.169058Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))
+2026-05-22T23:27:05.322464Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))
+codex
+Using `staff-code-reviewer` for this review pass, because this is explicitly a Slice B-2 review and the expected output is finding-first or LGTM. I’ll inspect the touched files and rerun the narrow checks before signing off.
+exec
+/bin/bash -lc 'git diff -- tests/install_sh_unit.sh .github/workflows/ci.yml' in $REPO_ROOT
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md 2>/dev/null || sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md 2>/dev/null || sed -n '1,220p' /Users/sasuketorii/.agents/skills/staff-code-reviewer/SKILL.md 2>/dev/null" in $REPO_ROOT
+ exited 1 in 0ms:
+ succeeded in 0ms:
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 196efea7..5a6dbb3e 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -885,3 +885,22 @@ jobs:
+             --exit-code 1 \
+             --no-progress \
+             local/rev-stealth-test:pr
++
++  install-sh-unit:
++    name: install.sh POSIX unit test (shellcheck + behavior)
++    if: github.event_name == 'pull_request'
++    runs-on: ubuntu-22.04
++    timeout-minutes: 10
++    steps:
++      - uses: actions/checkout@v4
++      - name: Install shellcheck
++        run: |
++          set -euo pipefail
++          sudo apt-get update
++          sudo apt-get install -y shellcheck
++          shellcheck --version
++      - name: shellcheck install.sh + tests/install_sh_unit.sh
++        run: shellcheck -s sh install.sh tests/install_sh_unit.sh
++      - name: Run install.sh POSIX unit test
++        # Pure /bin/sh (dash on ubuntu) to catch any latent bashism.
++        run: sh tests/install_sh_unit.sh
+
+exec
+/bin/bash -lc 'tail -n 20 .github/workflows/ci.yml | nl -ba' in $REPO_ROOT
+ succeeded in 0ms:
+     1	            local/rev-stealth-test:pr
+     2	
+     3	  install-sh-unit:
+     4	    name: install.sh POSIX unit test (shellcheck + behavior)
+     5	    if: github.event_name == 'pull_request'
+     6	    runs-on: ubuntu-22.04
+     7	    timeout-minutes: 10
+     8	    steps:
+     9	      - uses: actions/checkout@v4
+    10	      - name: Install shellcheck
+    11	        run: |
+    12	          set -euo pipefail
+    13	          sudo apt-get update
+    14	          sudo apt-get install -y shellcheck
+    15	          shellcheck --version
+    16	      - name: shellcheck install.sh + tests/install_sh_unit.sh
+    17	        run: shellcheck -s sh install.sh tests/install_sh_unit.sh
+    18	      - name: Run install.sh POSIX unit test
+    19	        # Pure /bin/sh (dash on ubuntu) to catch any latent bashism.
+    20	        run: sh tests/install_sh_unit.sh
+
+exec
+/bin/bash -lc "nl -ba tests/install_sh_unit.sh | sed -n '1,180p'" in $REPO_ROOT
+ succeeded in 0ms:
+     1	#!/bin/sh
+     2	# shellcheck shell=sh
+     3	# SPDX-License-Identifier: MIT
+     4	#
+     5	# Lane H Slice B-2 — POSIX unit test for install.sh.
+     6	#
+     7	# Verifies:
+     8	#   1. detect_target() returns the correct triple for every supported
+     9	#      (os, arch) pair, and dies on unsupported combos.
+    10	#   2. End-to-end script behavior under a PATH of fake binaries:
+    11	#      a. sha256 sidecar missing -> warn, install succeeds (with --no-verify).
+    12	#      b. sha256 mismatch -> die.
+    13	#      c. cosign absent + verify on (default) -> die.
+    14	#      d. cosign absent + --no-verify -> install succeeds (with warn).
+    15	#      e. cosign present + valid sig -> install succeeds.
+    16	#
+    17	# Pure POSIX sh; no BATS, no bashisms. Validated by `shellcheck -s sh`.
+    18	#
+    19	# Run:
+    20	#     sh tests/install_sh_unit.sh
+    21	
+    22	set -eu
+    23	
+    24	unset CDPATH
+    25	# Pin PATH to standard locations so that `rm`, `mkdir`, `awk`, `grep`, `tar`,
+    26	# `mktemp`, and `sed` resolve to system tools even when this script is run
+    27	# from a workspace that injects its own wrappers earlier on PATH. The fake
+    28	# PATH used by the e2e cases is scoped to the inner `sh -c` invocation only;
+    29	# the outer shell (including trap/cleanup) always uses the path below.
+    30	PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:${PATH}}"
+    31	export PATH
+    32	
+    33	REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+    34	INSTALL_SH="${REPO_ROOT}/install.sh"
+    35	
+    36	# Discovery sanity --------------------------------------------------------
+    37	[ -f "${INSTALL_SH}" ] || { echo "FAIL: ${INSTALL_SH} not found" >&2; exit 1; }
+    38	
+    39	# Test harness ------------------------------------------------------------
+    40	TESTS_RUN=0
+    41	TESTS_FAIL=0
+    42	WORK_ROOT="$(mktemp -d)"
+    43	trap 'rm -rf "${WORK_ROOT}" 2>/dev/null || :' EXIT INT TERM
+    44	
+    45	pass() { TESTS_RUN=$((TESTS_RUN + 1)); printf '  ok   %s\n' "$1"; }
+    46	fail() {
+    47	    TESTS_RUN=$((TESTS_RUN + 1))
+    48	    TESTS_FAIL=$((TESTS_FAIL + 1))
+    49	    printf '  FAIL %s\n' "$1" >&2
+    50	    if [ -n "${2:-}" ]; then
+    51	        printf '       %s\n' "$2" >&2
+    52	    fi
+    53	}
+    54	
+    55	# ---------- Extract function definitions for unit-level testing ---------
+    56	# install.sh has top-level executable code; we can't `.` it directly.
+    57	# Carve out only the function blocks ("^log()", "^warn()", "^die()",
+    58	# "^need()", "^detect_target()", "^resolve_version()") into a sourceable
+    59	# snippet. The carving uses sed with awk-like ranges over function braces.
+    60	extract_functions() {
+    61	    snippet="${WORK_ROOT}/install_sh_funcs.sh"
+    62	    awk '
+    63	        /^log\(\)/  || /^warn\(\)/ || /^die\(\)/ ||
+    64	        /^need\(\)/ || /^detect_target\(\)/ || /^resolve_version\(\)/ {
+    65	            in_fn = 1
+    66	        }
+    67	        in_fn { print }
+    68	        in_fn && /^\}$/ { in_fn = 0 }
+    69	    ' "${INSTALL_SH}" > "${snippet}"
+    70	    echo "${snippet}"
+    71	}
+    72	
+    73	FUNCS_SNIPPET="$(extract_functions)"
+    74	
+    75	# Sanity: snippet must define detect_target.
+    76	grep -q '^detect_target()' "${FUNCS_SNIPPET}" \
+    77	    || { echo "FAIL: could not extract functions from install.sh" >&2; exit 1; }
+    78	
+    79	# ---------- detect_target() table-driven test ---------------------------
+    80	check_target() {
+    81	    label="$1"
+    82	    fake_os="$2"
+    83	    fake_arch="$3"
+    84	    expected="$4"   # empty => expect die()
+    85	
+    86	    sandbox="${WORK_ROOT}/sandbox-detect-$$-${TESTS_RUN}"
+    87	    mkdir -p "${sandbox}/bin"
+    88	    # Fake uname that honors -s and -m
+    89	    cat > "${sandbox}/bin/uname" <<EOF
+    90	#!/bin/sh
+    91	case "\$1" in
+    92	    -s) printf '%s\n' "${fake_os}"  ;;
+    93	    -m) printf '%s\n' "${fake_arch}" ;;
+    94	    *)  printf '%s\n' "${fake_os}"  ;;
+    95	esac
+    96	EOF
+    97	    chmod +x "${sandbox}/bin/uname"
+    98	
+    99	    # tr / sed must remain available; prepend sandbox.
+   100	    out="$(PATH="${sandbox}/bin:${PATH}" sh -c ". '${FUNCS_SNIPPET}'; detect_target" 2>&1)" \
+   101	        && rc=0 || rc=$?
+   102	
+   103	    if [ -n "${expected}" ]; then
+   104	        if [ "${rc}" -eq 0 ] && [ "${out}" = "${expected}" ]; then
+   105	            pass "detect_target ${label}"
+   106	        else
+   107	            fail "detect_target ${label}" "rc=${rc} out=${out} expected=${expected}"
+   108	        fi
+   109	    else
+   110	        # Expect failure (die).
+   111	        if [ "${rc}" -ne 0 ]; then
+   112	            pass "detect_target ${label} (expected die)"
+   113	        else
+   114	            fail "detect_target ${label}" "expected die, got rc=0 out=${out}"
+   115	        fi
+   116	    fi
+   117	    rm -rf "${sandbox}" 2>/dev/null || :
+   118	}
+   119	
+   120	echo "[1/2] detect_target() matrix"
+   121	check_target "linux-x86_64"    "Linux"   "x86_64"  "x86_64-unknown-linux-musl"
+   122	check_target "linux-aarch64"   "Linux"   "aarch64" "aarch64-unknown-linux-musl"
+   123	check_target "linux-arm64"     "Linux"   "arm64"   "aarch64-unknown-linux-musl"
+   124	check_target "darwin-x86_64"   "Darwin"  "x86_64"  "x86_64-apple-darwin"
+   125	check_target "darwin-arm64"    "Darwin"  "arm64"   "aarch64-apple-darwin"
+   126	check_target "freebsd-amd64"   "FreeBSD" "amd64"   ""
+   127	check_target "linux-i686"      "Linux"   "i686"    ""
+   128	check_target "windows-x86_64"  "MINGW64_NT-10.0" "x86_64" ""
+   129	
+   130	# ---------- End-to-end behavior with fake PATH --------------------------
+   131	# Build a per-case sandbox with:
+   132	#   - fake curl that copies fixture bytes into the requested output path
+   133	#   - fake tar that materializes ${BIN_NAME} at the extraction root
+   134	#   - optional fake cosign that either succeeds or is absent
+   135	#   - PREFIX writable temp dir so no sudo
+   136	#
+   137	# We invoke install.sh with --version vX.Y.Z to short-circuit resolve_version,
+   138	# and with --prefix pointing into the sandbox.
+   139	
+   140	ARCHIVE_FIXTURE_BIN_CONTENT='#!/bin/sh
+   141	echo "rev-stealth fake"
+   142	'
+   143	
+   144	setup_e2e_sandbox() {
+   145	    sb="$1"
+   146	    mkdir -p "${sb}/bin" "${sb}/prefix" "${sb}/fixture"
+   147	
+   148	    # Build a real tar.gz with a fake rev-stealth binary inside the expected dir.
+   149	    fixture_root="${sb}/fixture"
+   150	    inner_dir="${fixture_root}/rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl"
+   151	    mkdir -p "${inner_dir}"
+   152	    printf '%s' "${ARCHIVE_FIXTURE_BIN_CONTENT}" > "${inner_dir}/rev-stealth"
+   153	    chmod +x "${inner_dir}/rev-stealth"
+   154	    ( cd "${fixture_root}" && tar -czf archive.tar.gz "$(basename "${inner_dir}")" )
+   155	    # Pre-compute sha256 for the archive (use shasum if sha256sum missing).
+   156	    if command -v sha256sum >/dev/null 2>&1; then
+   157	        ( cd "${fixture_root}" && sha256sum archive.tar.gz \
+   158	            | sed 's| archive\.tar\.gz| rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz|' \
+   159	            > archive.sha256 )
+   160	    else
+   161	        ( cd "${fixture_root}" && shasum -a 256 archive.tar.gz \
+   162	            | sed 's| archive\.tar\.gz| rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz|' \
+   163	            > archive.sha256 )
+   164	    fi
+   165	
+   166	    # Force the target triple to one we built the fixture for: a fake
+   167	    # uname that always reports linux/x86_64.
+   168	    cat > "${sb}/bin/uname" <<'EOF'
+   169	#!/bin/sh
+   170	case "$1" in
+   171	    -s) echo "Linux"   ;;
+   172	    -m) echo "x86_64"  ;;
+   173	    *)  echo "Linux"   ;;
+   174	esac
+   175	EOF
+   176	    chmod +x "${sb}/bin/uname"
+   177	}
+   178	
+   179	# Mode selector: $1 = mode for fake curl behavior
+   180	#   "ok"           -> serve archive + sha256 sidecar (matching)
+
+codex
+I’ve confirmed the round-2 delta is limited to the PATH pin and non-fatal cleanup changes in the unit script, plus the CI job content already in the branch. I’m checking the full script around the fake PATH/e2e path now so the sign-off isn’t based only on the excerpt.
+exec
+/bin/bash -lc 'ls -l /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer /Users/sasuketorii/.codex/skills/staff-code-reviewer /Users/sasuketorii/.agents/skills/staff-code-reviewer 2>/dev/null' in $REPO_ROOT
+ exited 1 in 0ms:
+exec
+/bin/bash -lc "nl -ba tests/install_sh_unit.sh | sed -n '180,380p'" in $REPO_ROOT
+ succeeded in 0ms:
+   180	#   "ok"           -> serve archive + sha256 sidecar (matching)
+   181	#   "no_sha"       -> serve archive but 404 on sha256
+   182	#   "bad_sha"      -> serve archive + sha256 sidecar with wrong digest
+   183	make_fake_curl() {
+   184	    sb="$1"
+   185	    mode="$2"
+   186	    cat > "${sb}/bin/curl" <<EOF
+   187	#!/bin/sh
+   188	# Fake curl: parses -o <out> and trailing URL, then serves from fixture/.
+   189	set -eu
+   190	out=""
+   191	url=""
+   192	while [ \$# -gt 0 ]; do
+   193	    case "\$1" in
+   194	        -o)        out="\$2"; shift 2 ;;
+   195	        -f|-s|-S|-L|-fsSL) shift ;;
+   196	        --proto|--tlsv1.2) shift ;;
+   197	        --proto=*|--tlsv1.2=*) shift ;;
+   198	        -*)        shift ;;
+   199	        *)         url="\$1"; shift ;;
+   200	    esac
+   201	done
+   202	fx='${sb}/fixture'
+   203	case "\$url" in
+   204	    *.tar.gz)         cp "\$fx/archive.tar.gz" "\$out" ;;
+   205	    *.tar.gz.sha256)
+   206	        case "${mode}" in
+   207	            ok)      cp "\$fx/archive.sha256" "\$out" ;;
+   208	            bad_sha)
+   209	                # Wrong digest, but well-formed.
+   210	                printf '0000000000000000000000000000000000000000000000000000000000000000  rev-stealth-v0.0.0-test-x86_64-unknown-linux-musl.tar.gz\n' > "\$out"
+   211	                ;;
+   212	            no_sha)  exit 22 ;;
+   213	        esac
+   214	        ;;
+   215	    *.sig)            : > "\$out" ;;
+   216	    *-keyless.pem)    : > "\$out" ;;
+   217	    *)                exit 22 ;;
+   218	esac
+   219	EOF
+   220	    chmod +x "${sb}/bin/curl"
+   221	}
+   222	
+   223	make_fake_cosign_ok() {
+   224	    sb="$1"
+   225	    cat > "${sb}/bin/cosign" <<'EOF'
+   226	#!/bin/sh
+   227	# Pretend verify-blob always passes.
+   228	exit 0
+   229	EOF
+   230	    chmod +x "${sb}/bin/cosign"
+   231	}
+   232	
+   233	# Run install.sh inside sandbox; capture rc + combined output.
+   234	run_install() {
+   235	    sb="$1"
+   236	    shift
+   237	    PATH="${sb}/bin:/usr/bin:/bin" \
+   238	        sh "${INSTALL_SH}" \
+   239	            --version v0.0.0-test \
+   240	            --prefix "${sb}/prefix" \
+   241	            "$@" \
+   242	        > "${sb}/out.log" 2>&1
+   243	}
+   244	
+   245	echo "[2/2] end-to-end behavior with fake PATH"
+   246	
+   247	# (a) sha256 sidecar missing -> warn, but install succeeds (with --no-verify).
+   248	SB="${WORK_ROOT}/sb-a"
+   249	setup_e2e_sandbox "${SB}"
+   250	make_fake_curl "${SB}" "no_sha"
+   251	if run_install "${SB}" --no-verify; then
+   252	    if [ -x "${SB}/prefix/rev-stealth" ]; then
+   253	        if grep -q "no sha256 sidecar" "${SB}/out.log"; then
+   254	            pass "sha256 sidecar missing -> warn + install ok"
+   255	        else
+   256	            fail "sha256 sidecar missing" "expected warn line; log=$(cat "${SB}/out.log")"
+   257	        fi
+   258	    else
+   259	        fail "sha256 sidecar missing" "binary not installed; log=$(cat "${SB}/out.log")"
+   260	    fi
+   261	else
+   262	    fail "sha256 sidecar missing" "install exited non-zero; log=$(cat "${SB}/out.log")"
+   263	fi
+   264	
+   265	# (b) sha256 mismatch -> die.
+   266	SB="${WORK_ROOT}/sb-b"
+   267	setup_e2e_sandbox "${SB}"
+   268	make_fake_curl "${SB}" "bad_sha"
+   269	if run_install "${SB}" --no-verify; then
+   270	    fail "sha256 mismatch -> die" "install unexpectedly succeeded; log=$(cat "${SB}/out.log")"
+   271	else
+   272	    if grep -q "sha256 mismatch" "${SB}/out.log"; then
+   273	        pass "sha256 mismatch -> die"
+   274	    else
+   275	        fail "sha256 mismatch -> die" "wrong error; log=$(cat "${SB}/out.log")"
+   276	    fi
+   277	fi
+   278	
+   279	# (c) cosign absent + verify on (default) -> die.
+   280	SB="${WORK_ROOT}/sb-c"
+   281	setup_e2e_sandbox "${SB}"
+   282	make_fake_curl "${SB}" "ok"
+   283	# Intentionally no cosign in sandbox.
+   284	if run_install "${SB}"; then
+   285	    fail "cosign absent default -> die" "install unexpectedly succeeded; log=$(cat "${SB}/out.log")"
+   286	else
+   287	    if grep -q "cosign not installed" "${SB}/out.log"; then
+   288	        pass "cosign absent + default verify -> die"
+   289	    else
+   290	        fail "cosign absent + default verify -> die" "wrong error; log=$(cat "${SB}/out.log")"
+   291	    fi
+   292	fi
+   293	
+   294	# (d) cosign absent + --no-verify -> install ok (with warn).
+   295	SB="${WORK_ROOT}/sb-d"
+   296	setup_e2e_sandbox "${SB}"
+   297	make_fake_curl "${SB}" "ok"
+   298	if run_install "${SB}" --no-verify; then
+   299	    if [ -x "${SB}/prefix/rev-stealth" ] \
+   300	        && grep -q "cosign verification SKIPPED" "${SB}/out.log"; then
+   301	        pass "cosign absent + --no-verify -> install ok"
+   302	    else
+   303	        fail "cosign absent + --no-verify -> install ok" "log=$(cat "${SB}/out.log")"
+   304	    fi
+   305	else
+   306	    fail "cosign absent + --no-verify -> install ok" "install failed; log=$(cat "${SB}/out.log")"
+   307	fi
+   308	
+   309	# (e) cosign present + valid sig -> install ok.
+   310	SB="${WORK_ROOT}/sb-e"
+   311	setup_e2e_sandbox "${SB}"
+   312	make_fake_curl "${SB}" "ok"
+   313	make_fake_cosign_ok "${SB}"
+   314	if run_install "${SB}"; then
+   315	    if [ -x "${SB}/prefix/rev-stealth" ] \
+   316	        && grep -q "cosign verification PASS" "${SB}/out.log"; then
+   317	        pass "cosign present + valid sig -> install ok"
+   318	    else
+   319	        fail "cosign present + valid sig -> install ok" "log=$(cat "${SB}/out.log")"
+   320	    fi
+   321	else
+   322	    fail "cosign present + valid sig -> install ok" "install failed; log=$(cat "${SB}/out.log")"
+   323	fi
+   324	
+   325	# ---------- Report ------------------------------------------------------
+   326	echo ""
+   327	echo "Ran ${TESTS_RUN} tests, ${TESTS_FAIL} failed."
+   328	[ "${TESTS_FAIL}" -eq 0 ] || exit 1
+
+exec
+/bin/bash -lc "nl -ba install.sh | sed -n '1,260p'" in $REPO_ROOT
+ succeeded in 0ms:
+     1	#!/usr/bin/env sh
+     2	# shellcheck shell=sh
+     3	# SPDX-License-Identifier: MIT
+     4	#
+     5	# Lane H.6 — `curl | sh` installer for rev-stealth.
+     6	#
+     7	# Usage:
+     8	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh
+     9	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --version v1.3.0
+    10	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --prefix /opt/rev-stealth/bin
+    11	#   curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh -s -- --no-verify  # skip cosign
+    12	#
+    13	# Security model:
+    14	#   - Downloads the release artifact + its `*.sig` + `*-keyless.pem` from
+    15	#     `https://github.com/sasuketorii/rev_scraping/releases/download/${VERSION}/`.
+    16	#   - Verifies with `cosign verify-blob` using a fixed certificate-identity
+    17	#     (GitHub Actions OIDC issuer pinned to the release workflow).
+    18	#   - Refuses to install if cosign is unavailable AND `--no-verify` was not
+    19	#     explicitly passed (fail-closed default).
+    20	#   - Tries `sha256` checksum as a secondary integrity gate.
+    21	#
+    22	# Strict POSIX sh; no bashisms. Validated under `shellcheck -s sh`.
+    23	
+    24	set -eu
+    25	
+    26	# ---------- defaults -------------------------------------------------------
+    27	REPO_OWNER="sasuketorii"
+    28	REPO_NAME="rev_scraping"
+    29	BIN_NAME="rev-stealth"
+    30	DEFAULT_VERSION="latest"
+    31	DEFAULT_PREFIX="/usr/local/bin"
+    32	
+    33	# Cosign identity pin (matches release.yml workflow file path + ref).
+    34	# `release-please` rewrites the ref pin on each tag.
+    35	COSIGN_IDENTITY="https://github.com/${REPO_OWNER}/${REPO_NAME}/.github/workflows/release.yml@refs/tags/v"
+    36	COSIGN_OIDC_ISSUER="https://token.actions.githubusercontent.com"
+    37	
+    38	VERSION="${REV_STEALTH_VERSION:-${DEFAULT_VERSION}}"
+    39	PREFIX="${REV_STEALTH_PREFIX:-${DEFAULT_PREFIX}}"
+    40	VERIFY="1"
+    41	
+    42	# ---------- arg parse ------------------------------------------------------
+    43	while [ $# -gt 0 ]; do
+    44	    case "$1" in
+    45	        --version)   VERSION="$2"; shift 2 ;;
+    46	        --version=*) VERSION="${1#*=}"; shift ;;
+    47	        --prefix)    PREFIX="$2"; shift 2 ;;
+    48	        --prefix=*)  PREFIX="${1#*=}"; shift ;;
+    49	        --no-verify) VERIFY="0"; shift ;;
+    50	        -h|--help)
+    51	            sed -n '/^# Usage:/,/^# Security model:/p' "$0" | sed 's/^# //; s/^#$//'
+    52	            exit 0
+    53	            ;;
+    54	        *)
+    55	            echo "install.sh: unknown arg: $1" >&2
+    56	            exit 64
+    57	            ;;
+    58	    esac
+    59	done
+    60	
+    61	# ---------- helpers --------------------------------------------------------
+    62	log()  { printf '[install.sh] %s\n' "$*"; }
+    63	warn() { printf '[install.sh] WARN: %s\n' "$*" >&2; }
+    64	die()  { printf '[install.sh] ERROR: %s\n' "$*" >&2; exit 1; }
+    65	
+    66	need() {
+    67	    command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"
+    68	}
+    69	
+    70	detect_target() {
+    71	    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    72	    arch="$(uname -m)"
+    73	    case "${os}-${arch}" in
+    74	        linux-x86_64)   echo "x86_64-unknown-linux-musl" ;;
+    75	        linux-aarch64)  echo "aarch64-unknown-linux-musl" ;;
+    76	        linux-arm64)    echo "aarch64-unknown-linux-musl" ;;
+    77	        darwin-x86_64)  echo "x86_64-apple-darwin" ;;
+    78	        darwin-arm64)   echo "aarch64-apple-darwin" ;;
+    79	        *) die "unsupported platform: ${os}-${arch}" ;;
+    80	    esac
+    81	}
+    82	
+    83	resolve_version() {
+    84	    if [ "${VERSION}" = "latest" ]; then
+    85	        need curl
+    86	        VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest" \
+    87	            | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+    88	            | head -n 1)
+    89	        [ -n "${VERSION}" ] || die "could not resolve latest version"
+    90	    fi
+    91	    echo "${VERSION}"
+    92	}
+    93	
+    94	# ---------- main -----------------------------------------------------------
+    95	need curl
+    96	need uname
+    97	need tar
+    98	
+    99	TARGET="$(detect_target)"
+   100	VERSION="$(resolve_version)"
+   101	log "installing ${BIN_NAME} ${VERSION} for ${TARGET}"
+   102	
+   103	TMPDIR_REAL="$(mktemp -d)"
+   104	trap 'rm -rf "${TMPDIR_REAL}"' EXIT INT TERM
+   105	
+   106	BASE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${VERSION}"
+   107	ARCHIVE="${BIN_NAME}-${VERSION}-${TARGET}.tar.gz"
+   108	
+   109	log "fetching ${BASE_URL}/${ARCHIVE}"
+   110	curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}"     "${BASE_URL}/${ARCHIVE}"
+   111	curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sha256" "${BASE_URL}/${ARCHIVE}.sha256" || warn "no sha256 sidecar"
+   112	
+   113	# sha256 check (best-effort, soft-fail if sidecar absent).
+   114	if [ -s "${TMPDIR_REAL}/${ARCHIVE}.sha256" ]; then
+   115	    if command -v sha256sum >/dev/null 2>&1; then
+   116	        ( cd "${TMPDIR_REAL}" && sha256sum -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+   117	    elif command -v shasum >/dev/null 2>&1; then
+   118	        ( cd "${TMPDIR_REAL}" && shasum -a 256 -c "${ARCHIVE}.sha256" ) || die "sha256 mismatch"
+   119	    else
+   120	        warn "no sha256sum / shasum available; skipping checksum gate"
+   121	    fi
+   122	    log "sha256 OK"
+   123	fi
+   124	
+   125	# Cosign verification (fail-closed unless --no-verify).
+   126	if [ "${VERIFY}" = "1" ]; then
+   127	    if command -v cosign >/dev/null 2>&1; then
+   128	        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.sig" "${BASE_URL}/${ARCHIVE}.sig"
+   129	        curl -fsSL --proto '=https' --tlsv1.2 -o "${TMPDIR_REAL}/${ARCHIVE}.cert" "${BASE_URL}/${ARCHIVE}-keyless.pem"
+   130	        # Pin to the *exact* tag in the identity to prevent workflow-rename
+   131	        # spoofing. Tag format is `v<semver>`.
+   132	        cosign verify-blob \
+   133	            --certificate-identity "${COSIGN_IDENTITY}${VERSION#v}" \
+   134	            --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" \
+   135	            --signature "${TMPDIR_REAL}/${ARCHIVE}.sig" \
+   136	            --certificate "${TMPDIR_REAL}/${ARCHIVE}.cert" \
+   137	            "${TMPDIR_REAL}/${ARCHIVE}" \
+   138	            || die "cosign verify-blob FAILED — refusing to install"
+   139	        log "cosign verification PASS"
+   140	    else
+   141	        die "cosign not installed; install cosign (https://docs.sigstore.dev/cosign/installation/) or rerun with --no-verify"
+   142	    fi
+   143	else
+   144	    warn "cosign verification SKIPPED (--no-verify). Not recommended."
+   145	fi
+   146	
+   147	# Extract + install. The release tarball is laid out as
+   148	#   rev-stealth-${VERSION}-${TARGET}/{rev-stealth,stealth-mcp,rev-auth,README,LICENSE}
+   149	# so we resolve the binary by find (handles dirname variations).
+   150	tar -xzf "${TMPDIR_REAL}/${ARCHIVE}" -C "${TMPDIR_REAL}"
+   151	EXTRACTED_BIN="$(find "${TMPDIR_REAL}" -type f -name "${BIN_NAME}" -perm -u+x -print -quit)"
+   152	[ -n "${EXTRACTED_BIN}" ] && [ -x "${EXTRACTED_BIN}" ] \
+   153	    || die "archive missing expected binary: ${BIN_NAME}"
+   154	
+   155	if [ -w "${PREFIX}" ]; then
+   156	    install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+   157	else
+   158	    log "PREFIX ${PREFIX} not writable; using sudo"
+   159	    need sudo
+   160	    sudo install -m 0755 "${EXTRACTED_BIN}" "${PREFIX}/${BIN_NAME}"
+   161	fi
+   162	
+   163	log "installed ${PREFIX}/${BIN_NAME}"
+   164	log "next steps: ${BIN_NAME} --help"
+
+exec
+/bin/bash -lc 'git diff --check -- .github/workflows/ci.yml tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 0ms:
+exec
+/bin/bash -lc "rg --files /Users/sasuketorii/.codex /Users/sasuketorii/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
+ exited 1 in 0ms:
+exec
+/bin/bash -lc 'shellcheck -s sh install.sh tests/install_sh_unit.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'dash tests/install_sh_unit.sh' in $REPO_ROOT
+exec
+/bin/bash -lc 'sh tests/install_sh_unit.sh' in $REPO_ROOT
+ succeeded in 101ms:
+ succeeded in 8317ms:
+  ok   detect_target linux-x86_64
+  ok   detect_target linux-aarch64
+  ok   detect_target linux-arm64
+  ok   detect_target darwin-x86_64
+  ok   detect_target darwin-arm64
+  ok   detect_target freebsd-amd64 (expected die)
+  ok   detect_target linux-i686 (expected die)
+  ok   detect_target windows-x86_64 (expected die)
+[2/2] end-to-end behavior with fake PATH
+  ok   sha256 sidecar missing -> warn + install ok
+  ok   sha256 mismatch -> die
+  ok   cosign absent + default verify -> die
+  ok   cosign absent + --no-verify -> install ok
+  ok   cosign present + valid sig -> install ok
+
+Ran 13 tests, 0 failed.
+
+ succeeded in 8589ms:
+  ok   detect_target linux-x86_64
+  ok   detect_target linux-aarch64
+  ok   detect_target linux-arm64
+  ok   detect_target darwin-x86_64
+  ok   detect_target darwin-arm64
+  ok   detect_target freebsd-amd64 (expected die)
+  ok   detect_target linux-i686 (expected die)
+  ok   detect_target windows-x86_64 (expected die)
+[2/2] end-to-end behavior with fake PATH
+  ok   sha256 sidecar missing -> warn + install ok
+  ok   sha256 mismatch -> die
+  ok   cosign absent + default verify -> die
+  ok   cosign absent + --no-verify -> install ok
+  ok   cosign present + valid sig -> install ok
+
+Ran 13 tests, 0 failed.
+
+exec
+/bin/bash -lc 'tail -c 1 .github/workflows/ci.yml | od -An -t x1' in $REPO_ROOT
+ succeeded in 0ms:
+           0a                                                            
+
+
+exec
+/bin/bash -lc 'git status --short -- .github/workflows/ci.yml tests/install_sh_unit.sh install.sh' in $REPO_ROOT
+ succeeded in 0ms:
+ M .github/workflows/ci.yml
+?? tests/install_sh_unit.sh
+
+codex
+The listed `staff-code-reviewer` skill path wasn’t readable in this workspace, so I continued with the same finding-first review stance manually. The narrow verification commands all passed, including `git diff --check`, `shellcheck`, `sh`, and `dash`. 
+
+codex
+LGTM — both round-1 items are satisfied: whitespace check is clean, and `tests/install_sh_unit.sh` now pins outer `PATH` plus makes cleanup `rm -rf` non-fatal while keeping fake PATH scoped to inner e2e runs.
+
+Verified locally: `git diff --check`, `shellcheck -s sh`, `sh tests/install_sh_unit.sh`, and `dash tests/install_sh_unit.sh` all pass.
+tokens used
+17,716
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"f3c4d0e0-a5da-4f58-a939-3f358df811ed","timestamp":"2026-05-22T23:27:03Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":0,"duration_ms":84309,"tokens_in":17716,"tokens_out":0,"total_tokens":17716,"dry_run":false,"specialty_status":"none"}
