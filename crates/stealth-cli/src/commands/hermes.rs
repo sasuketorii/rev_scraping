@@ -539,18 +539,35 @@ fn emit_ok(format: OutputFormat, action: &str, report: &HermesReport) -> i32 {
 }
 
 fn emit_err(format: OutputFormat, action: &str, err: &HermesError) -> i32 {
+    // v1.3 Lane G.7: hermes carries its own (kind/action/status/error) shape
+    // for backward compat with v1.2.x consumers. To converge on the
+    // canonical {message, hint?, retry_after_ms?, doc_url} surface,
+    // augment the payload in place. NOTE: hermes' existing `kind: "hermes"`
+    // field is a *category* tag (not an `ErrorKind` variant) — we therefore
+    // namespace the G.7 wire kind under `error_kind` here so we don't clobber
+    // the existing field. The new test asserts on `error_kind` for this
+    // surface and on `kind` for every other CLI surface.
+    let message = err.to_string();
+    let g7_kind = crate::commands::error_envelope::classify_legacy_message(&message);
+    let doc_url = g7_kind.doc_url();
     match format {
         OutputFormat::Json => {
             let payload = json!({
                 "kind": "hermes",
                 "action": action,
                 "status": "error",
-                "error": err.to_string(),
+                "error": message,
+                "error_kind": g7_kind.wire_name(),
+                "message": message,
+                "hint": serde_json::Value::Null,
+                "retry_after_ms": serde_json::Value::Null,
+                "doc_url": doc_url,
             });
             eprintln!("{}", payload);
         }
         OutputFormat::Human => {
             eprintln!("hermes {} failed: {}", action, err);
+            eprintln!("  see: {doc_url}");
         }
     }
     1

@@ -343,6 +343,19 @@ ENV:\n  \
 Used by scripts/gen_completions.sh and the completion-drift CI gate."
     )]
     Completions(CompletionsArgs),
+    /// v1.3 (G.8): generate roff(7) man(1) pages for `rev-stealth` and every
+    /// public subcommand into the requested output directory. Hidden from
+    /// `--help` because it is a build-time tool driven by
+    /// `scripts/gen_manpages.sh` and gated by the `manpage-drift` CI job, not
+    /// a user-facing operation. One file per command:
+    /// `<out>/rev-stealth.1`, `<out>/rev-stealth-spider.1`, etc.
+    #[command(
+        hide = true,
+        long_about = "Generate roff man pages for `rev-stealth` and every public \
+subcommand into <output-dir>. Used by scripts/gen_manpages.sh and the manpage-drift \
+CI gate."
+    )]
+    Manpages(ManpagesArgs),
 }
 
 #[derive(clap::Args, Debug)]

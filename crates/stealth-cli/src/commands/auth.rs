@@ -787,22 +787,15 @@ fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
 }
 
 fn emit_err(format: OutputFormat, op: &str, exit: i32, msg: &str) {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({
-                    "ok": false,
-                    "operation": op,
-                    "exit_code": exit,
-                    "error": msg,
-                })
-            );
-        }
-        OutputFormat::Human => {
-            eprintln!("[ERROR] {op}: {msg}");
-        }
-    }
+    // v1.3 Lane G.7: route every auth failure through the canonical
+    // `{kind, message, hint?, retry_after_ms?, doc_url}` envelope. The
+    // kind is classified heuristically here so legacy `emit_err`
+    // callers (which only pass a free-form `msg`) still produce the
+    // unified shape without a per-callsite migration.
+    let kind = crate::commands::error_envelope::classify_legacy_message(msg);
+    let _ = crate::commands::error_envelope::emit_err_envelope(
+        format, op, exit, kind, msg, None, None,
+    );
 }
 
 trait Confirm {

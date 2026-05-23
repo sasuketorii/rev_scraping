@@ -591,10 +591,37 @@ fn print_deep_text(d: &DeepReport) {
 
 fn emit_report(report: &DoctorReport, format: DoctorFormat) -> Result<(), ExitCode> {
     match format {
-        DoctorFormat::Json => match serde_json::to_string_pretty(report) {
-            Ok(s) => {
-                println!("{s}");
-                Ok(())
+        DoctorFormat::Json => match serde_json::to_value(report) {
+            Ok(mut value) => {
+                // v1.3 Lane G.7: when doctor detects a leak (non-zero
+                // exit ahead), augment the report JSON with the canonical
+                // `{kind, message, hint?, retry_after_ms?, doc_url}` so
+                // callers branching on doctor's exit get the same wire
+                // contract as every other failure surface.
+                if !report.all_pass() {
+                    let msg = if report.errors.is_empty() {
+                        "doctor: leak/integrity check failed".to_string()
+                    } else {
+                        format!("doctor: {}", report.errors.join("; "))
+                    };
+                    crate::commands::error_envelope::augment_with_g7_fields(
+                        &mut value,
+                        crate::commands::error_envelope::CliErrorKind::VpnLeak,
+                        Some(&msg),
+                        Some("Run `rev-stealth doctor` again after bringing the VPN/kill-switch up."),
+                        None,
+                    );
+                }
+                match serde_json::to_string_pretty(&value) {
+                    Ok(s) => {
+                        println!("{s}");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("[ERROR] doctor: serialise report: {e}");
+                        Err(ExitCode::PermanentError)
+                    }
+                }
             }
             Err(e) => {
                 eprintln!("[ERROR] doctor: serialise report: {e}");

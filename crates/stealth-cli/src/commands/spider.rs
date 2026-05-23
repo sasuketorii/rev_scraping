@@ -1608,13 +1608,21 @@ async fn emit_leak_exit(
     poll_secs: Option<u64>,
 ) {
     let monitor_json = vpn_monitor_json(state, poll_secs).await;
-    let payload = json!({
+    let mut payload = json!({
         "ok": false,
         "operation": op,
         "exit_code": 7,
         "error": format!("vpn leak detected: {reason}"),
         "vpn_monitor": monitor_json,
     });
+    // v1.3 Lane G.7: augment with `{kind, message, hint?, retry_after_ms?, doc_url}`.
+    crate::commands::error_envelope::augment_with_g7_fields(
+        &mut payload,
+        crate::commands::error_envelope::CliErrorKind::VpnLeak,
+        None,
+        Some("Bring VPN up and re-run doctor; rotate via vpn_rotate."),
+        None,
+    );
     match format {
         OutputFormat::Json => println!("{payload}"),
         OutputFormat::Human => {
@@ -1627,23 +1635,11 @@ async fn emit_leak_exit(
 }
 
 fn emit_err(format: OutputFormat, op: &str, exit: i32, msg: &str) {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({
-                    "ok": false,
-                    "operation": op,
-                    "exit_code": exit,
-                    "error": msg,
-                })
-            );
-        }
-        OutputFormat::Human => {
-            eprintln!("[ERROR] {op}: {msg}");
-        }
-    }
-    let _ = exit;
+    // v1.3 Lane G.7: canonical error envelope (see commands/error_envelope.rs).
+    let kind = crate::commands::error_envelope::classify_legacy_message(msg);
+    let _ = crate::commands::error_envelope::emit_err_envelope(
+        format, op, exit, kind, msg, None, None,
+    );
 }
 
 #[cfg(test)]

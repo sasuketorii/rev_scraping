@@ -21,6 +21,10 @@ pub mod output_format;
 pub mod dry_run;
 // v1.3 (G.6): idempotent commit replay store for mutate subcommands.
 pub mod idempotency;
+// v1.3 (G.7): unified `{kind, message, hint?, retry_after_ms?, doc_url}` error
+// envelope shared by every CLI failure path (stdout/stderr, JSON/human,
+// in-process/spawned subprocess). See `error_envelope.rs`.
+pub mod error_envelope;
 pub mod recipe_runtime;
 pub mod relocate;
 pub mod spider;

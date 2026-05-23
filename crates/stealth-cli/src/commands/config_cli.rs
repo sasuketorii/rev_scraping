@@ -615,7 +615,27 @@ fn repo_templates_policy() -> PathBuf {
 
 /// Async entrypoint so it slots into the existing `main.rs` dispatch (other
 /// subcommands are async). The body is fully synchronous.
-pub async fn run(_global: GlobalFormat, args: ConfigArgs) -> i32 {
+pub async fn run(global: GlobalFormat, mut args: ConfigArgs) -> i32 {
+    // v1.3 Lane G.7 round-3: propagate the global `--format json` flag
+    // into the config subtree when the user did NOT explicitly pass the
+    // local `--output-format`. The default-equals-text check alone
+    // cannot distinguish "user typed --output-format text" from "user
+    // passed nothing", so the round-2 form violated the documented
+    // precedence rule (local wins over global). Resolve by peeking the
+    // process argv for an explicit `--output-format` flag in any of its
+    // accepted shapes (split `--output-format text`, combined
+    // `--output-format=text`). When absent, promote default text → json
+    // under a JSON-global session. When present, the explicit local
+    // value wins.
+    let local_set_explicitly = std::env::args().any(|a| {
+        a == "--output-format" || a.starts_with("--output-format=")
+    });
+    if matches!(global, GlobalFormat::Json)
+        && matches!(args.format, ConfigFormat::Text)
+        && !local_set_explicitly
+    {
+        args.format = ConfigFormat::Json;
+    }
     let locs = ConfigLocations::resolve();
     match args.action {
         ConfigAction::Show => run_show(&locs, args.format),
@@ -886,29 +906,70 @@ fn run_validate(locs: &ConfigLocations, format: ConfigFormat) -> i32 {
             println!("OK   (no live config files present)");
         }
     } else {
-        let payload = json!({
-            "ok": !any_err,
-            "reports": all_reports
-                .iter()
-                .map(|(p, r)| {
-                    json!({
-                        "path": p,
-                        "ok": r.is_ok(),
-                        "errors": r.errors.iter().map(|i| json!({
-                            "path": i.path,
-                            "code": format!("{:?}", i.code),
-                            "message": i.message,
-                            "hint": i.hint,
-                        })).collect::<Vec<_>>(),
-                    })
+        let reports_json = all_reports
+            .iter()
+            .map(|(p, r)| {
+                json!({
+                    "path": p,
+                    "ok": r.is_ok(),
+                    "errors": r.errors.iter().map(|i| json!({
+                        "path": i.path,
+                        "code": format!("{:?}", i.code),
+                        "message": i.message,
+                        "hint": i.hint,
+                    })).collect::<Vec<_>>(),
                 })
-                .collect::<Vec<_>>(),
-            "read_errors": read_errors
-                .iter()
-                .map(|(p, e)| json!({ "path": p, "error": e }))
-                .collect::<Vec<_>>(),
-        });
-        emit(&payload, format);
+            })
+            .collect::<Vec<_>>();
+        let read_errors_json = read_errors
+            .iter()
+            .map(|(p, e)| json!({ "path": p, "error": e }))
+            .collect::<Vec<_>>();
+        if any_err {
+            // v1.3 Lane G.7 round-6: structurally honest failure envelope.
+            // Build the canonical G.7 envelope and retain the diagnostic
+            // payload (reports / read_errors) so operators parsing JSON
+            // still see the per-file validation detail. The central
+            // `emit()` auto-augmentation only fires when `kind` is absent,
+            // so we attach it here explicitly and skip the heuristic.
+            let fail_count = all_reports.iter().filter(|(_, r)| !r.is_ok()).count();
+            let summary = if !read_errors.is_empty() && fail_count == 0 {
+                format!(
+                    "config validate failed: {} file(s) unreadable",
+                    read_errors.len()
+                )
+            } else if read_errors.is_empty() {
+                format!("config validate failed: {fail_count} file(s) with schema errors")
+            } else {
+                format!(
+                    "config validate failed: {fail_count} schema error file(s), {} unreadable",
+                    read_errors.len()
+                )
+            };
+            let mut payload = json!({
+                "ok": false,
+                "operation": "config.validate",
+                "exit_code": 1,
+                "error": summary,
+                "reports": reports_json,
+                "read_errors": read_errors_json,
+            });
+            crate::commands::error_envelope::augment_with_g7_fields(
+                &mut payload,
+                crate::commands::error_envelope::CliErrorKind::Validation,
+                None,
+                Some("Run `rev-stealth config validate --format json` for full diagnostic; see `reports` and `read_errors` for per-file detail"),
+                None,
+            );
+            emit(&payload, format);
+        } else {
+            let payload = json!({
+                "ok": true,
+                "reports": reports_json,
+                "read_errors": read_errors_json,
+            });
+            emit(&payload, format);
+        }
     }
     if any_err {
         1
@@ -1005,10 +1066,23 @@ fn run_get(locs: &ConfigLocations, key: &str, format: ConfigFormat) -> i32 {
             if format == ConfigFormat::Text {
                 eprintln!("key not found: {key}");
             } else {
-                emit(
-                    &json!({ "key": key, "value": null, "error": "not_found" }),
-                    format,
+                // v1.3 Lane G.7: augment with the canonical
+                // `{kind, message, hint?, retry_after_ms?, doc_url}` fields
+                // alongside the legacy `error` string so callers can branch
+                // on the closed `not_found` taxonomy variant.
+                let mut payload = json!({
+                    "key": key,
+                    "value": null,
+                    "error": "not_found",
+                });
+                crate::commands::error_envelope::augment_with_g7_fields(
+                    &mut payload,
+                    crate::commands::error_envelope::CliErrorKind::NotFound,
+                    Some(&format!("key not found: {key}")),
+                    Some("Run `rev-stealth config show` to list available keys."),
+                    None,
                 );
+                emit(&payload, format);
             }
             1
         }
@@ -1045,17 +1119,61 @@ fn redact_if_secret(key: &str, value: &JsonValue) -> JsonValue {
 // ---------- emit -----------------------------------------------------------
 
 fn emit(value: &JsonValue, format: ConfigFormat) {
+    // v1.3 Lane G.7 round-4: auto-augment any object payload that looks
+    // like an error envelope (carries an `error` string field and does
+    // not yet have `kind`/`doc_url`) with the canonical 5 G.7 fields.
+    // This centralises the contract across every `config` failure sink
+    // so future emit sites don't have to remember to call
+    // `augment_with_g7_fields` individually.
+    //
+    // We do NOT augment when:
+    //   * format is not a structured shape (Text);
+    //   * payload is not a JSON object;
+    //   * payload already carries `kind` (caller opted into a specific
+    //     classification, e.g. `emit_set_error`);
+    //   * payload has no `error` string (e.g. `show`/`get` success).
+    let augmented_owned;
+    let value_to_emit: &JsonValue =
+        if matches!(format, ConfigFormat::Json | ConfigFormat::Yaml) {
+            if let Some(obj) = value.as_object() {
+                let needs_augment = obj.contains_key("error")
+                    && !obj.contains_key("kind")
+                    && !obj.contains_key("doc_url");
+                if needs_augment {
+                    let mut clone = value.clone();
+                    // Best-effort: derive `message` from `error`; classify
+                    // via the shared heuristic. Caller-supplied `message`
+                    // is preserved if already present.
+                    let err_text = obj
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let kind = crate::commands::error_envelope::classify_legacy_message(err_text);
+                    crate::commands::error_envelope::augment_with_g7_fields(
+                        &mut clone, kind, None, None, None,
+                    );
+                    augmented_owned = clone;
+                    &augmented_owned
+                } else {
+                    value
+                }
+            } else {
+                value
+            }
+        } else {
+            value
+        };
     match format {
         ConfigFormat::Json => {
             println!(
                 "{}",
-                serde_json::to_string_pretty(value).unwrap_or_default()
+                serde_json::to_string_pretty(value_to_emit).unwrap_or_default()
             );
         }
         ConfigFormat::Yaml => {
             println!(
                 "{}",
-                serde_yaml::to_string(value).unwrap_or_else(|e| format!("# yaml-error: {e}"))
+                serde_yaml::to_string(value_to_emit).unwrap_or_else(|e| format!("# yaml-error: {e}"))
             );
         }
         ConfigFormat::Text => {
@@ -1064,7 +1182,7 @@ fn emit(value: &JsonValue, format: ConfigFormat) {
             // `diff` already handle text mode themselves.
             println!(
                 "{}",
-                serde_json::to_string_pretty(value).unwrap_or_default()
+                serde_json::to_string_pretty(value_to_emit).unwrap_or_default()
             );
         }
     }
@@ -1617,10 +1735,13 @@ fn emit_set_error(format: ConfigFormat, key: &str, message: &str) {
     if format == ConfigFormat::Text {
         eprintln!("FAIL set {key}: {message}");
     } else {
-        emit(
-            &json!({ "ok": false, "key": key, "error": message }),
-            format,
+        // v1.3 Lane G.7: augment with canonical envelope fields.
+        let mut payload = json!({ "ok": false, "key": key, "error": message });
+        let kind = crate::commands::error_envelope::classify_legacy_message(message);
+        crate::commands::error_envelope::augment_with_g7_fields(
+            &mut payload, kind, None, None, None,
         );
+        emit(&payload, format);
     }
 }
 
@@ -1867,7 +1988,13 @@ fn emit_edit_error(format: ConfigFormat, message: &str) {
     if format == ConfigFormat::Text {
         eprintln!("FAIL edit: {message}");
     } else {
-        emit(&json!({ "ok": false, "error": message }), format);
+        // v1.3 Lane G.7: augment with canonical envelope fields.
+        let mut payload = json!({ "ok": false, "error": message });
+        let kind = crate::commands::error_envelope::classify_legacy_message(message);
+        crate::commands::error_envelope::augment_with_g7_fields(
+            &mut payload, kind, None, None, None,
+        );
+        emit(&payload, format);
     }
 }
 
@@ -2075,6 +2202,29 @@ fn run_migrate(locs: &ConfigLocations, args: MigrateArgs, format: ConfigFormat) 
                     .unwrap_or_default(),
             );
         }
+    } else if any_error {
+        // v1.3 Lane G.7 round-6: structurally honest failure envelope.
+        // Build the canonical G.7 envelope and retain the `outcomes`
+        // diagnostic payload so operators can still parse per-target
+        // migration state. The central `emit()` auto-augmentation only
+        // fires when `kind` is absent, so we attach it here explicitly.
+        let error_count = outcomes.iter().filter(|o| o.action == "error").count();
+        let summary = format!("config migrate failed: {error_count} target(s) errored");
+        let mut payload = json!({
+            "ok": false,
+            "operation": "config.migrate",
+            "exit_code": 1,
+            "error": summary,
+            "outcomes": outcomes,
+        });
+        crate::commands::error_envelope::augment_with_g7_fields(
+            &mut payload,
+            crate::commands::error_envelope::CliErrorKind::Validation,
+            None,
+            Some("Run `rev-stealth config migrate --format json` to inspect per-target outcomes; see `outcomes[].note` for the cause"),
+            None,
+        );
+        emit(&payload, format);
     } else {
         emit(&json!({ "outcomes": outcomes }), format);
     }

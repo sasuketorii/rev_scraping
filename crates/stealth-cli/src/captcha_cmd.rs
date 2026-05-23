@@ -220,21 +220,16 @@ fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
 }
 
 fn emit_error(format: OutputFormat, exit: ExitCode, op: &str, message: &str) -> ExitCode {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({
-                    "ok": false,
-                    "operation": op,
-                    "exit_code": exit.as_i32(),
-                    "error": message,
-                })
-            );
-        }
-        OutputFormat::Human => {
-            eprintln!("[ERROR] {op}: {message}");
-        }
-    }
+    // v1.3 Lane G.7: canonical error envelope (see commands/error_envelope.rs).
+    let kind = crate::commands::error_envelope::classify_legacy_message(message);
+    let _ = crate::commands::error_envelope::emit_err_envelope(
+        format,
+        op,
+        exit.as_i32(),
+        kind,
+        message,
+        None,
+        None,
+    );
     exit
 }
