@@ -102,7 +102,41 @@ pub(crate) async fn run(format: OutputFormat, action: VpnAction) -> ExitCode {
                 );
                 return ExitCode::Ok;
             }
-            rotate(format, &provider, &strategy, region.as_deref(), &reason).await
+            // v1.3 Lane G.6: idempotent commit. If the caller passed
+            // `--idempotency-key` and we have a cached envelope for the same
+            // (op, key, payload), short-circuit before the side effect.
+            let key = dry_run_args.idempotency_key.clone();
+            let payload = crate::commands::idempotency::payload_value(
+                "vpn.rotate",
+                [
+                    ("provider", json!(provider.clone())),
+                    ("strategy", json!(strategy.clone())),
+                    ("region", json!(region.clone())),
+                    ("reason", json!(reason.clone())),
+                ],
+            );
+            let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
+            if let Some((_h, env)) =
+                crate::commands::idempotency::maybe_replay(&store, "vpn.rotate", key.as_deref(), &payload)
+            {
+                let _ = crate::commands::idempotency::emit_replay(format, "vpn.rotate", &env);
+                return ExitCode::Ok;
+            }
+            let (exit, success_result) =
+                rotate(format, &provider, &strategy, region.as_deref(), &reason).await;
+            if matches!(exit, ExitCode::Ok) {
+                if let Some(result) = success_result {
+                    let envelope = json!({
+                        "ok": true,
+                        "operation": "vpn.rotate",
+                        "result": result,
+                    });
+                    crate::commands::idempotency::record_success(
+                        &store, "vpn.rotate", key.as_deref(), &payload, &envelope,
+                    );
+                }
+            }
+            exit
         }
         VpnAction::Status { provider } => status(format, &provider).await,
     }
@@ -114,16 +148,17 @@ async fn rotate(
     strategy: &str,
     region: Option<&str>,
     reason: &str,
-) -> ExitCode {
+) -> (ExitCode, Option<serde_json::Value>) {
     let strat = match vpn_rotate::RotationStrategy::from_slug(strategy) {
         Some(s) => s,
         None => {
-            return emit_error(
+            let exit = emit_error(
                 format,
                 ExitCode::UserError,
                 "vpn.rotate",
                 &format!("unknown strategy {strategy:?}; valid: lazy-on-fail, every-n, interval"),
             );
+            return (exit, None);
         }
     };
     let req = vpn_rotate::RotationRequest {
@@ -134,21 +169,21 @@ async fn rotate(
     };
     match vpn_rotate::rotate(req).await {
         Ok(report) => {
-            emit_ok(
-                format,
-                "vpn.rotate",
-                json!({
-                    "rotated": report.rotated,
-                    "container": report.container,
-                    "previous_ip": report.previous_ip,
-                    "new_ip": report.new_ip,
-                    "elapsed_ms": report.elapsed_ms,
-                    "reason": reason,
-                }),
-            );
-            ExitCode::Ok
+            let result = json!({
+                "rotated": report.rotated,
+                "container": report.container,
+                "previous_ip": report.previous_ip,
+                "new_ip": report.new_ip,
+                "elapsed_ms": report.elapsed_ms,
+                "reason": reason,
+            });
+            emit_ok(format, "vpn.rotate", result.clone());
+            (ExitCode::Ok, Some(result))
         }
-        Err(e) => emit_error(format, e.exit_code(), "vpn.rotate", &format!("{e}")),
+        Err(e) => (
+            emit_error(format, e.exit_code(), "vpn.rotate", &format!("{e}")),
+            None,
+        ),
     }
 }
 

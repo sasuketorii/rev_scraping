@@ -19,6 +19,8 @@ pub mod measure;
 pub mod output_format;
 // v1.3 (G.5): shared `--dry-run` / `--explain` / `--idempotency-key` for mutate subcommands.
 pub mod dry_run;
+// v1.3 (G.6): idempotent commit replay store for mutate subcommands.
+pub mod idempotency;
 pub mod recipe_runtime;
 pub mod relocate;
 pub mod spider;

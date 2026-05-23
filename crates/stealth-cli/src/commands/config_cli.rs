@@ -1139,6 +1139,24 @@ fn run_init(locs: &ConfigLocations, args: InitArgs, format: ConfigFormat) -> i32
             &args.dry_run_args,
         );
     }
+    // v1.3 Lane G.6: idempotent commit hook.
+    let key = args.dry_run_args.idempotency_key.clone();
+    let payload = crate::commands::idempotency::payload_value(
+        "config.init",
+        [
+            ("target", json!(format!("{:?}", args.target))),
+            ("force", json!(args.force)),
+        ],
+    );
+    let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+        dry_run_format_bridge(format),
+        "config.init",
+        key,
+        payload,
+    );
+    if let Some(code) = replay_exit {
+        return code;
+    }
     let mut outcomes: Vec<InitOutcome> = Vec::new();
     let want_policy = matches!(args.target, InitTarget::All | InitTarget::Policy);
     let want_authorized = matches!(args.target, InitTarget::All | InitTarget::Authorized);
@@ -1188,6 +1206,12 @@ fn run_init(locs: &ConfigLocations, args: InitArgs, format: ConfigFormat) -> i32
     if any_error {
         3
     } else {
+        let envelope = json!({
+            "ok": true,
+            "operation": "config.init",
+            "result": { "outcomes": outcomes },
+        });
+        idem.record("config.init", &envelope);
         0
     }
 }
@@ -1449,6 +1473,24 @@ fn run_set(locs: &ConfigLocations, args: SetArgs, format: ConfigFormat) -> i32 {
             &args.dry_run_args,
         );
     }
+    let key_id = args.dry_run_args.idempotency_key.clone();
+    let idem_payload = crate::commands::idempotency::payload_value(
+        "config.set",
+        [
+            ("target", json!(format!("{:?}", args.target))),
+            ("key", json!(args.key.clone())),
+            ("value_sha", json!(crate::commands::idempotency::IdempotencyStore::hash16(&args.value))),
+        ],
+    );
+    let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+        dry_run_format_bridge(format),
+        "config.set",
+        key_id,
+        idem_payload,
+    );
+    if let Some(code) = replay_exit {
+        return code;
+    }
     let path = target_path(locs, args.target);
     // Reviewer round-2 finding: a read error on an existing file MUST
     // fail closed. Silently coercing to "" would let `set` overwrite the
@@ -1553,6 +1595,15 @@ fn run_set(locs: &ConfigLocations, args: SetArgs, format: ConfigFormat) -> i32 {
                     format,
                 );
             }
+            let envelope = json!({
+                "ok": true,
+                "operation": "config.set",
+                "result": {
+                    "key": args.key,
+                    "path": path.display().to_string(),
+                },
+            });
+            idem.record("config.set", &envelope);
             0
         }
         Err(e) => {
@@ -1589,6 +1640,14 @@ fn run_edit(locs: &ConfigLocations, args: EditArgs, format: ConfigFormat) -> i32
             &args.dry_run_args,
         );
     }
+    // v1.3 Lane G.6: `config.edit` deliberately does NOT participate in the
+    // idempotent replay store. The mutation is driven by interactive editor
+    // input which is not knowable from the CLI args alone — keying replay
+    // on `(target,)` would let a same-key second invocation skip a
+    // genuinely-different edit. `--idempotency-key` remains accepted on the
+    // surface for shape consistency across mutate commands but is a no-op
+    // here; callers needing at-most-once edit semantics should instead pin
+    // the candidate via `config set` (whose payload includes the value).
     let path = target_path(locs, args.target);
     // Reviewer round-2 finding: read failures (permission, invalid UTF-8,
     // etc.) on an existing file MUST fail closed, not coerce to "" which
@@ -1776,6 +1835,8 @@ fn run_edit(locs: &ConfigLocations, args: EditArgs, format: ConfigFormat) -> i32
                     format,
                 );
             }
+            // v1.3 Lane G.6: see top-of-fn note — `config.edit` is
+            // intentionally NOT registered in the idempotency store.
             0
         }
         Err(e) => {
@@ -1904,6 +1965,20 @@ fn run_migrate(locs: &ConfigLocations, args: MigrateArgs, format: ConfigFormat) 
             &args.dry_run_args,
         );
     }
+    let key_id = args.dry_run_args.idempotency_key.clone();
+    let idem_payload = crate::commands::idempotency::payload_value(
+        "config.migrate",
+        [("dry_run_inner", json!(args.dry_run()))],
+    );
+    let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+        dry_run_format_bridge(format),
+        "config.migrate",
+        key_id,
+        idem_payload,
+    );
+    if let Some(code) = replay_exit {
+        return code;
+    }
     let mut outcomes: Vec<MigrateOutcome> = Vec::new();
     for (label, path) in [("policy", &locs.policy), ("authorized", &locs.authorized)] {
         if !path.exists() {
@@ -2006,6 +2081,12 @@ fn run_migrate(locs: &ConfigLocations, args: MigrateArgs, format: ConfigFormat) 
     if any_error {
         1
     } else {
+        let envelope = json!({
+            "ok": true,
+            "operation": "config.migrate",
+            "result": { "outcomes": outcomes },
+        });
+        idem.record("config.migrate", &envelope);
         0
     }
 }
@@ -2147,6 +2228,23 @@ fn run_rollback(locs: &ConfigLocations, args: RollbackArgs, format: ConfigFormat
             &args.dry_run_args,
         );
     }
+    let key_id = args.dry_run_args.idempotency_key.clone();
+    let idem_payload = crate::commands::idempotency::payload_value(
+        "config.rollback",
+        [
+            ("target", json!(format!("{:?}", args.target))),
+            ("bak_name", json!(args.bak_name.clone())),
+        ],
+    );
+    let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+        dry_run_format_bridge(format),
+        "config.rollback",
+        key_id,
+        idem_payload,
+    );
+    if let Some(code) = replay_exit {
+        return code;
+    }
     let path = target_path_for(locs, args.target);
     let label = write_target_label(args.target);
     let bak = match resolve_bak(path, &args.bak_name) {
@@ -2217,6 +2315,12 @@ fn run_rollback(locs: &ConfigLocations, args: RollbackArgs, format: ConfigFormat
                     format,
                 );
             }
+            let envelope = json!({
+                "ok": true,
+                "operation": "config.rollback",
+                "result": &outcome,
+            });
+            idem.record("config.rollback", &envelope);
             0
         }
         Err(e) => {
@@ -2246,6 +2350,23 @@ fn run_gc(locs: &ConfigLocations, args: GcArgs, format: ConfigFormat) -> i32 {
             ],
             &args.dry_run_args,
         );
+    }
+    let key_id = args.dry_run_args.idempotency_key.clone();
+    let idem_payload = crate::commands::idempotency::payload_value(
+        "config.gc",
+        [
+            ("target", json!(format!("{:?}", args.target))),
+            ("keep", json!(args.keep)),
+        ],
+    );
+    let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+        dry_run_format_bridge(format),
+        "config.gc",
+        key_id,
+        idem_payload,
+    );
+    if let Some(code) = replay_exit {
+        return code;
     }
     let path = target_path_for(locs, args.target);
     let label = write_target_label(args.target);
@@ -2287,6 +2408,12 @@ fn run_gc(locs: &ConfigLocations, args: GcArgs, format: ConfigFormat) -> i32 {
                     format,
                 );
             }
+            let envelope = json!({
+                "ok": true,
+                "operation": "config.gc",
+                "result": &outcome,
+            });
+            idem.record("config.gc", &envelope);
             0
         }
         Err(e) => {
@@ -2400,7 +2527,30 @@ fn run_profile(locs: &ConfigLocations, action: ProfileAction, format: ConfigForm
                     &dry_run_args,
                 );
             }
-            run_profile_create(&name, format)
+            let key_id = dry_run_args.idempotency_key.clone();
+            let idem_payload = crate::commands::idempotency::payload_value(
+                "config.profile.create",
+                [("name", json!(name.clone()))],
+            );
+            let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+                dry_run_format_bridge(format),
+                "config.profile.create",
+                key_id,
+                idem_payload,
+            );
+            if let Some(code) = replay_exit {
+                return code;
+            }
+            let exit = run_profile_create(&name, format);
+            if exit == 0 {
+                let envelope = json!({
+                    "ok": true,
+                    "operation": "config.profile.create",
+                    "result": { "profile": name },
+                });
+                idem.record("config.profile.create", &envelope);
+            }
+            exit
         }
         ProfileAction::Switch { name, dry_run_args } => {
             if dry_run_args.is_dry_run() {
@@ -2415,7 +2565,30 @@ fn run_profile(locs: &ConfigLocations, action: ProfileAction, format: ConfigForm
                     &dry_run_args,
                 );
             }
-            run_profile_switch(&name, format)
+            let key_id = dry_run_args.idempotency_key.clone();
+            let idem_payload = crate::commands::idempotency::payload_value(
+                "config.profile.switch",
+                [("name", json!(name.clone()))],
+            );
+            let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+                dry_run_format_bridge(format),
+                "config.profile.switch",
+                key_id,
+                idem_payload,
+            );
+            if let Some(code) = replay_exit {
+                return code;
+            }
+            let exit = run_profile_switch(&name, format);
+            if exit == 0 {
+                let envelope = json!({
+                    "ok": true,
+                    "operation": "config.profile.switch",
+                    "result": { "profile": name },
+                });
+                idem.record("config.profile.switch", &envelope);
+            }
+            exit
         }
         ProfileAction::Delete {
             name,
@@ -2435,7 +2608,30 @@ fn run_profile(locs: &ConfigLocations, action: ProfileAction, format: ConfigForm
                     &dry_run_args,
                 );
             }
-            run_profile_delete(locs, &name, yes, format)
+            let key_id = dry_run_args.idempotency_key.clone();
+            let idem_payload = crate::commands::idempotency::payload_value(
+                "config.profile.delete",
+                [("name", json!(name.clone())), ("yes", json!(yes))],
+            );
+            let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
+                dry_run_format_bridge(format),
+                "config.profile.delete",
+                key_id,
+                idem_payload,
+            );
+            if let Some(code) = replay_exit {
+                return code;
+            }
+            let exit = run_profile_delete(locs, &name, yes, format);
+            if exit == 0 {
+                let envelope = json!({
+                    "ok": true,
+                    "operation": "config.profile.delete",
+                    "result": { "profile": name },
+                });
+                idem.record("config.profile.delete", &envelope);
+            }
+            exit
         }
     }
 }

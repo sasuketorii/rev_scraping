@@ -181,8 +181,51 @@ pub async fn run(format: OutputFormat, args: HermesArgs) -> i32 {
                     &a.dry_run_args,
                 );
             }
+            // v1.3 Lane G.6: idempotent commit hook.
+            let key = a.dry_run_args.idempotency_key.clone();
+            let payload = crate::commands::idempotency::payload_value(
+                "hermes.install",
+                [
+                    (
+                        "prefix",
+                        json!(a.prefix.as_ref().map(|p| p.display().to_string())),
+                    ),
+                    (
+                        "source",
+                        json!(a.source.as_ref().map(|p| p.display().to_string())),
+                    ),
+                    ("force", json!(a.force)),
+                ],
+            );
+            let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
+            if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
+                &store,
+                "hermes.install",
+                key.as_deref(),
+                &payload,
+            ) {
+                return crate::commands::idempotency::emit_replay(format, "hermes.install", &env);
+            }
             match install(&a) {
-                Ok(report) => emit_ok(format, "install", &report),
+                Ok(report) => {
+                    let exit = emit_ok(format, "install", &report);
+                    if exit == 0 {
+                        let envelope = json!({
+                            "kind": "hermes",
+                            "action": "install",
+                            "status": "ok",
+                            "report": &report,
+                        });
+                        crate::commands::idempotency::record_success(
+                            &store,
+                            "hermes.install",
+                            key.as_deref(),
+                            &payload,
+                            &envelope,
+                        );
+                    }
+                    exit
+                }
                 Err(e) => emit_err(format, "install", &e),
             }
         }
@@ -199,8 +242,43 @@ pub async fn run(format: OutputFormat, args: HermesArgs) -> i32 {
                     &a.dry_run_args,
                 );
             }
+            let key = a.dry_run_args.idempotency_key.clone();
+            let payload = crate::commands::idempotency::payload_value(
+                "hermes.uninstall",
+                [(
+                    "prefix",
+                    json!(a.prefix.as_ref().map(|p| p.display().to_string())),
+                )],
+            );
+            let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
+            if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
+                &store,
+                "hermes.uninstall",
+                key.as_deref(),
+                &payload,
+            ) {
+                return crate::commands::idempotency::emit_replay(format, "hermes.uninstall", &env);
+            }
             match uninstall(&a) {
-                Ok(report) => emit_ok(format, "uninstall", &report),
+                Ok(report) => {
+                    let exit = emit_ok(format, "uninstall", &report);
+                    if exit == 0 {
+                        let envelope = json!({
+                            "kind": "hermes",
+                            "action": "uninstall",
+                            "status": "ok",
+                            "report": &report,
+                        });
+                        crate::commands::idempotency::record_success(
+                            &store,
+                            "hermes.uninstall",
+                            key.as_deref(),
+                            &payload,
+                            &envelope,
+                        );
+                    }
+                    exit
+                }
                 Err(e) => emit_err(format, "uninstall", &e),
             }
         }

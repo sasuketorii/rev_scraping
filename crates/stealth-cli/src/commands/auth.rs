@@ -286,6 +286,41 @@ async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
             &args.dry_run_args,
         );
     }
+    // v1.3 Lane G.6: idempotent commit hook.
+    //
+    // Limitation: `auth.login` spawns `rev-auth` which prints its own JSON
+    // directly to the inherited stdout. We don't see the child's envelope
+    // from Rust, so the recorded replay envelope is a synthesized marker
+    // (`{ok: true, operation: "auth.login", result: {recorded: true}}`).
+    // The replay contract — "no side effect re-runs" — still holds.
+    let key = args.dry_run_args.idempotency_key.clone();
+    // v1.3 Lane G.6 reviewer fix: include every behavior-changing input,
+    // not just profile/url/domain. Helper-binary path and completion pattern
+    // change WHICH external program is spawned; aad_context and VPN flags
+    // change the security envelope the sealed cookie is bound to.
+    let payload = crate::commands::idempotency::payload_value(
+        "auth.login",
+        [
+            ("profile", json!(args.profile.clone())),
+            ("url", json!(args.url.clone())),
+            ("domain", json!(args.domain.clone())),
+            ("completion_pattern", json!(args.completion_pattern.clone())),
+            ("obscura_bin", json!(args.obscura_bin.as_ref().map(|p| p.display().to_string()))),
+            ("rev_auth_bin", json!(args.rev_auth_bin.as_ref().map(|p| p.display().to_string()))),
+            ("aad_context", json!(args.aad_context.clone())),
+            ("require_vpn", json!(args.require_vpn)),
+            ("allow_no_vpn", json!(args.allow_no_vpn)),
+        ],
+    );
+    let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
+    if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
+        &store,
+        "auth.login",
+        key.as_deref(),
+        &payload,
+    ) {
+        return crate::commands::idempotency::emit_replay(format, "auth.login", &env);
+    }
     let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
         Ok(d) => d,
         Err(msg) => {
@@ -319,7 +354,7 @@ async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
         emit_err(format, "auth.login", code, &format!("{e}"));
         return code;
     }
-    spawn_rev_auth_login(
+    let exit = spawn_rev_auth_login(
         format,
         "auth.login",
         &args.profile,
@@ -329,7 +364,18 @@ async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
         args.obscura_bin.as_deref(),
         args.rev_auth_bin.as_deref(),
         &args.aad_context,
-    )
+    );
+    if exit == 0 {
+        let envelope = json!({
+            "ok": true,
+            "operation": "auth.login",
+            "result": { "recorded": true, "profile": args.profile },
+        });
+        crate::commands::idempotency::record_success(
+            &store, "auth.login", key.as_deref(), &payload, &envelope,
+        );
+    }
+    exit
 }
 
 async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
@@ -347,6 +393,33 @@ async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
             ],
             &args.dry_run_args,
         );
+    }
+    // v1.3 Lane G.6: idempotent commit hook. Same limitation as auth.login —
+    // rev-auth child owns the success envelope; we record a synthesized marker.
+    let key = args.dry_run_args.idempotency_key.clone();
+    // v1.3 Lane G.6 reviewer fix: same rationale as `auth.login`.
+    let payload = crate::commands::idempotency::payload_value(
+        "auth.refresh",
+        [
+            ("profile", json!(args.profile.clone())),
+            ("url", json!(args.url.clone())),
+            ("domain", json!(args.domain.clone())),
+            ("completion_pattern", json!(args.completion_pattern.clone())),
+            ("obscura_bin", json!(args.obscura_bin.as_ref().map(|p| p.display().to_string()))),
+            ("rev_auth_bin", json!(args.rev_auth_bin.as_ref().map(|p| p.display().to_string()))),
+            ("aad_context", json!(args.aad_context.clone())),
+            ("require_vpn", json!(args.require_vpn)),
+            ("allow_no_vpn", json!(args.allow_no_vpn)),
+        ],
+    );
+    let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
+    if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
+        &store,
+        "auth.refresh",
+        key.as_deref(),
+        &payload,
+    ) {
+        return crate::commands::idempotency::emit_replay(format, "auth.refresh", &env);
     }
     let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
         Ok(d) => d,
@@ -386,7 +459,7 @@ async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
         emit_err(format, "auth.refresh", code, &format!("{e}"));
         return code;
     }
-    spawn_rev_auth_login(
+    let exit = spawn_rev_auth_login(
         format,
         "auth.refresh",
         &args.profile,
@@ -396,7 +469,18 @@ async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
         args.obscura_bin.as_deref(),
         args.rev_auth_bin.as_deref(),
         &args.aad_context,
-    )
+    );
+    if exit == 0 {
+        let envelope = json!({
+            "ok": true,
+            "operation": "auth.refresh",
+            "result": { "recorded": true, "profile": args.profile },
+        });
+        crate::commands::idempotency::record_success(
+            &store, "auth.refresh", key.as_deref(), &payload, &envelope,
+        );
+    }
+    exit
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -534,6 +618,24 @@ fn run_delete(format: OutputFormat, args: DeleteArgs, confirm: &mut dyn Confirm)
             &args.dry_run_args,
         );
     }
+    // v1.3 Lane G.6: idempotent commit hook.
+    let key = args.dry_run_args.idempotency_key.clone();
+    let payload = crate::commands::idempotency::payload_value(
+        "auth.delete",
+        [
+            ("profile", json!(args.profile.clone())),
+            ("force", json!(args.force)),
+        ],
+    );
+    let idem_store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
+    if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
+        &idem_store,
+        "auth.delete",
+        key.as_deref(),
+        &payload,
+    ) {
+        return crate::commands::idempotency::emit_replay(format, "auth.delete", &env);
+    }
     if !args.force && !confirm.confirm(&format!("Delete auth profile {:?}? [y/N]: ", args.profile))
     {
         emit_err(format, "auth.delete", EXIT_ABORTED, "user declined");
@@ -545,10 +647,15 @@ fn run_delete(format: OutputFormat, args: DeleteArgs, confirm: &mut dyn Confirm)
     };
     match store.delete(&args.profile) {
         Ok(()) => {
-            emit_ok(
-                format,
-                "auth.delete",
-                json!({ "profile": args.profile, "deleted": true }),
+            let result = json!({ "profile": args.profile.clone(), "deleted": true });
+            emit_ok(format, "auth.delete", result.clone());
+            let envelope = json!({
+                "ok": true,
+                "operation": "auth.delete",
+                "result": result,
+            });
+            crate::commands::idempotency::record_success(
+                &idem_store, "auth.delete", key.as_deref(), &payload, &envelope,
             );
             EXIT_OK
         }
