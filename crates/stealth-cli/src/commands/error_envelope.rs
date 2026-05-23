@@ -241,22 +241,32 @@ pub fn emit_err_envelope(
     retry_after_ms: Option<u64>,
 ) -> i32 {
     let doc_url = kind.doc_url();
+    let envelope = json!({
+        "ok": false,
+        "operation": op,
+        "exit_code": exit,
+        "error": message,
+        "kind": kind.wire_name(),
+        "message": message,
+        "hint": hint,
+        "retry_after_ms": retry_after_ms,
+        "doc_url": doc_url,
+    });
     match format {
         OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({
-                    "ok": false,
-                    "operation": op,
-                    "exit_code": exit,
-                    "error": message,
-                    "kind": kind.wire_name(),
-                    "message": message,
-                    "hint": hint,
-                    "retry_after_ms": retry_after_ms,
-                    "doc_url": doc_url,
-                })
-            );
+            println!("{envelope}");
+        }
+        OutputFormat::Yaml => {
+            // v1.3 Lane G fix-up R2: yaml mirrors JSON envelope verbatim
+            // (same field set, different encoding). The JSON-schema docs
+            // remain the single source of truth for the envelope shape.
+            match serde_yaml::to_string(&envelope) {
+                Ok(s) => print!("{s}"),
+                Err(e) => {
+                    eprintln!("# yaml-encode-error: {e}");
+                    println!("{envelope}");
+                }
+            }
         }
         OutputFormat::Human => {
             eprintln!("[ERROR] {op}: {message}");
@@ -356,10 +366,7 @@ pub fn classify_legacy_message(msg: &str) -> CliErrorKind {
         CliErrorKind::BrowserNotFound
     } else if lower.contains("cookie") && lower.contains("decrypt") {
         CliErrorKind::CookieDecryptFailed
-    } else if lower.contains("auth")
-        || lower.contains("login")
-        || lower.contains("unauthorized")
-    {
+    } else if lower.contains("auth") || lower.contains("login") || lower.contains("unauthorized") {
         CliErrorKind::Auth
     } else if lower.contains("not found") || lower.contains("no match") {
         CliErrorKind::NotFound
@@ -380,7 +387,11 @@ mod tests {
 
     #[test]
     fn arity_is_exactly_26() {
-        assert_eq!(CliErrorKind::all().len(), 26, "must mirror 26-variant Lane I ErrorKind");
+        assert_eq!(
+            CliErrorKind::all().len(),
+            26,
+            "must mirror 26-variant Lane I ErrorKind"
+        );
     }
 
     #[test]
@@ -401,7 +412,10 @@ mod tests {
 
     #[test]
     fn pascal_names_are_unique() {
-        let mut names: Vec<&str> = CliErrorKind::all().iter().map(|k| k.pascal_name()).collect();
+        let mut names: Vec<&str> = CliErrorKind::all()
+            .iter()
+            .map(|k| k.pascal_name())
+            .collect();
         names.sort();
         names.dedup();
         assert_eq!(names.len(), 26, "PascalCase names must be unique");
@@ -416,13 +430,21 @@ mod tests {
 
     #[test]
     fn build_error_fields_contains_all_5_keys() {
-        let v = build_error_fields(CliErrorKind::Timeout, "took too long", Some("retry"), Some(1_000));
+        let v = build_error_fields(
+            CliErrorKind::Timeout,
+            "took too long",
+            Some("retry"),
+            Some(1_000),
+        );
         let obj = v.as_object().expect("object");
         for k in ["kind", "message", "hint", "retry_after_ms", "doc_url"] {
             assert!(obj.contains_key(k), "missing key: {k}");
         }
         assert_eq!(obj["kind"], json!("timeout"));
-        assert_eq!(obj["doc_url"].as_str().unwrap(), CliErrorKind::Timeout.doc_url());
+        assert_eq!(
+            obj["doc_url"].as_str().unwrap(),
+            CliErrorKind::Timeout.doc_url()
+        );
     }
 
     #[test]
@@ -434,15 +456,27 @@ mod tests {
             "error": "vpn leak detected: tunnel down",
             "vpn_monitor": { "running": false },
         });
-        augment_with_g7_fields(&mut env, CliErrorKind::VpnLeak, None, Some("rotate VPN"), None);
+        augment_with_g7_fields(
+            &mut env,
+            CliErrorKind::VpnLeak,
+            None,
+            Some("rotate VPN"),
+            None,
+        );
         let obj = env.as_object().unwrap();
         // Pre-existing fields untouched.
         assert_eq!(obj["operation"], json!("spider"));
-        assert_eq!(obj["error"].as_str().unwrap(), "vpn leak detected: tunnel down");
+        assert_eq!(
+            obj["error"].as_str().unwrap(),
+            "vpn leak detected: tunnel down"
+        );
         assert!(obj.contains_key("vpn_monitor"));
         // New G.7 fields present.
         assert_eq!(obj["kind"], json!("vpn_leak"));
-        assert_eq!(obj["message"].as_str().unwrap(), "vpn leak detected: tunnel down");
+        assert_eq!(
+            obj["message"].as_str().unwrap(),
+            "vpn leak detected: tunnel down"
+        );
         assert_eq!(obj["hint"].as_str().unwrap(), "rotate VPN");
         assert!(obj["retry_after_ms"].is_null());
         assert_eq!(
@@ -453,14 +487,38 @@ mod tests {
 
     #[test]
     fn classify_legacy_message_smoke() {
-        assert_eq!(classify_legacy_message("AUP: not authorized"), CliErrorKind::Aup);
-        assert_eq!(classify_legacy_message("SSRF guard tripped"), CliErrorKind::Ssrf);
-        assert_eq!(classify_legacy_message("vpn leak detected"), CliErrorKind::VpnLeak);
-        assert_eq!(classify_legacy_message("vpn pool exhausted"), CliErrorKind::VpnAllInstancesFailed);
-        assert_eq!(classify_legacy_message("invalid --url"), CliErrorKind::Validation);
-        assert_eq!(classify_legacy_message("connect: refused"), CliErrorKind::Network);
-        assert_eq!(classify_legacy_message("user declined"), CliErrorKind::Aborted);
-        assert_eq!(classify_legacy_message("unknown captcha type"), CliErrorKind::Captcha);
+        assert_eq!(
+            classify_legacy_message("AUP: not authorized"),
+            CliErrorKind::Aup
+        );
+        assert_eq!(
+            classify_legacy_message("SSRF guard tripped"),
+            CliErrorKind::Ssrf
+        );
+        assert_eq!(
+            classify_legacy_message("vpn leak detected"),
+            CliErrorKind::VpnLeak
+        );
+        assert_eq!(
+            classify_legacy_message("vpn pool exhausted"),
+            CliErrorKind::VpnAllInstancesFailed
+        );
+        assert_eq!(
+            classify_legacy_message("invalid --url"),
+            CliErrorKind::Validation
+        );
+        assert_eq!(
+            classify_legacy_message("connect: refused"),
+            CliErrorKind::Network
+        );
+        assert_eq!(
+            classify_legacy_message("user declined"),
+            CliErrorKind::Aborted
+        );
+        assert_eq!(
+            classify_legacy_message("unknown captcha type"),
+            CliErrorKind::Captcha
+        );
         // Fall-through to Internal.
         assert_eq!(classify_legacy_message("???"), CliErrorKind::Internal);
     }

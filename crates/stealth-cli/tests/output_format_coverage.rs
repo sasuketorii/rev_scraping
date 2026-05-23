@@ -57,6 +57,29 @@ use clap::{CommandFactory, Parser};
 
 use stealth_cli::__cli_parse_for_test as parse;
 
+/// v1.3 Lane G fix-up R2: the multi-format wire matrix every top-level
+/// subcommand must accept. Each format string is the canonical value name
+/// accepted by clap — `human` (default), `text` (alias of `human`), `json`
+/// (machine-parseable), `yaml` (re-encoded json envelope).
+///
+/// Doctor + config are special-cased: doctor's enum is `{json, text, yaml}`
+/// (no `human` synonym, because the historical default was `json`); config's
+/// enum is `{json, text, yaml}` for the same reason. The shared matrix is
+/// stripped of `human` for those two surfaces in [`shared_formats_for`].
+const ALL_FORMATS_GENERIC: &[&str] = &["human", "text", "json", "yaml"];
+const DOCTOR_FORMATS: &[&str] = &["text", "json", "yaml"];
+const CONFIG_FORMATS: &[&str] = &["text", "json", "yaml"];
+
+fn shared_formats_for(label: &str) -> &'static [&'static str] {
+    if label.starts_with("doctor") {
+        DOCTOR_FORMATS
+    } else if label.starts_with("config") {
+        CONFIG_FORMATS
+    } else {
+        ALL_FORMATS_GENERIC
+    }
+}
+
 /// Subcommands whose `--output-format json` must parse cleanly.
 ///
 /// Each entry: `(label, argv_after_program_name)`.
@@ -67,82 +90,274 @@ const SUBCOMMAND_CASES: &[(&str, &[&str])] = &[
     // The global `--format` (root level) and per-action JSON output
     // still cover the "everywhere works" UX, but the canonical position
     // for the new flag on these groups is between the noun and the verb.
-    ("captcha solve", &[
-        "captcha", "--output-format", "json",
-        "solve",
-        "--type", "recaptcha-v2",
-        "--site-url", "https://example.test",
-        "--dry-run",
-    ]),
-    ("captcha verify", &[
-        "captcha", "--output-format", "json",
-        "verify",
-        "--type", "hcaptcha",
-        "--token", "dummy",
-        "--secret", "dummy",
-    ]),
-    ("browser launch", &[
-        "browser", "--output-format", "json",
-        "launch",
-        "--url", "https://example.test",
-    ]),
-    ("browser stealth-test", &[
-        "browser", "--output-format", "json",
-        "stealth-test",
-    ]),
-    ("vpn status", &[
-        "vpn", "--output-format", "json",
-        "status",
-    ]),
-    ("vpn rotate", &[
-        "vpn", "--output-format", "json",
-        "rotate",
-        "--reason", "test",
-    ]),
-    ("doctor", &[
+    (
+        "captcha solve",
+        &[
+            "captcha",
+            "--output-format",
+            "json",
+            "solve",
+            "--type",
+            "recaptcha-v2",
+            "--site-url",
+            "https://example.test",
+            "--dry-run",
+        ],
+    ),
+    (
+        "captcha verify",
+        &[
+            "captcha",
+            "--output-format",
+            "json",
+            "verify",
+            "--type",
+            "hcaptcha",
+            "--token",
+            "dummy",
+            "--secret",
+            "dummy",
+        ],
+    ),
+    (
+        "browser launch",
+        &[
+            "browser",
+            "--output-format",
+            "json",
+            "launch",
+            "--url",
+            "https://example.test",
+        ],
+    ),
+    (
+        "browser stealth-test",
+        &["browser", "--output-format", "json", "stealth-test"],
+    ),
+    ("vpn status", &["vpn", "--output-format", "json", "status"]),
+    (
+        "vpn rotate",
+        &[
+            "vpn",
+            "--output-format",
+            "json",
+            "rotate",
+            "--reason",
+            "test",
+        ],
+    ),
+    (
         "doctor",
-        "--skip-exit-ip",
-        "--output-format", "json",
-    ]),
-    ("spider", &[
+        &["doctor", "--skip-exit-ip", "--output-format", "json"],
+    ),
+    (
         "spider",
-        "--url", "https://example.test",
-        "--allow-no-vpn",
-        "--output-format", "json",
-    ]),
-    ("relocate", &[
+        &[
+            "spider",
+            "--url",
+            "https://example.test",
+            "--allow-no-vpn",
+            "--output-format",
+            "json",
+        ],
+    ),
+    (
         "relocate",
-        "--stable-id", "abc",
-        "--html-file", "/tmp/none.html",
-        "--output-format", "json",
-    ]),
-    ("cf-evaluate", &[
+        &[
+            "relocate",
+            "--stable-id",
+            "abc",
+            "--html-file",
+            "/tmp/none.html",
+            "--output-format",
+            "json",
+        ],
+    ),
+    (
         "cf-evaluate",
-        "--url", "https://example.test",
-        "--i-have-authorization",
-        "--output-format", "json",
-    ]),
-    ("auth list", &[
-        "auth",
-        "--output-format", "json",
-        "list",
-    ]),
-    ("measure", &[
+        &[
+            "cf-evaluate",
+            "--url",
+            "https://example.test",
+            "--i-have-authorization",
+            "--output-format",
+            "json",
+        ],
+    ),
+    ("auth list", &["auth", "--output-format", "json", "list"]),
+    (
         "measure",
-        "--url", "https://example.test",
-        "--output-format", "json",
-    ]),
-    ("hermes verify", &[
-        "hermes",
-        "--output-format", "json",
-        "verify",
-    ]),
-    ("config validate", &[
-        "config",
-        "--output-format", "json",
-        "validate",
-    ]),
+        &[
+            "measure",
+            "--url",
+            "https://example.test",
+            "--output-format",
+            "json",
+        ],
+    ),
+    (
+        "hermes verify",
+        &["hermes", "--output-format", "json", "verify"],
+    ),
+    (
+        "config validate",
+        &["config", "--output-format", "json", "validate"],
+    ),
 ];
+
+/// Rewrite an argv slice substituting the value following every
+/// `--output-format` token with `fmt`. The token must already be present
+/// (the existing fixtures all include `--output-format json`); this keeps
+/// the per-subcommand placement (between noun and verb for action groups,
+/// trailing for leaf subcommands) untouched.
+fn argv_with_format<'a>(template: &'a [&'a str], fmt: &'a str) -> Vec<&'a str> {
+    let mut out: Vec<&str> = Vec::with_capacity(template.len());
+    let mut i = 0;
+    while i < template.len() {
+        out.push(template[i]);
+        if template[i] == "--output-format" && i + 1 < template.len() {
+            out.push(fmt);
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+#[test]
+fn every_subcommand_accepts_all_output_formats() {
+    // v1.3 Lane G fix-up R2: extend the original `--output-format json`
+    // gate to cover the full {human, text, json, yaml} matrix. This is the
+    // direct evidence target Codex flagged for R2: text + yaml acceptance
+    // across every top-level subcommand, not just JSON.
+    let mut failures = Vec::new();
+    for (label, argv) in SUBCOMMAND_CASES {
+        for fmt in shared_formats_for(label) {
+            let rewritten = argv_with_format(argv, fmt);
+            let mut full = vec!["rev-stealth"];
+            full.extend(rewritten.iter().copied());
+            if let Err(e) = parse(&full) {
+                failures.push(format!("{label} (--output-format {fmt}): {e}"));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "subcommands rejected one or more `--output-format` values:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// Sub-sub-command coverage: a representative leaf under each multi-verb
+/// group (captcha, browser, vpn, auth, hermes, config) must also accept
+/// every wire format on the noun-level `--output-format` placement.
+///
+/// This guards against the failure mode where `--output-format yaml` works
+/// at the leaf-only level (`spider --output-format yaml`) but a regression
+/// removes acceptance at the group level (`auth --output-format yaml list`).
+#[test]
+fn sub_sub_commands_accept_all_output_formats() {
+    let cases: &[(&str, &[&str], &[&str])] = &[
+        // (label, argv-template, allowed-formats)
+        (
+            "captcha solve",
+            &[
+                "captcha",
+                "--output-format",
+                "json",
+                "solve",
+                "--type",
+                "recaptcha-v2",
+                "--site-url",
+                "https://example.test",
+                "--dry-run",
+            ],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "captcha verify",
+            &[
+                "captcha",
+                "--output-format",
+                "json",
+                "verify",
+                "--type",
+                "hcaptcha",
+                "--token",
+                "x",
+                "--secret",
+                "y",
+            ],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "browser launch",
+            &[
+                "browser",
+                "--output-format",
+                "json",
+                "launch",
+                "--url",
+                "https://example.test",
+            ],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "browser stealth-test",
+            &["browser", "--output-format", "json", "stealth-test"],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "vpn status",
+            &["vpn", "--output-format", "json", "status"],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "vpn rotate",
+            &[
+                "vpn",
+                "--output-format",
+                "json",
+                "rotate",
+                "--reason",
+                "test",
+            ],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "auth list",
+            &["auth", "--output-format", "json", "list"],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "hermes verify",
+            &["hermes", "--output-format", "json", "verify"],
+            ALL_FORMATS_GENERIC,
+        ),
+        (
+            "config validate",
+            &["config", "--output-format", "json", "validate"],
+            CONFIG_FORMATS,
+        ),
+    ];
+    let mut failures = Vec::new();
+    for (label, argv, formats) in cases {
+        for fmt in *formats {
+            let rewritten = argv_with_format(argv, fmt);
+            let mut full = vec!["rev-stealth"];
+            full.extend(rewritten.iter().copied());
+            if let Err(e) = parse(&full) {
+                failures.push(format!("{label} (--output-format {fmt}): {e}"));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "sub-sub-commands rejected one or more `--output-format` values:\n{}",
+        failures.join("\n")
+    );
+}
 
 #[test]
 fn every_subcommand_accepts_output_format_json() {
@@ -167,23 +382,43 @@ fn global_format_json_remains_compatible() {
     // Belt-and-suspenders: the v1.2.x `--format json` alias still parses on
     // every subcommand. We test one representative leaf per top-level group.
     let cases: &[(&str, &[&str])] = &[
-        ("captcha solve (global --format)", &[
-            "rev-stealth", "--format", "json",
-            "captcha", "solve",
-            "--type", "turnstile",
-            "--site-url", "https://example.test",
-            "--dry-run",
-        ]),
-        ("spider (global --format)", &[
-            "rev-stealth", "--format", "json",
-            "spider",
-            "--url", "https://example.test",
-            "--allow-no-vpn",
-        ]),
-        ("doctor (global --format)", &[
-            "rev-stealth", "--format", "json",
-            "doctor", "--skip-exit-ip",
-        ]),
+        (
+            "captcha solve (global --format)",
+            &[
+                "rev-stealth",
+                "--format",
+                "json",
+                "captcha",
+                "solve",
+                "--type",
+                "turnstile",
+                "--site-url",
+                "https://example.test",
+                "--dry-run",
+            ],
+        ),
+        (
+            "spider (global --format)",
+            &[
+                "rev-stealth",
+                "--format",
+                "json",
+                "spider",
+                "--url",
+                "https://example.test",
+                "--allow-no-vpn",
+            ],
+        ),
+        (
+            "doctor (global --format)",
+            &[
+                "rev-stealth",
+                "--format",
+                "json",
+                "doctor",
+                "--skip-exit-ip",
+            ],
+        ),
     ];
     for (label, argv) in cases {
         parse(argv).unwrap_or_else(|e| panic!("{label}: {e}"));

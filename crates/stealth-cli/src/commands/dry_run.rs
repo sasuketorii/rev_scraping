@@ -94,20 +94,28 @@ pub fn emit_dry_run(
         .as_deref()
         .map(|k| json!(k))
         .unwrap_or(json!(null));
+    let envelope = json!({
+        "ok": true,
+        "operation": operation,
+        "result": {
+            "dry_run": true,
+            "plan": plan,
+            "idempotency_key": key_json,
+        },
+    });
     match format {
         OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({
-                    "ok": true,
-                    "operation": operation,
-                    "result": {
-                        "dry_run": true,
-                        "plan": plan,
-                        "idempotency_key": key_json,
-                    },
-                })
-            );
+            println!("{}", envelope);
+        }
+        OutputFormat::Yaml => {
+            // v1.3 Lane G fix-up R2: yaml mirror of the dry-run envelope.
+            match serde_yaml::to_string(&envelope) {
+                Ok(s) => print!("{s}"),
+                Err(e) => {
+                    eprintln!("# yaml-encode-error: {e}");
+                    println!("{envelope}");
+                }
+            }
         }
         OutputFormat::Human => {
             println!("[DRY-RUN] {operation}");

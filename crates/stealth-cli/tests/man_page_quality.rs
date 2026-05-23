@@ -111,8 +111,7 @@ fn manpages_have_well_formed_roff_structure() {
     let tmp = gen_into_tempdir();
     for name in collect_man_files(tmp.path()) {
         let path = tmp.path().join(&name);
-        let body = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {name}: {e}"));
+        let body = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {name}: {e}"));
         // clap_mangen emits a small roff-portability prelude (`.ie \n(.g .ds
         // Aq \(aq` apostrophe-fallback macro etc.) before the `.TH` title
         // heading, so we look for `.TH ` anywhere in the first ~10 lines
@@ -165,8 +164,8 @@ fn manpages_top_level_has_subcommands_section() {
     // `strip_internal_subcommands` walker accidentally hides a real
     // user-facing subcommand, this test would catch it.
     let tmp = gen_into_tempdir();
-    let body = std::fs::read_to_string(tmp.path().join("rev-stealth.1"))
-        .expect("read rev-stealth.1");
+    let body =
+        std::fs::read_to_string(tmp.path().join("rev-stealth.1")).expect("read rev-stealth.1");
     assert!(
         body.contains(".SH SUBCOMMANDS"),
         "rev-stealth.1 must contain `.SH SUBCOMMANDS` listing public commands"
@@ -256,8 +255,8 @@ fn manpages_does_not_leak_internal_subcommands() {
             "internal/help subcommand leaked into man pages: {leaked}"
         );
     }
-    let root = std::fs::read_to_string(tmp.path().join("rev-stealth.1"))
-        .expect("read rev-stealth.1");
+    let root =
+        std::fs::read_to_string(tmp.path().join("rev-stealth.1")).expect("read rev-stealth.1");
     // The root page renders subcommand names with surrounding roff `\fB ... \fR`
     // bold markers. Match on a word-boundary substring to avoid false positives
     // from a different command's description text mentioning the word.

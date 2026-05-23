@@ -105,8 +105,7 @@ fn note_field_value(note: &str, key: &str) -> Option<String> {
     let mut i = 0usize;
     while i + key_bytes.len() <= bytes.len() {
         if &bytes[i..i + key_bytes.len()] == key_bytes {
-            let prev_ok = i == 0
-                || !(bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
+            let prev_ok = i == 0 || !(bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
             let next_ok = bytes
                 .get(i + key_bytes.len())
                 .is_none_or(|c| !(c.is_ascii_alphanumeric() || *c == b'_'));
@@ -129,7 +128,11 @@ fn note_field_value(note: &str, key: &str) -> Option<String> {
                 // a `\"` here so both `removal_target_version = "X.Y.Z"`
                 // and the source-form `removal_target_version = \"X.Y.Z\"`
                 // are recognized.
-                if j < bytes.len() && bytes[j] == b'\\' && j + 1 < bytes.len() && bytes[j + 1] == b'"' {
+                if j < bytes.len()
+                    && bytes[j] == b'\\'
+                    && j + 1 < bytes.len()
+                    && bytes[j + 1] == b'"'
+                {
                     j += 1;
                 }
                 if j >= bytes.len() || bytes[j] != b'"' {
@@ -557,7 +560,8 @@ fn lint_smoke_detects_missing_metadata() {
     .unwrap();
     let f6 = audit_file(&p6);
     assert!(
-        f6.iter().any(|f| f.reason.contains("removal_target_version")),
+        f6.iter()
+            .any(|f| f.reason.contains("removal_target_version")),
         "expected removal_target_version violation, got {f6:?}"
     );
 
@@ -588,7 +592,8 @@ fn lint_smoke_detects_missing_metadata() {
     .unwrap();
     let f8 = audit_file(&p8);
     assert!(
-        f8.iter().any(|f| f.reason.contains("removal_target_version")),
+        f8.iter()
+            .any(|f| f.reason.contains("removal_target_version")),
         "non-semver removal_target value must be rejected, got {f8:?}"
     );
 }

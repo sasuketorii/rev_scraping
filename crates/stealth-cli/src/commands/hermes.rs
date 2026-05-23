@@ -513,15 +513,25 @@ fn python_syntax_ok(path: &Path) -> Result<bool, HermesError> {
 // ---------------------------------------------------------------- output
 
 fn emit_ok(format: OutputFormat, action: &str, report: &HermesReport) -> i32 {
+    let payload = json!({
+        "kind": "hermes",
+        "action": action,
+        "status": "ok",
+        "report": report,
+    });
     match format {
         OutputFormat::Json => {
-            let payload = json!({
-                "kind": "hermes",
-                "action": action,
-                "status": "ok",
-                "report": report,
-            });
             println!("{}", payload);
+        }
+        OutputFormat::Yaml => {
+            // v1.3 Lane G fix-up R2: yaml encoding of the canonical envelope.
+            match serde_yaml::to_string(&payload) {
+                Ok(s) => print!("{s}"),
+                Err(e) => {
+                    eprintln!("# yaml-encode-error: {e}");
+                    println!("{payload}");
+                }
+            }
         }
         OutputFormat::Human => {
             println!("hermes {}: ok", action);
@@ -550,20 +560,31 @@ fn emit_err(format: OutputFormat, action: &str, err: &HermesError) -> i32 {
     let message = err.to_string();
     let g7_kind = crate::commands::error_envelope::classify_legacy_message(&message);
     let doc_url = g7_kind.doc_url();
+    let payload = json!({
+        "kind": "hermes",
+        "action": action,
+        "status": "error",
+        "error": message,
+        "error_kind": g7_kind.wire_name(),
+        "message": message,
+        "hint": serde_json::Value::Null,
+        "retry_after_ms": serde_json::Value::Null,
+        "doc_url": doc_url,
+    });
     match format {
         OutputFormat::Json => {
-            let payload = json!({
-                "kind": "hermes",
-                "action": action,
-                "status": "error",
-                "error": message,
-                "error_kind": g7_kind.wire_name(),
-                "message": message,
-                "hint": serde_json::Value::Null,
-                "retry_after_ms": serde_json::Value::Null,
-                "doc_url": doc_url,
-            });
             eprintln!("{}", payload);
+        }
+        OutputFormat::Yaml => {
+            // v1.3 Lane G fix-up R2: yaml encoding of the canonical
+            // hermes-error envelope (stderr to mirror Json branch).
+            match serde_yaml::to_string(&payload) {
+                Ok(s) => eprint!("{s}"),
+                Err(e) => {
+                    eprintln!("# yaml-encode-error: {e}");
+                    eprintln!("{payload}");
+                }
+            }
         }
         OutputFormat::Human => {
             eprintln!("hermes {} failed: {}", action, err);

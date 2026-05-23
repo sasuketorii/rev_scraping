@@ -8,6 +8,26 @@
 # itself ignored. See:
 # https://git-scm.com/docs/gitignore "It is not possible to re-include a file
 # if a parent directory of that file is excluded."
+#
+# v1.3 Lane G fix-up R2 — honest-disclosure note (Codex R1 finding #5):
+#
+# Committing `target/completions/*` and `target/man/*` is a deliberate
+# deviation from the Rust convention of treating `target/` as pure build
+# artifact. The rationale is the `completion-drift` + `manpage-drift` CI
+# gates: each PR rebuilds the binary and re-runs the generator, then
+# `git diff` against the committed copies fails-fast when a contributor
+# changes a flag without regenerating. Committing the artifact (instead
+# of rebuilding it on every consumer install) lets operators inspect the
+# exact bytes that ship in the `.deb`/`.rpm`/Homebrew bundle without
+# needing a Rust toolchain.
+#
+# The cost is a small "build artifact in git" debt: every flag rename
+# produces a +/- diff in `target/completions/` + `target/man/`. Reviewers
+# should treat these diffs as derived state, not source; the source of
+# truth is the clap CommandFactory tree in `crates/stealth-cli/src/`.
+# The `cli-surface-drift` job (Lane G fix-up R2) is the upstream gate
+# that fails first when the source-of-truth changes without the
+# downstream artifacts being regenerated.
 /target/*
 !/target/completions/
 !/target/man/

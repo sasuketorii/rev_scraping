@@ -305,20 +305,23 @@ async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
             ("url", json!(args.url.clone())),
             ("domain", json!(args.domain.clone())),
             ("completion_pattern", json!(args.completion_pattern.clone())),
-            ("obscura_bin", json!(args.obscura_bin.as_ref().map(|p| p.display().to_string()))),
-            ("rev_auth_bin", json!(args.rev_auth_bin.as_ref().map(|p| p.display().to_string()))),
+            (
+                "obscura_bin",
+                json!(args.obscura_bin.as_ref().map(|p| p.display().to_string())),
+            ),
+            (
+                "rev_auth_bin",
+                json!(args.rev_auth_bin.as_ref().map(|p| p.display().to_string())),
+            ),
             ("aad_context", json!(args.aad_context.clone())),
             ("require_vpn", json!(args.require_vpn)),
             ("allow_no_vpn", json!(args.allow_no_vpn)),
         ],
     );
     let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
-    if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
-        &store,
-        "auth.login",
-        key.as_deref(),
-        &payload,
-    ) {
+    if let Some((_h, env)) =
+        crate::commands::idempotency::maybe_replay(&store, "auth.login", key.as_deref(), &payload)
+    {
         return crate::commands::idempotency::emit_replay(format, "auth.login", &env);
     }
     let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
@@ -372,7 +375,11 @@ async fn run_login(format: OutputFormat, args: LoginArgs) -> i32 {
             "result": { "recorded": true, "profile": args.profile },
         });
         crate::commands::idempotency::record_success(
-            &store, "auth.login", key.as_deref(), &payload, &envelope,
+            &store,
+            "auth.login",
+            key.as_deref(),
+            &payload,
+            &envelope,
         );
     }
     exit
@@ -405,20 +412,23 @@ async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
             ("url", json!(args.url.clone())),
             ("domain", json!(args.domain.clone())),
             ("completion_pattern", json!(args.completion_pattern.clone())),
-            ("obscura_bin", json!(args.obscura_bin.as_ref().map(|p| p.display().to_string()))),
-            ("rev_auth_bin", json!(args.rev_auth_bin.as_ref().map(|p| p.display().to_string()))),
+            (
+                "obscura_bin",
+                json!(args.obscura_bin.as_ref().map(|p| p.display().to_string())),
+            ),
+            (
+                "rev_auth_bin",
+                json!(args.rev_auth_bin.as_ref().map(|p| p.display().to_string())),
+            ),
             ("aad_context", json!(args.aad_context.clone())),
             ("require_vpn", json!(args.require_vpn)),
             ("allow_no_vpn", json!(args.allow_no_vpn)),
         ],
     );
     let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
-    if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
-        &store,
-        "auth.refresh",
-        key.as_deref(),
-        &payload,
-    ) {
+    if let Some((_h, env)) =
+        crate::commands::idempotency::maybe_replay(&store, "auth.refresh", key.as_deref(), &payload)
+    {
         return crate::commands::idempotency::emit_replay(format, "auth.refresh", &env);
     }
     let domain = match resolve_domain(&args.url, args.domain.as_deref()) {
@@ -477,7 +487,11 @@ async fn run_refresh(format: OutputFormat, args: RefreshArgs) -> i32 {
             "result": { "recorded": true, "profile": args.profile },
         });
         crate::commands::idempotency::record_success(
-            &store, "auth.refresh", key.as_deref(), &payload, &envelope,
+            &store,
+            "auth.refresh",
+            key.as_deref(),
+            &payload,
+            &envelope,
         );
     }
     exit
@@ -655,7 +669,11 @@ fn run_delete(format: OutputFormat, args: DeleteArgs, confirm: &mut dyn Confirm)
                 "result": result,
             });
             crate::commands::idempotency::record_success(
-                &idem_store, "auth.delete", key.as_deref(), &payload, &envelope,
+                &idem_store,
+                "auth.delete",
+                key.as_deref(),
+                &payload,
+                &envelope,
             );
             EXIT_OK
         }
@@ -770,20 +788,9 @@ fn find_in_path(name: &str) -> Option<PathBuf> {
 }
 
 fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({ "ok": true, "operation": op, "result": payload })
-            );
-        }
-        OutputFormat::Human => {
-            println!("[OK] {op}");
-            if let Ok(s) = serde_json::to_string_pretty(&payload) {
-                println!("{s}");
-            }
-        }
-    }
+    // v1.3 Lane G fix-up R2: delegate to centralized multi-format renderer
+    // (handles human/text/json/yaml uniformly so the yaml branch lives in one place).
+    crate::commands::output_render::emit_ok(format, op, payload);
 }
 
 fn emit_err(format: OutputFormat, op: &str, exit: i32, msg: &str) {
@@ -793,9 +800,8 @@ fn emit_err(format: OutputFormat, op: &str, exit: i32, msg: &str) {
     // callers (which only pass a free-form `msg`) still produce the
     // unified shape without a per-callsite migration.
     let kind = crate::commands::error_envelope::classify_legacy_message(msg);
-    let _ = crate::commands::error_envelope::emit_err_envelope(
-        format, op, exit, kind, msg, None, None,
-    );
+    let _ =
+        crate::commands::error_envelope::emit_err_envelope(format, op, exit, kind, msg, None, None);
 }
 
 trait Confirm {

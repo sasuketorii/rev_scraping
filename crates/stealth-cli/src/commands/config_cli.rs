@@ -627,14 +627,22 @@ pub async fn run(global: GlobalFormat, mut args: ConfigArgs) -> i32 {
     // `--output-format=text`). When absent, promote default text → json
     // under a JSON-global session. When present, the explicit local
     // value wins.
-    let local_set_explicitly = std::env::args().any(|a| {
-        a == "--output-format" || a.starts_with("--output-format=")
-    });
-    if matches!(global, GlobalFormat::Json)
-        && matches!(args.format, ConfigFormat::Text)
-        && !local_set_explicitly
-    {
-        args.format = ConfigFormat::Json;
+    let local_set_explicitly =
+        std::env::args().any(|a| a == "--output-format" || a.starts_with("--output-format="));
+    // v1.3 Lane G fix-up R2 round 5 — Codex review finding #2:
+    // previously only the global `--format json` promotion was wired;
+    // `--format yaml` was silently demoted to `ConfigFormat::Text`
+    // (default), so `rev-stealth --format yaml config init --dry-run`
+    // emitted a `[DRY-RUN]` human banner instead of YAML. Fix:
+    // promote `Yaml` in addition to `Json` when the local override is
+    // absent. (Local-set-explicitly still wins, mirroring the
+    // `OutputFormatOverride::resolve` contract.)
+    if matches!(args.format, ConfigFormat::Text) && !local_set_explicitly {
+        match global {
+            GlobalFormat::Json => args.format = ConfigFormat::Json,
+            GlobalFormat::Yaml => args.format = ConfigFormat::Yaml,
+            GlobalFormat::Human => {}
+        }
     }
     let locs = ConfigLocations::resolve();
     match args.action {
@@ -1133,36 +1141,32 @@ fn emit(value: &JsonValue, format: ConfigFormat) {
     //     classification, e.g. `emit_set_error`);
     //   * payload has no `error` string (e.g. `show`/`get` success).
     let augmented_owned;
-    let value_to_emit: &JsonValue =
-        if matches!(format, ConfigFormat::Json | ConfigFormat::Yaml) {
-            if let Some(obj) = value.as_object() {
-                let needs_augment = obj.contains_key("error")
-                    && !obj.contains_key("kind")
-                    && !obj.contains_key("doc_url");
-                if needs_augment {
-                    let mut clone = value.clone();
-                    // Best-effort: derive `message` from `error`; classify
-                    // via the shared heuristic. Caller-supplied `message`
-                    // is preserved if already present.
-                    let err_text = obj
-                        .get("error")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    let kind = crate::commands::error_envelope::classify_legacy_message(err_text);
-                    crate::commands::error_envelope::augment_with_g7_fields(
-                        &mut clone, kind, None, None, None,
-                    );
-                    augmented_owned = clone;
-                    &augmented_owned
-                } else {
-                    value
-                }
+    let value_to_emit: &JsonValue = if matches!(format, ConfigFormat::Json | ConfigFormat::Yaml) {
+        if let Some(obj) = value.as_object() {
+            let needs_augment = obj.contains_key("error")
+                && !obj.contains_key("kind")
+                && !obj.contains_key("doc_url");
+            if needs_augment {
+                let mut clone = value.clone();
+                // Best-effort: derive `message` from `error`; classify
+                // via the shared heuristic. Caller-supplied `message`
+                // is preserved if already present.
+                let err_text = obj.get("error").and_then(|v| v.as_str()).unwrap_or("");
+                let kind = crate::commands::error_envelope::classify_legacy_message(err_text);
+                crate::commands::error_envelope::augment_with_g7_fields(
+                    &mut clone, kind, None, None, None,
+                );
+                augmented_owned = clone;
+                &augmented_owned
             } else {
                 value
             }
         } else {
             value
-        };
+        }
+    } else {
+        value
+    };
     match format {
         ConfigFormat::Json => {
             println!(
@@ -1173,7 +1177,8 @@ fn emit(value: &JsonValue, format: ConfigFormat) {
         ConfigFormat::Yaml => {
             println!(
                 "{}",
-                serde_yaml::to_string(value_to_emit).unwrap_or_else(|e| format!("# yaml-error: {e}"))
+                serde_yaml::to_string(value_to_emit)
+                    .unwrap_or_else(|e| format!("# yaml-error: {e}"))
             );
         }
         ConfigFormat::Text => {
@@ -1232,13 +1237,26 @@ pub enum InitStatus {
     Error,
 }
 
-/// v1.3 Lane G.5: bridge `ConfigFormat` → `OutputFormat` for the shared
-/// dry-run emitter. `ConfigFormat::Yaml` collapses to `OutputFormat::Json`
-/// for the dry-run envelope, because the envelope is a stable JSON shape
-/// (yaml callers can pipe through `yq`).
+/// v1.3 Lane G.5 (revised v1.3 Lane G fix-up R2): bridge
+/// `ConfigFormat` → `OutputFormat` for the shared dry-run emitter.
+///
+/// Before R2: `ConfigFormat::Yaml` collapsed to `OutputFormat::Json` on
+/// the assumption that yaml callers could pipe through `yq`.
+///
+/// After R2 (Codex review finding #2): the dry-run emitter learned a
+/// yaml branch, so `ConfigFormat::Yaml` now maps to `OutputFormat::Yaml`
+/// and the operator's requested encoding is honoured end-to-end without
+/// the extra `yq` hop.
 fn dry_run_format_bridge(format: ConfigFormat) -> crate::OutputFormat {
+    // v1.3 Lane G fix-up R2 — Codex review finding #2:
+    // ConfigFormat::Yaml no longer collapses to OutputFormat::Json. The
+    // dry-run emitter learned a yaml branch in R2, so config-mutate
+    // dry-run paths now honour the operator's requested encoding end-to-
+    // end. Text still maps to Human (the dry-run plan is a bulleted
+    // operator-facing list in that mode).
     match format {
-        ConfigFormat::Json | ConfigFormat::Yaml => crate::OutputFormat::Json,
+        ConfigFormat::Json => crate::OutputFormat::Json,
+        ConfigFormat::Yaml => crate::OutputFormat::Yaml,
         ConfigFormat::Text => crate::OutputFormat::Human,
     }
 }
@@ -1597,7 +1615,12 @@ fn run_set(locs: &ConfigLocations, args: SetArgs, format: ConfigFormat) -> i32 {
         [
             ("target", json!(format!("{:?}", args.target))),
             ("key", json!(args.key.clone())),
-            ("value_sha", json!(crate::commands::idempotency::IdempotencyStore::hash16(&args.value))),
+            (
+                "value_sha",
+                json!(crate::commands::idempotency::IdempotencyStore::hash16(
+                    &args.value
+                )),
+            ),
         ],
     );
     let (idem, replay_exit) = crate::commands::idempotency::ReplayGuard::check(
@@ -1739,7 +1762,11 @@ fn emit_set_error(format: ConfigFormat, key: &str, message: &str) {
         let mut payload = json!({ "ok": false, "key": key, "error": message });
         let kind = crate::commands::error_envelope::classify_legacy_message(message);
         crate::commands::error_envelope::augment_with_g7_fields(
-            &mut payload, kind, None, None, None,
+            &mut payload,
+            kind,
+            None,
+            None,
+            None,
         );
         emit(&payload, format);
     }
@@ -1992,7 +2019,11 @@ fn emit_edit_error(format: ConfigFormat, message: &str) {
         let mut payload = json!({ "ok": false, "error": message });
         let kind = crate::commands::error_envelope::classify_legacy_message(message);
         crate::commands::error_envelope::augment_with_g7_fields(
-            &mut payload, kind, None, None, None,
+            &mut payload,
+            kind,
+            None,
+            None,
+            None,
         );
         emit(&payload, format);
     }
@@ -3590,7 +3621,7 @@ mod tests {
         let code = run_edit(
             &locs,
             EditArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 target: WriteTarget::Policy,
                 editor: Some(editor_path.display().to_string()),
             },
@@ -3667,7 +3698,17 @@ mod tests {
         // reproduce the outcome generation here via the same helper).
         // Drive run_migrate end-to-end and pin the exit code; the JSON
         // schema itself is covered by serde + the `Serialize` derive.
-        let code = run_migrate(&locs, MigrateArgs { dry_run_args: crate::commands::dry_run::DryRunArgs { dry_run: true, explain: false, idempotency_key: None } }, ConfigFormat::Json);
+        let code = run_migrate(
+            &locs,
+            MigrateArgs {
+                dry_run_args: crate::commands::dry_run::DryRunArgs {
+                    dry_run: true,
+                    explain: false,
+                    idempotency_key: None,
+                },
+            },
+            ConfigFormat::Json,
+        );
         assert_eq!(code, 0);
         // Both files present → both surfaced. Direct invariant check via
         // schema_version reader.
@@ -3738,7 +3779,7 @@ mod tests {
         let code = run_edit(
             &locs,
             EditArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 target: WriteTarget::Policy,
                 // Force a non-zero editor exit so we hit the abort branch.
                 editor: Some("false".into()),
@@ -3782,7 +3823,7 @@ mod tests {
         let code = run_edit(
             &locs,
             EditArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 target: WriteTarget::Policy,
                 editor: Some(editor_path.display().to_string()),
             },
@@ -3915,7 +3956,7 @@ mod tests {
         let code = run_rollback(
             &locs,
             RollbackArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 bak_name: oldest_name.clone(),
                 target: WriteTarget::Policy,
             },
@@ -3942,7 +3983,7 @@ mod tests {
         let code = run_rollback(
             &locs,
             RollbackArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 bak_name: v0_name.clone(),
                 target: WriteTarget::Policy,
             },
@@ -3972,7 +4013,7 @@ mod tests {
         let code = run_rollback(
             &locs,
             RollbackArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 bak_name: "../etc/passwd".into(),
                 target: WriteTarget::Policy,
             },
@@ -4176,7 +4217,7 @@ mod tests {
         let code = run_gc(
             &locs,
             GcArgs {
-            dry_run_args: Default::default(),
+                dry_run_args: Default::default(),
                 keep: 2,
                 target: WriteTarget::Policy,
             },

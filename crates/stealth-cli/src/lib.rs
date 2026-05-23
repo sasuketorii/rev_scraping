@@ -41,6 +41,18 @@ mod commands;
 pub mod __error_envelope_for_test {
     pub use crate::commands::error_envelope::{CliErrorKind, DOC_URL_BASE};
 }
+
+// v1.3 Lane G fix-up R2: expose the idempotency store API to the
+// integration test `tests/idempotency_invariants.rs` (proptest 50-iter)
+// without making the whole `commands` module public. The integration test
+// drives the in-process store directly so the property loop stays under
+// 1s per case (no `cargo run` shell-out per iteration).
+#[doc(hidden)]
+pub mod __idempotency_for_test {
+    pub use crate::commands::idempotency::{
+        maybe_replay, payload_value, CheckResult, IdempotencyStore,
+    };
+}
 pub mod config_io;
 mod doctor;
 pub mod policy;
@@ -80,10 +92,43 @@ struct Cli {
     command: Command,
 }
 
-#[derive(Copy, Clone, Debug, ValueEnum)]
+/// v1.3 Lane G fix-up R2: the global output-format enum.
+///
+/// Variants:
+///   * `Human` — operator-friendly multi-line output (default). The clap value
+///     name is `human`; an alias `text` is accepted as the canonical
+///     "agent-style plain text" spelling (matches `kubectl`, `gh`, `aws`).
+///   * `Json` — machine-parseable JSON envelope (single source of truth for
+///     agent consumers; documented under `docs/json-schemas/cli/`).
+///   * `Yaml` — JSON envelope re-serialized via `serde_yaml`. Same wire
+///     contract as JSON modulo encoding, so downstream tooling can
+///     `yq -y < ...` without an extra hop.
+///
+/// `Text` is intentionally NOT a distinct variant: the `text` alias maps to
+/// `Human` so the existing match-arms stay closed-form (two real wire shapes
+/// × multi-format render).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
 pub(crate) enum OutputFormat {
+    /// Operator-friendly multi-line output. Aliases: `text`.
+    #[value(name = "human", alias = "text")]
     Human,
+    /// Machine-parseable JSON envelope.
+    #[value(name = "json")]
     Json,
+    /// JSON envelope re-encoded as YAML (same fields, yaml syntax).
+    #[value(name = "yaml")]
+    Yaml,
+}
+
+impl OutputFormat {
+    /// Whether this format is "structured" (JSON / YAML). Helpers that emit
+    /// stable agent-consumable envelopes use this to decide between the
+    /// human pretty-print path and the structured-serializer path.
+    #[allow(dead_code)] // forward-use: callers may bypass the centralized
+                        // renderer for envelopes that need custom yaml/json branching.
+    pub(crate) fn is_structured(self) -> bool {
+        matches!(self, OutputFormat::Json | OutputFormat::Yaml)
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -414,6 +459,149 @@ pub fn run() -> i32 {
     runtime.block_on(run_async())
 }
 
+/// v1.3 Lane G fix-up R2 round 3 — clap-parse-failure structured-format
+/// detector.
+///
+/// Mirrors the runtime dispatch precedence (per-subcommand
+/// `--output-format` wins over the global `--format`, see
+/// `commands/output_format.rs::OutputFormatOverride::resolve`) so that
+/// a parse-time failure with `--format json … --output-format yaml`
+/// emits a yaml envelope, matching what the operator would have
+/// observed on a successful invocation.
+///
+/// Accepts both split (` `) and combined (`=`) clap forms. Walks argv
+/// in source order, recording separate `global` and `local` candidates,
+/// and returns `local.or(global)` so the per-subcommand spelling wins
+/// when both are present.
+///
+/// Returns `None` when no `(--format|--output-format) (json|yaml)` pair
+/// is found, in which case the caller falls through to clap's human
+/// print.
+///
+/// This is module-private to `lib.rs` to keep the surface narrow, but
+/// the `#[cfg(test)]` regression tests in `cli_tests` exercise it
+/// directly via the in-crate visibility.
+fn requested_structured_format(argv: &[String]) -> Option<&'static str> {
+    /// Three-valued classification of a single flag value. The
+    /// returned `Some(..)` carries the recognised wire-name (so
+    /// downstream filtering can distinguish `human` from `text` even
+    /// though both fall through to clap's human print on the generic
+    /// subcommand path).
+    ///   * `Some(Some("json"|"yaml"))` — structured wire format the
+    ///     parse-failure path can emit as an envelope.
+    ///   * `Some(Some("human"|"text"))` — recognised human-aliased
+    ///     value. Records the *presence* of the flag so local-over-
+    ///     global precedence can suppress a structured global on
+    ///     subcommands whose local enum accepts the value; carries
+    ///     the value name so the config/doctor filter below can drop
+    ///     specifically `human` (which their local enums reject) and
+    ///     keep `text` (which they accept).
+    ///   * `None` — unrecognised value, ignored.
+    fn classify(v: &str) -> Option<&'static str> {
+        match v {
+            "json" => Some("json"),
+            "yaml" => Some("yaml"),
+            "human" => Some("human"),
+            "text" => Some("text"),
+            _ => None,
+        }
+    }
+    fn is_structured_value(v: &str) -> bool {
+        matches!(v, "json" | "yaml")
+    }
+    // v1.3 Lane G fix-up R2 round 5 — Codex review finding #1:
+    // `config` and `doctor` have their own local `--output-format`
+    // enums (`{json,text,yaml}` — NO `human` variant). A user typing
+    // `--format json config --output-format human …` is in fact
+    // hitting a clap value-error on the local enum, not exercising a
+    // valid human override. The detector must therefore NOT use a
+    // local `human`/`text` value to suppress a structured global on
+    // those two subcommand subtrees. For every other subcommand the
+    // local enum accepts both `human` and `text`, so the suppression
+    // continues to apply.
+    let subcommand_rejects_local_human = {
+        // First non-flag token after argv[0] is the subcommand. Flags
+        // we accept here are the ones with values that could appear
+        // before the subcommand name; the global `--format`/`--output-
+        // format` and `--verbose` count. Keep this list conservative.
+        let mut i = 1usize;
+        let mut sub: Option<&str> = None;
+        while i < argv.len() {
+            let a = &argv[i];
+            if a == "--format" || a == "--output-format" {
+                i += 2;
+                continue;
+            }
+            if a.starts_with("--format=") || a.starts_with("--output-format=") {
+                i += 1;
+                continue;
+            }
+            if a == "-v" || a == "--verbose" || a.starts_with("-v") {
+                i += 1;
+                continue;
+            }
+            if a.starts_with('-') {
+                // Unknown flag — be conservative and stop scanning.
+                break;
+            }
+            sub = Some(a.as_str());
+            break;
+        }
+        matches!(sub, Some("config") | Some("doctor"))
+    };
+
+    let mut global: Option<&'static str> = None;
+    let mut local: Option<&'static str> = None;
+    let mut i = 0;
+    while i < argv.len() {
+        let a = &argv[i];
+        if let Some(rest) = a.strip_prefix("--format=") {
+            if let Some(c) = classify(rest) {
+                global = Some(c);
+            }
+        } else if let Some(rest) = a.strip_prefix("--output-format=") {
+            if let Some(c) = classify(rest) {
+                local = Some(c);
+            }
+        } else if a == "--format" && i + 1 < argv.len() {
+            if let Some(c) = classify(&argv[i + 1]) {
+                global = Some(c);
+            }
+        } else if a == "--output-format" && i + 1 < argv.len() {
+            if let Some(c) = classify(&argv[i + 1]) {
+                local = Some(c);
+            }
+        }
+        i += 1;
+    }
+
+    // On `config` / `doctor`, a recorded local `human` is in fact a
+    // clap value-error (the local enum is `{json, text, yaml}` and
+    // does NOT include a `human` variant). Drop only that specific
+    // case so the structured global keeps its suppression-immunity
+    // and the parse-failure envelope still ships in the requested
+    // format. `text` IS valid on those subcommands' local enums, so
+    // the suppression rule continues to apply there.
+    if subcommand_rejects_local_human && local == Some("human") {
+        local = None;
+    }
+
+    // Local-over-global: if any local override was recorded, ignore
+    // the global. This matches `OutputFormatOverride::resolve`:
+    // `self.output_format.unwrap_or(global)` only consults `global`
+    // when `self.output_format == None`.
+    let effective = local.or(global);
+    // Map the effective value to the wire format the parse-failure
+    // emitter should use:
+    //   * `Some("json"|"yaml")`  — emit structured envelope.
+    //   * `Some("human"|"text")` — fall through to clap's human print.
+    //   * `None`                 — no flag seen, fall through.
+    match effective {
+        Some(v) if is_structured_value(v) => Some(v),
+        _ => None,
+    }
+}
+
 /// Async core of [`run`]. Parses argv, initialises tracing, and dispatches
 /// to the requested subcommand. Returns the exit code without calling
 /// `std::process::exit` so callers can perform cleanup.
@@ -438,34 +626,49 @@ pub async fn run_async() -> i32 {
                 let _ = e.print();
                 return 0;
             }
-            // Heuristic JSON detection: emit a G.7 envelope when the user
-            // asked for JSON output; otherwise let clap render its
-            // friendly human error. We do NOT call clap's `.exit()`
-            // (which terminates the process) so callers retain control.
+            // Heuristic structured-output detection: emit a G.7 envelope
+            // (in JSON or YAML, per operator request) when the user
+            // explicitly asked for a structured format; otherwise let
+            // clap render its friendly human error. We do NOT call
+            // clap's `.exit()` (which terminates the process) so callers
+            // retain control.
+            //
+            // v1.3 Lane G fix-up R2 — Codex review finding #3:
+            // previously only JSON was detected here. YAML now follows
+            // the same pattern. `text` is an alias of `human` and falls
+            // through to the human-readable clap branch, which is the
+            // operator-visible behavior the alias name implies.
             let argv: Vec<String> = std::env::args().collect();
-            // Accept both split (`--format json`) and combined
-            // (`--format=json`) clap forms. Round-2 reviewer finding:
-            // the previous heuristic only covered the split form.
-            let wants_json = argv.iter().any(|a| {
-                a == "--format=json"
-                    || a == "--output-format=json"
-            }) || argv.windows(2).any(|w| {
-                matches!(w[0].as_str(), "--format" | "--output-format") && w[1] == "json"
-            });
-            if wants_json {
-                let msg = e.to_string();
-                let kind_e = commands::error_envelope::classify_legacy_message(&msg);
-                let _ = commands::error_envelope::emit_err_envelope(
-                    OutputFormat::Json,
-                    "cli.parse",
-                    2,
-                    kind_e,
-                    &msg,
-                    None,
-                    None,
-                );
-            } else {
-                let _ = e.print();
+            match requested_structured_format(&argv) {
+                Some("json") => {
+                    let msg = e.to_string();
+                    let kind_e = commands::error_envelope::classify_legacy_message(&msg);
+                    let _ = commands::error_envelope::emit_err_envelope(
+                        OutputFormat::Json,
+                        "cli.parse",
+                        2,
+                        kind_e,
+                        &msg,
+                        None,
+                        None,
+                    );
+                }
+                Some("yaml") => {
+                    let msg = e.to_string();
+                    let kind_e = commands::error_envelope::classify_legacy_message(&msg);
+                    let _ = commands::error_envelope::emit_err_envelope(
+                        OutputFormat::Yaml,
+                        "cli.parse",
+                        2,
+                        kind_e,
+                        &msg,
+                        None,
+                        None,
+                    );
+                }
+                _ => {
+                    let _ = e.print();
+                }
             }
             return 2;
         }
@@ -962,6 +1165,264 @@ mod cli_tests {
                 );
             }
             other => panic!("expected Doctor subcommand, got {other:?}"),
+        }
+    }
+
+    /// v1.3 Lane G fix-up R2 round 3 regression tests:
+    /// the clap-parse-failure structured-format detector
+    /// (`requested_structured_format`) must mirror runtime dispatch
+    /// precedence — local per-subcommand `--output-format` wins over
+    /// the global `--format`. Each case here is a real argv slice the
+    /// operator might type; the assertion locks the format choice the
+    /// error envelope will use on parse failure.
+    mod parse_failure_format_detector {
+        use super::super::requested_structured_format;
+        fn s(items: &[&str]) -> Vec<String> {
+            items.iter().map(|s| (*s).to_string()).collect()
+        }
+
+        #[test]
+        fn no_format_flag_returns_none() {
+            assert_eq!(
+                requested_structured_format(&s(&["rev-stealth", "spider"])),
+                None
+            );
+        }
+
+        #[test]
+        fn global_format_json_is_detected_split() {
+            assert_eq!(
+                requested_structured_format(&s(&["rev-stealth", "--format", "json", "spider",])),
+                Some("json"),
+            );
+        }
+
+        #[test]
+        fn global_format_yaml_is_detected_combined() {
+            assert_eq!(
+                requested_structured_format(&s(&["rev-stealth", "--format=yaml", "spider",])),
+                Some("yaml"),
+            );
+        }
+
+        #[test]
+        fn local_output_format_yaml_is_detected_split() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "spider",
+                    "--output-format",
+                    "yaml",
+                ])),
+                Some("yaml"),
+            );
+        }
+
+        /// Codex R2 round-2 regression:
+        /// `--format json … --output-format yaml` MUST resolve to YAML
+        /// because the local per-subcommand override is what
+        /// `OutputFormatOverride::resolve` would have picked at
+        /// dispatch time.
+        #[test]
+        fn local_output_format_wins_over_global_format() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "json",
+                    "spider",
+                    "--output-format",
+                    "yaml",
+                ])),
+                Some("yaml"),
+            );
+        }
+
+        /// Inverse: local `--output-format json` overrides a later
+        /// global `--format yaml`. (Argv re-ordering by clap is not
+        /// a concern here — we mirror the literal source-order rule
+        /// "local wins" the runtime applies.)
+        #[test]
+        fn local_output_format_json_wins_over_global_format_yaml() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "yaml",
+                    "spider",
+                    "--output-format",
+                    "json",
+                ])),
+                Some("json"),
+            );
+        }
+
+        #[test]
+        fn global_text_falls_through_to_none() {
+            // `text` is an alias of `human` and resolves to the human
+            // print branch (not a structured envelope).
+            assert_eq!(
+                requested_structured_format(&s(&["rev-stealth", "--format", "text", "spider",])),
+                None,
+            );
+        }
+
+        /// v1.3 Lane G fix-up R2 round 4 — Codex review finding:
+        /// a local `--output-format text` (or `human`) MUST suppress
+        /// the global `--format json|yaml`. Otherwise the parse-failure
+        /// path emits a structured envelope while the successful-
+        /// dispatch path would have emitted human text. The detector
+        /// is three-state aware (no-flag / human-alias / structured)
+        /// so it represents the suppression case.
+        #[test]
+        fn local_output_format_text_suppresses_global_format_json() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "json",
+                    "spider",
+                    "--output-format",
+                    "text",
+                ])),
+                None,
+            );
+        }
+
+        #[test]
+        fn local_output_format_human_suppresses_global_format_yaml() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "yaml",
+                    "spider",
+                    "--output-format",
+                    "human",
+                ])),
+                None,
+            );
+        }
+
+        #[test]
+        fn local_output_format_human_combined_suppresses_global_combined() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format=json",
+                    "spider",
+                    "--output-format=human",
+                ])),
+                None,
+            );
+        }
+
+        /// Symmetric belt-and-suspenders: a global `--format human`
+        /// does NOT mask a local `--output-format json` (local wins
+        /// even when global is the human alias).
+        #[test]
+        fn local_structured_wins_over_global_human() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "human",
+                    "spider",
+                    "--output-format",
+                    "json",
+                ])),
+                Some("json"),
+            );
+        }
+
+        /// v1.3 Lane G fix-up R2 round 5 — Codex review finding #1:
+        /// `config` and `doctor` have local `--output-format` enums
+        /// that do NOT accept `human`. A user typing
+        /// `--format json config --output-format human …` is in fact
+        /// hitting a clap value-error on the local enum, so the
+        /// detector MUST NOT use that local human-alias to suppress
+        /// the structured global. Expected: JSON envelope (the local
+        /// is dropped, the global wins).
+        #[test]
+        fn local_human_on_config_does_not_suppress_global_json() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "json",
+                    "config",
+                    "--output-format",
+                    "human",
+                    "init",
+                    "--dry-run",
+                ])),
+                Some("json"),
+            );
+        }
+
+        /// doctor's local enum is `{json, text, yaml}` — `text` IS a
+        /// valid local value, so the suppression rule still applies
+        /// and the detector returns `None` (clap human print branch).
+        /// This case documents that we drop human-on-doctor/config but
+        /// NOT text-on-doctor (the two enums diverge there).
+        #[test]
+        fn local_text_on_doctor_does_suppress_global_yaml() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "yaml",
+                    "doctor",
+                    "--output-format",
+                    "text",
+                ])),
+                None,
+            );
+        }
+
+        #[test]
+        fn local_human_on_doctor_does_not_suppress_global_yaml() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "yaml",
+                    "doctor",
+                    "--output-format",
+                    "human",
+                ])),
+                Some("yaml"),
+            );
+        }
+
+        /// Non-config/doctor subcommand: local human-alias still
+        /// suppresses, matching round-4 contract.
+        #[test]
+        fn local_human_on_spider_still_suppresses_global_json() {
+            assert_eq!(
+                requested_structured_format(&s(&[
+                    "rev-stealth",
+                    "--format",
+                    "json",
+                    "spider",
+                    "--output-format",
+                    "human",
+                ])),
+                None,
+            );
+        }
+
+        /// Unrecognised values are simply skipped — clap will emit
+        /// its own value-error which surfaces through the normal
+        /// non-structured branch.
+        #[test]
+        fn unrecognised_format_value_is_ignored() {
+            assert_eq!(
+                requested_structured_format(&s(
+                    &["rev-stealth", "--format", "nonsense", "spider",]
+                )),
+                None,
+            );
         }
     }
 }

@@ -743,6 +743,60 @@ jobs:
   # `rev-stealth completions <shell>` subcommand, which reads the clap
   # CommandFactory tree — so the gate also covers --help drift in
   # subcommands/flags reachable from completion.
+  # v1.3 Lane G fix-up R2 — Delta 4: CLI-surface inventory drift gate.
+  #
+  # Rebuilds `rev-stealth` and re-runs `scripts/cli_surface_inventory.py`
+  # in `--check` mode to assert that the committed inventory under
+  # `.agent/v1.3/cli-surface.json` (+ the naming-lint sidecar) matches the
+  # clap CommandFactory tree of the freshly-built binary. The script
+  # prints a unified diff on drift and exits non-zero, surfacing exactly
+  # which sub-command / flag / exit-code changed without the operator
+  # having to bisect.
+  #
+  # Operator fix: `cargo build --release --bin rev-stealth &&
+  # scripts/cli_surface_inventory.py`, then commit the regenerated files.
+  cli-surface-drift:
+    name: cli surface inventory drift
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: assert committed inventory is tracked
+        # Sibling-of completion-drift: bare `git diff --exit-code` ignores
+        # missing files, so we pre-flight check the two artifacts the
+        # script generates.
+        run: |
+          set -euo pipefail
+          missing=0
+          for f in \
+              .agent/v1.3/cli-surface.json \
+              .agent/v1.3/cli-naming-lint.json; do
+            if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+              echo "::error::expected inventory file is not tracked: $f" >&2
+              missing=1
+            fi
+          done
+          if [[ "$missing" -eq 1 ]]; then
+            echo "::error::commit the inventory files (regen via cargo build --release --bin rev-stealth && scripts/cli_surface_inventory.py)." >&2
+            exit 1
+          fi
+      - name: build rev-stealth (release)
+        # The inventory script walks `rev-stealth --help` recursively; we
+        # build release here to mirror what the operator would run locally.
+        run: cargo build --release --bin rev-stealth
+      - name: cli-surface inventory --check
+        run: |
+          set -euo pipefail
+          python3 scripts/cli_surface_inventory.py \
+            --bin ./target/release/rev-stealth \
+            --check
+
   completion-drift:
     name: shell-completion drift
     runs-on: ubuntu-22.04

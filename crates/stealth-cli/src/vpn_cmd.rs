@@ -116,9 +116,12 @@ pub(crate) async fn run(format: OutputFormat, action: VpnAction) -> ExitCode {
                 ],
             );
             let store = crate::commands::idempotency::IdempotencyStore::from_env_or_default();
-            if let Some((_h, env)) =
-                crate::commands::idempotency::maybe_replay(&store, "vpn.rotate", key.as_deref(), &payload)
-            {
+            if let Some((_h, env)) = crate::commands::idempotency::maybe_replay(
+                &store,
+                "vpn.rotate",
+                key.as_deref(),
+                &payload,
+            ) {
                 let _ = crate::commands::idempotency::emit_replay(format, "vpn.rotate", &env);
                 return ExitCode::Ok;
             }
@@ -132,7 +135,11 @@ pub(crate) async fn run(format: OutputFormat, action: VpnAction) -> ExitCode {
                         "result": result,
                     });
                     crate::commands::idempotency::record_success(
-                        &store, "vpn.rotate", key.as_deref(), &payload, &envelope,
+                        &store,
+                        "vpn.rotate",
+                        key.as_deref(),
+                        &payload,
+                        &envelope,
                     );
                 }
             }
@@ -207,20 +214,9 @@ async fn status(format: OutputFormat, provider: &str) -> ExitCode {
 }
 
 fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({ "ok": true, "operation": op, "result": payload })
-            );
-        }
-        OutputFormat::Human => {
-            println!("[OK] {op}");
-            if let Ok(s) = serde_json::to_string_pretty(&payload) {
-                println!("{s}");
-            }
-        }
-    }
+    // v1.3 Lane G fix-up R2: delegate to centralized multi-format renderer
+    // (handles human/text/json/yaml uniformly so the yaml branch lives in one place).
+    crate::commands::output_render::emit_ok(format, op, payload);
 }
 
 fn emit_error(format: OutputFormat, exit: ExitCode, op: &str, message: &str) -> ExitCode {

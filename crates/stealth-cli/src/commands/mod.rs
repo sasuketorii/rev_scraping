@@ -17,6 +17,9 @@ pub mod hermes;
 pub mod measure;
 // v1.3 (G.4): shared `--output-format` per-subcommand override.
 pub mod output_format;
+// v1.3 Lane G fix-up R2: shared multi-format (`human`/`json`/`yaml`) OK
+// envelope renderer. Single source of truth for the yaml branch.
+pub mod output_render;
 // v1.3 (G.5): shared `--dry-run` / `--explain` / `--idempotency-key` for mutate subcommands.
 pub mod dry_run;
 // v1.3 (G.6): idempotent commit replay store for mutate subcommands.

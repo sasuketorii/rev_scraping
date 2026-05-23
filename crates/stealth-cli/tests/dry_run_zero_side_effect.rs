@@ -149,10 +149,7 @@ fn assert_dry_run_envelope(payload: &Value, expected_operation: &str) {
         .get("plan")
         .and_then(Value::as_array)
         .expect("result.plan is array");
-    assert!(
-        !plan.is_empty(),
-        "result.plan must be non-empty: {result}"
-    );
+    assert!(!plan.is_empty(), "result.plan must be non-empty: {result}");
     // idempotency_key field MUST exist (G.5 surface contract for G.6).
     assert!(result.get("idempotency_key").is_some());
 }
@@ -239,13 +236,7 @@ fn config_migrate_dry_run_is_side_effect_free() {
     let tmp = tempfile::tempdir().unwrap();
     assert_zero_side_effect(
         tmp.path(),
-        &[
-            "config",
-            "--output-format",
-            "json",
-            "migrate",
-            "--dry-run",
-        ],
+        &["config", "--output-format", "json", "migrate", "--dry-run"],
         "config.migrate",
     );
 }

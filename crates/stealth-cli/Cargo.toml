@@ -96,6 +96,10 @@ stealth-auth = { workspace = true }
 # v1.1.0 (P17): snapshot tests for CLI --help and config-compat.
 jsonschema = { version = "0.17", default-features = false }
 insta = { version = "1", features = ["yaml"] }
+# v1.3 Lane G fix-up R2: idempotency invariant property tests
+# (`tests/idempotency_invariants.rs`). Workspace pin = 1.x; cases default to
+# PROPTEST_CASES=50 inside the test module to keep PR-loop time bounded.
+proptest = { workspace = true }
 
 [lints]
 workspace = true

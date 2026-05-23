@@ -2507,6 +2507,7 @@ dependencies = [
  "dirs",
  "insta",
  "jsonschema",
+ "proptest",
  "regex",
  "reqwest",
  "rev-stealth-auth",

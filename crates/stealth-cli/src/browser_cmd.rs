@@ -243,20 +243,9 @@ async fn navigate_and_inspect(
 }
 
 fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({ "ok": true, "operation": op, "result": payload })
-            );
-        }
-        OutputFormat::Human => {
-            println!("[OK] {op}");
-            if let Ok(s) = serde_json::to_string_pretty(&payload) {
-                println!("{s}");
-            }
-        }
-    }
+    // v1.3 Lane G fix-up R2: delegate to centralized multi-format renderer
+    // (handles human/text/json/yaml uniformly so the yaml branch lives in one place).
+    crate::commands::output_render::emit_ok(format, op, payload);
 }
 
 fn emit_error(format: OutputFormat, exit: ExitCode, op: &str, message: &str) -> ExitCode {

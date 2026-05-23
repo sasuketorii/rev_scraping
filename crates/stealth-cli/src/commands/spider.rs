@@ -1571,20 +1571,9 @@ fn dump_html_to(path: &std::path::Path, html: &str) -> std::io::Result<usize> {
 }
 
 fn emit_ok(format: OutputFormat, op: &str, payload: serde_json::Value) {
-    match format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                json!({ "ok": true, "operation": op, "result": payload })
-            );
-        }
-        OutputFormat::Human => {
-            println!("[OK] {op}");
-            if let Ok(s) = serde_json::to_string_pretty(&payload) {
-                println!("{s}");
-            }
-        }
-    }
+    // v1.3 Lane G fix-up R2: delegate to centralized multi-format renderer
+    // (handles human/text/json/yaml uniformly so the yaml branch lives in one place).
+    crate::commands::output_render::emit_ok(format, op, payload);
 }
 
 /// Build the `vpn_monitor` JSON envelope block (Phase 6e).
@@ -1625,6 +1614,16 @@ async fn emit_leak_exit(
     );
     match format {
         OutputFormat::Json => println!("{payload}"),
+        OutputFormat::Yaml => {
+            // v1.3 Lane G fix-up R2: yaml encoding of the same envelope.
+            match serde_yaml::to_string(&payload) {
+                Ok(s) => print!("{s}"),
+                Err(e) => {
+                    eprintln!("# yaml-encode-error: {e}");
+                    println!("{payload}");
+                }
+            }
+        }
         OutputFormat::Human => {
             eprintln!("[ERROR] {op}: vpn leak detected: {reason}");
             if let Ok(s) = serde_json::to_string_pretty(&payload) {
@@ -1637,9 +1636,8 @@ async fn emit_leak_exit(
 fn emit_err(format: OutputFormat, op: &str, exit: i32, msg: &str) {
     // v1.3 Lane G.7: canonical error envelope (see commands/error_envelope.rs).
     let kind = crate::commands::error_envelope::classify_legacy_message(msg);
-    let _ = crate::commands::error_envelope::emit_err_envelope(
-        format, op, exit, kind, msg, None, None,
-    );
+    let _ =
+        crate::commands::error_envelope::emit_err_envelope(format, op, exit, kind, msg, None, None);
 }
 
 #[cfg(test)]

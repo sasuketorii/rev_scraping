@@ -321,6 +321,25 @@ def main() -> int:
     ap.add_argument("--bin", default="./target/debug/rev-stealth")
     ap.add_argument("--out", default=".agent/v1.3/cli-surface.json")
     ap.add_argument("--lint-out", default=".agent/v1.3/cli-naming-lint.json")
+    # v1.3 Lane G fix-up R2 — Delta 4: drift-gate mode.
+    #
+    # When `--check` is passed, the script re-runs the same walk + payload
+    # computation but does NOT overwrite the on-disk inventory. Instead it
+    # compares the freshly-computed payload against the committed
+    # `--out` / `--lint-out` files and exits non-zero (with a unified diff
+    # on stderr) if either has drifted. This is the gate the `cli-surface-drift`
+    # GitHub Actions job consumes.
+    #
+    # Operator workflow:
+    #   * local: `cargo build --release --bin rev-stealth` then
+    #     `scripts/cli_surface_inventory.py` (no flag) to regenerate.
+    #   * CI:    same build, then `scripts/cli_surface_inventory.py --check`.
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="exit 1 if the live CLI tree diverges from the committed "
+             "inventory file (drift-gate mode; does NOT write outputs).",
+    )
     args = ap.parse_args()
 
     root = walk(args.bin, [])
@@ -348,9 +367,6 @@ def main() -> int:
             "warning: commands missing from COMMAND_EXIT_CODES mapping "
             f"({len(missing_exit_codes)}): {missing_exit_codes}\n"
         )
-    with open(args.out, "w") as fh:
-        json.dump(payload, fh, indent=2, sort_keys=False)
-        fh.write("\n")
 
     lints = lint_naming(root)
     lint_payload = {
@@ -358,9 +374,58 @@ def main() -> int:
         "issues": lints,
         "issue_count": len(lints),
     }
+
+    # Canonical serialised form. Reused by both the write and the
+    # `--check` drift-gate path so the on-disk format is byte-identical.
+    payload_text = json.dumps(payload, indent=2, sort_keys=False) + "\n"
+    lint_text = json.dumps(lint_payload, indent=2) + "\n"
+
+    if args.check:
+        # v1.3 Lane G fix-up R2 — Delta 4: drift gate.
+        #
+        # Diff each freshly-computed artifact against the committed copy
+        # under .agent/v1.3/. Print a unified diff on drift and exit 1.
+        import difflib
+        rc = 0
+        for label, path, fresh in (
+            ("cli-surface", args.out, payload_text),
+            ("cli-naming-lint", args.lint_out, lint_text),
+        ):
+            try:
+                with open(path, "r") as fh:
+                    committed = fh.read()
+            except FileNotFoundError:
+                sys.stderr.write(
+                    f"[drift] {label}: committed artifact missing at {path}\n"
+                )
+                rc = 1
+                continue
+            if committed != fresh:
+                rc = 1
+                diff = difflib.unified_diff(
+                    committed.splitlines(keepends=True),
+                    fresh.splitlines(keepends=True),
+                    fromfile=f"committed: {path}",
+                    tofile=f"fresh:     {path}",
+                    n=3,
+                )
+                sys.stderr.write(f"[drift] {label}: regenerated payload differs from {path}\n")
+                sys.stderr.writelines(diff)
+                sys.stderr.write("\n")
+        if rc == 0:
+            sys.stdout.write("cli-surface-drift: OK (no drift)\n")
+        else:
+            sys.stderr.write(
+                "cli-surface-drift: FAIL — run "
+                "`cargo build --release --bin rev-stealth && "
+                "scripts/cli_surface_inventory.py` to regenerate, then commit.\n"
+            )
+        return rc
+
+    with open(args.out, "w") as fh:
+        fh.write(payload_text)
     with open(args.lint_out, "w") as fh:
-        json.dump(lint_payload, fh, indent=2)
-        fh.write("\n")
+        fh.write(lint_text)
 
     # Summarize to stdout for CI logs.
     flat: list[CommandNode] = []

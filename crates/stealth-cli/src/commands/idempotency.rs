@@ -140,8 +140,7 @@ impl IdempotencyStore {
             recorded_at_unix: now_unix(),
             envelope: envelope.clone(),
         };
-        let bytes = serde_json::to_vec(&rec)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let bytes = serde_json::to_vec(&rec).map_err(io::Error::other)?;
         // Atomic write: tempfile in same dir + rename. POSIX guarantees
         // rename atomicity within a single filesystem.
         let tmp = path.with_extension(format!("tmp.{}", std::process::id()));
@@ -277,16 +276,27 @@ where
 /// Human mode: a `[REPLAY] <op>` banner is printed followed by the
 /// pretty-printed envelope JSON for operator readability.
 pub fn emit_replay(format: OutputFormat, op: &str, envelope: &Value) -> i32 {
+    // Attach a `replayed: true` marker so callers can tell the difference
+    // between a fresh and a replayed envelope without having to inspect the
+    // on-disk store. This marker is part of the wire contract for every
+    // structured format (json + yaml).
+    let mut envelope_owned = envelope.clone();
+    if let Some(obj) = envelope_owned.as_object_mut() {
+        obj.insert("replayed".to_string(), json!(true));
+    }
     match format {
         OutputFormat::Json => {
-            // Attach a `replayed: true` marker so callers can tell the
-            // difference between a fresh and a replayed envelope without
-            // having to inspect the on-disk store.
-            let mut envelope = envelope.clone();
-            if let Some(obj) = envelope.as_object_mut() {
-                obj.insert("replayed".to_string(), json!(true));
+            println!("{envelope_owned}");
+        }
+        OutputFormat::Yaml => {
+            // v1.3 Lane G fix-up R2: yaml mirror of the replay envelope.
+            match serde_yaml::to_string(&envelope_owned) {
+                Ok(s) => print!("{s}"),
+                Err(e) => {
+                    eprintln!("# yaml-encode-error: {e}");
+                    println!("{envelope_owned}");
+                }
             }
-            println!("{envelope}");
         }
         OutputFormat::Human => {
             println!("[REPLAY] {op}");
@@ -337,7 +347,13 @@ impl ReplayGuard {
     /// Record an envelope on the success path. Best-effort; failures are
     /// surfaced on stderr but do not change the operation's exit code.
     pub fn record(&self, op: &str, envelope: &Value) {
-        record_success(&self.store, op, self.key.as_deref(), &self.payload, envelope);
+        record_success(
+            &self.store,
+            op,
+            self.key.as_deref(),
+            &self.payload,
+            envelope,
+        );
     }
 }
 

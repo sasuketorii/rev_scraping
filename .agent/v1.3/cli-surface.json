@@ -53,7 +53,7 @@
         "short": null,
         "takes_value": true,
         "value_name": "FORMAT",
-        "description": "Output format [default: human] [possible values: human, json]"
+        "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
       },
       {
         "long": "--verbose",
@@ -67,7 +67,7 @@
         "short": "-h",
         "takes_value": false,
         "value_name": null,
-        "description": "Print help"
+        "description": "Print help (see a summary with '-h')"
       },
       {
         "long": "--version",
@@ -84,14 +84,21 @@
         "path": [
           "captcha"
         ],
-        "description": "CAPTCHA bypass operations (reCAPTCHA v2 / v3 / hCaptcha / Turnstile)",
+        "description": "CAPTCHA resilience evaluation. Drives the captcha-bypass solver against reCAPTCHA v2/v3, hCaptcha, or Turnstile, and verifies tokens via the provider's server-side endpoint. AUTHORIZED TARGETS ONLY.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--verbose",
@@ -105,7 +112,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth captcha solve --type recaptcha-v2 --site-url https://example.com $ rev-stealth captcha verify --type hcaptcha --token <TOKEN> EXIT CODES: 0  Ok               Action completed. 1  UserError        Bad args (unknown --type / missing --site-url). 2  TransientError   Solver or provider transient failure. 3  PermanentError   Solver not configured / challenge unsupported. ENV: REV_STEALTH_CAPTCHA_SECRET  Provider secret used by `captcha verify`."
           }
         ],
         "positionals": [],
@@ -121,14 +128,14 @@
               "captcha",
               "solve"
             ],
-            "description": "Solve a CAPTCHA challenge",
+            "description": "Solve a CAPTCHA challenge by delegating to the configured captcha-bypass solver. Supports reCAPTCHA v2/v3, hCaptcha, and Turnstile. Token output is JSON when --format=json. AUTHORIZED TARGETS ONLY.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--type",
@@ -177,7 +184,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth captcha solve --type recaptcha-v2 --site-url https://example.com $ rev-stealth captcha solve --type turnstile --site-url https://x.test --site-key 0x4 --dry-run $ rev-stealth --format json captcha solve --type hcaptcha --site-url https://h.test EXIT CODES: 0  Ok               Token solved successfully. 1  UserError        Bad args (unknown --type, malformed --site-url). 2  TransientError   Solver network/provider transient failure. 3  PermanentError   Solver not configured or challenge unsupported. ENV: REV_STEALTH_CAPTCHA_SECRET  Provider secret used by `verify` (see captcha verify --help)."
               }
             ],
             "positionals": [],
@@ -194,14 +201,14 @@
               "captcha",
               "verify"
             ],
-            "description": "Verify a previously-issued token (round-trips through the challenge provider's verify endpoint)",
+            "description": "Verify a CAPTCHA token by calling the challenge provider's server-side verify endpoint. Returns the provider's structured verdict; the exit code reflects RPC outcome only (not the verdict itself).",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--type",
@@ -236,7 +243,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth captcha verify --type recaptcha-v2 --token <TOKEN> $ rev-stealth captcha verify --type hcaptcha --token <TOKEN> --secret <SECRET> $ REV_STEALTH_CAPTCHA_SECRET=... rev-stealth captcha verify --type turnstile --token <TOKEN> EXIT CODES: 0  Ok               Verify RPC completed (read verdict from output). 1  UserError        Bad args (unknown --type, missing --secret). 2  TransientError   Provider network/timeout (retryable). 3  PermanentError   Provider permanently rejected (unsupported type, bad config). ENV: REV_STEALTH_CAPTCHA_SECRET  Provider secret. Preferred over `--secret` for ops use."
               }
             ],
             "positionals": [],
@@ -254,14 +261,21 @@
         "path": [
           "browser"
         ],
-        "description": "Stealth browser operations (launch a profile, run a stealth-test sweep)",
+        "description": "Stealth-browser operations via chromiumoxide. `launch` boots a fingerprint-cloaked Chrome, navigates, and dumps page metadata; `stealth-test` runs a detection-page sweep (default bot.sannysoft.com).",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--verbose",
@@ -275,7 +289,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth browser launch --profile mobile-ios --url https://example.com $ rev-stealth browser stealth-test --dwell 5 EXIT CODES: 0  Ok               Browser action completed. 1  UserError        Unknown --profile or --stealth slug. 2  TransientError   Chrome launch / CDP transient failure. 3  PermanentError   Chrome binary missing or stealth level unsupported. ENV: REV_STEALTH_CHROME  Override the chrome executable path."
           }
         ],
         "positionals": [],
@@ -291,14 +305,14 @@
               "browser",
               "launch"
             ],
-            "description": "Launch a stealth browser, navigate to a URL, and emit JSON about the resulting page (UA / viewport / title / final URL). Useful as a smoke test that the launcher works on this host",
+            "description": "Launch a chromiumoxide-driven stealth browser with the chosen profile and stealth level, navigate to --url, and dump page metadata (UA / viewport / title / final URL). Use for launcher smoke tests on a new host.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--profile",
@@ -354,7 +368,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth browser launch $ rev-stealth browser launch --profile desktop --url https://example.com --dwell 3 $ rev-stealth browser launch --headed --stealth full --chrome /usr/bin/google-chrome EXIT CODES: 0  Ok               Launch + navigation succeeded. 1  UserError        Unknown --profile / --stealth slug. 2  TransientError   Chrome launch/CDP transient failure. 3  PermanentError   Chrome binary missing or stealth level unsupported. ENV: REV_STEALTH_CHROME  Override the chrome executable path (else auto-detect)."
               }
             ],
             "positionals": [],
@@ -371,14 +385,14 @@
               "browser",
               "stealth-test"
             ],
-            "description": "Run a stealth self-test: launch a stealth browser, navigate to the target detection page (defaults to bot.sannysoft.com), wait briefly, then dump UA / viewport / title",
+            "description": "Run a stealth self-test against a detection page (default: bot.sannysoft.com). Launches the browser with the chosen profile + stealth level, dwells N seconds, then dumps UA / viewport / title for offline inspection. AUTHORIZED TARGETS ONLY.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--target",
@@ -434,7 +448,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth browser stealth-test $ rev-stealth browser stealth-test --profile desktop --dwell 8 $ rev-stealth browser stealth-test --target https://bot.sannysoft.com/ --headed EXIT CODES: 0  Ok               Stealth probe completed. 1  UserError        Unknown --profile / --stealth slug. 2  TransientError   Chrome launch/CDP transient failure. 3  PermanentError   Chrome binary missing or unsupported stealth level. ENV: REV_STEALTH_CHROME  Override the chrome executable path (else auto-detect)."
               }
             ],
             "positionals": [],
@@ -452,14 +466,21 @@
         "path": [
           "vpn"
         ],
-        "description": "VPN IP rotation operations (Surfshark / Gluetun lazy-rotate-on-fail)",
+        "description": "VPN exit-IP control. `rotate` triggers a provider rotation with the chosen strategy (lazy-on-fail / every-n / interval); `status` probes the current public IP and the VPN container state. All actions are audit-logged.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--verbose",
@@ -473,7 +494,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth vpn rotate --strategy lazy-on-fail --reason scrape-failure $ rev-stealth vpn status EXIT CODES: 0  Ok               Action completed. 1  UserError        Bad --provider / --strategy. 2  TransientError   Provider/container transient failure. 3  PermanentError   Provider unsupported in this build. 7  Leak             Post-action leak detected (fail-closed). ENV: REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard policy-wide. VPN_INSTANCES             Pool of named VPN instances (config.vpn_instances)."
           }
         ],
         "positionals": [],
@@ -490,14 +511,14 @@
               "vpn",
               "rotate"
             ],
-            "description": "Trigger a VPN rotation. With `lazy-on-fail`, rotation is skipped unless the failure counter has crossed the threshold",
+            "description": "Trigger a VPN exit-IP rotation through the configured provider (Surfshark / Gluetun). Strategy `lazy-on-fail` skips when the failure counter is under threshold; `every-n` / `interval` rotate unconditionally on cadence. The action is recorded to the audit log with the supplied --reason.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--provider",
@@ -535,11 +556,32 @@
                 "description": "Reason hint; recorded in the audit log for forensics [default: manual]"
               },
               {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+              },
+              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth vpn rotate $ rev-stealth vpn rotate --strategy every-n --region jp --reason scheduled $ rev-stealth vpn rotate --provider surfshark --strategy interval --reason failover EXIT CODES: 0  Ok               Rotation completed (or correctly skipped under lazy-on-fail). 1  UserError        Unknown --provider / --strategy. 2  TransientError   Provider/container transient failure. 3  PermanentError   Provider unsupported in this build. 7  Leak             Post-rotation leak check failed (fail-closed). ENV: REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard policy-wide."
               }
             ],
             "positionals": [],
@@ -557,14 +599,14 @@
               "vpn",
               "status"
             ],
-            "description": "Show the current public IP and the VPN container state",
+            "description": "Probe the current public IP via ipinfo.io and report the VPN container state (running / exit country / exit ASN) for the chosen provider. Useful as a 'before-rotate' diagnostic; pairs with `doctor` for leak checks.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--provider",
@@ -585,7 +627,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth vpn status $ rev-stealth vpn status --provider surfshark $ rev-stealth --format json vpn status EXIT CODES: 0  Ok               Status probe completed. 1  UserError        Unknown --provider slug. 2  TransientError   ipinfo / provider transient failure. 3  PermanentError   Provider unsupported in this build. 7  Leak             Exit-IP probe revealed a leak (fail-closed). ENV: (none consumed directly by this subcommand.)"
               }
             ],
             "positionals": [],
@@ -604,7 +646,7 @@
         "path": [
           "doctor"
         ],
-        "description": "Pre-flight leak-prevention checks (kill-switch / DNS / IPv6 / WebRTC). Exits with code 7 when any check fails (fail-closed)",
+        "description": "Pre-flight leak-prevention diagnostics: kill-switch, DNS lock, IPv6 disabled, WebRTC guard, and optional exit-IP probe (ipinfo.io). Fail-closed: any check failing yields exit code 7. `--deep` runs extended stack health checks; `--vps` adds VPS-deploy readiness checks.",
         "flags": [
           {
             "long": "--container",
@@ -618,7 +660,7 @@
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
           },
           {
             "long": "--expected-country",
@@ -639,7 +681,7 @@
             "short": null,
             "takes_value": true,
             "value_name": "OUTPUT_FORMAT",
-            "description": "Output format for doctor diagnostic results: `json` (machine-parseable, default) or `text` (human-readable) [default: json] [possible values: json, text]"
+            "description": "Output format for doctor diagnostic results: `json` (machine-parseable, default) or `text` (human-readable) Possible values: - json - text - yaml: v1.3 Lane G fix-up R2: yaml re-encoding of the same json envelope [default: json]"
           },
           {
             "long": "--skip-exit-ip",
@@ -667,7 +709,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth doctor $ rev-stealth doctor --expected-country JP --output-format text $ rev-stealth doctor --deep --skip-exit-ip $ rev-stealth doctor --vps EXIT CODES: 0  Ok               All checks passed. 1  UserError        Bad args (unknown --container, malformed country code). 7  Leak             One or more leak checks failed (fail-closed). ENV: REV_STEALTH_CHROME  WebRTC guard probe respects this override."
           }
         ],
         "positionals": [],
@@ -682,14 +724,21 @@
         "path": [
           "spider"
         ],
-        "description": "AUP-gated browse + optional CF eval + optional adaptive relocate",
+        "description": "AUP-gated browser fetch with optional Cloudflare Turnstile evaluation and adaptive element relocation. Honours the layered config / recipe cache; falls back from obscura to reqwest unless --no-auto-fallback is set. Replays stored auth cookies via --use-auth. AUTHORIZED TARGETS ONLY.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--url",
@@ -699,18 +748,18 @@
             "description": "Target URL"
           },
           {
-            "long": "--session-id",
-            "short": null,
-            "takes_value": true,
-            "value_name": "SESSION_ID",
-            "description": "Session id (auto-generated when omitted)"
-          },
-          {
             "long": "--verbose",
             "short": "-v",
             "takes_value": false,
             "value_name": null,
             "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--session-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "SESSION_ID",
+            "description": "Session id (auto-generated when omitted)"
           },
           {
             "long": "--mobile-preset",
@@ -934,7 +983,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth spider --url https://example.com --i-have-authorization $ rev-stealth spider --url https://x.test --use-auth my-profile --require-vpn $ rev-stealth spider --url https://x.test --http-only --dump-html out.html EXIT CODES: 0  Ok               Fetch + (optional) relocate succeeded. 1  UserError        Bad args / AUP rejection / config validation failure. 2  TransientError   Network / obscura / VPN flap (retryable). 3  PermanentError   Permanent fetch failure or unsupported config. 4  AuthExpired      Stored auth profile missing/expired (Phase 9a). 7  Leak             Leak detected (fail-closed when --require-vpn). ENV: REV_STEALTH_OBSCURA       Override the obscura binary path. REV_SCRAPING_HOME         Override `~/.rev_scraping/` base. REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard."
           }
         ],
         "positionals": [],
@@ -952,14 +1001,21 @@
         "path": [
           "relocate"
         ],
-        "description": "Locate a previously fingerprinted element in a saved HTML or fresh URL",
+        "description": "Locate a previously fingerprinted element by stable_id against either a local HTML file (--html-file) or a fresh fetch (--url, HTTP-only). Returns the best CSS selector + similarity score from ParseStore.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--session-id",
@@ -969,18 +1025,18 @@
             "description": "Session id (informational; not required to open the store)"
           },
           {
-            "long": "--stable-id",
-            "short": null,
-            "takes_value": true,
-            "value_name": "STABLE_ID",
-            "description": "stable_id of the element to locate"
-          },
-          {
             "long": "--verbose",
             "short": "-v",
             "takes_value": false,
             "value_name": null,
             "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--stable-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "STABLE_ID",
+            "description": "stable_id of the element to locate"
           },
           {
             "long": "--html-file",
@@ -1078,7 +1134,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth relocate --stable-id abc123 --html-file saved.html $ rev-stealth relocate --stable-id abc123 --url https://example.com --i-have-authorization $ rev-stealth relocate --stable-id abc123 --html-file saved.html --strict --threshold 0.9 EXIT CODES: 0  Ok               Match found above threshold. 1  UserError        Bad args / AUP rejection / missing stable_id. 3  PermanentError   ParseStore open failure or no candidate found. ENV: REV_SCRAPING_HOME  Override `~/.rev_scraping/` (ParseStore location)."
           }
         ],
         "positionals": [],
@@ -1093,14 +1149,21 @@
         "path": [
           "cf-evaluate"
         ],
-        "description": "Defender-testbed evaluation of Cloudflare Turnstile resilience",
+        "description": "Defender-testbed evaluation of Cloudflare Turnstile resilience. Launches the stealth browser against --url and records the Turnstile challenge trajectory without invoking any solver. Requires explicit AUP authorization.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--url",
@@ -1110,18 +1173,18 @@
             "description": ""
           },
           {
-            "long": "--session-id",
-            "short": null,
-            "takes_value": true,
-            "value_name": "SESSION_ID",
-            "description": ""
-          },
-          {
             "long": "--verbose",
             "short": "-v",
             "takes_value": false,
             "value_name": null,
             "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--session-id",
+            "short": null,
+            "takes_value": true,
+            "value_name": "SESSION_ID",
+            "description": ""
           },
           {
             "long": "--i-have-authorization",
@@ -1198,7 +1261,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth cf-evaluate --url https://example.com --i-have-authorization $ rev-stealth cf-evaluate --url https://x.test --i-have-authorization --use-auth my-profile $ rev-stealth cf-evaluate --url https://x.test --i-have-authorization --require-vpn EXIT CODES: 0  Ok               Evaluation completed. 1  UserError        Bad --url / AUP rejection / config error. 2  TransientError   Browser / network transient failure. 3  PermanentError   Obscura missing or evaluation unsupported. ENV: REV_STEALTH_OBSCURA       Override the obscura binary path. REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN-required guard."
           }
         ],
         "positionals": [],
@@ -1214,14 +1277,21 @@
         "path": [
           "auth"
         ],
-        "description": "Authenticated session capture / lifecycle (Phase 9d). Subcommands: login / list / show / delete / status / refresh",
+        "description": "Authenticated session lifecycle (Phase 9d). Login captures cookies via rev-auth and stores them sealed under AuthStore; list/show emit redacted metadata; status reports freshness; refresh re-runs login; delete shreds the profile.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--verbose",
@@ -1235,7 +1305,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth login --profile work --url https://x.test $ rev-stealth auth list $ rev-stealth auth status --profile work $ rev-stealth auth delete --profile work --force EXIT CODES: 0  Ok               Action completed. 1  UserError        Bad args / unknown profile / AUP rejection. 3  PermanentError   AuthStore unavailable / rev-auth not installed. 4  AuthExpired      Profile expired or unusable (login/status/refresh paths). ENV: REV_OBSCURA_BIN              Override the obscura binary path. REV_AUTH_BIN                 Override the rev-auth helper binary. REV_SCRAPING_AUTH_DIR        Override the AuthStore directory. REV_SCRAPING_AUTH_PASSPHRASE Sealed-store passphrase (else keystore-derived). REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN-required guard."
           }
         ],
         "positionals": [],
@@ -1251,14 +1321,42 @@
               "auth",
               "login"
             ],
-            "description": "Spawn `rev-auth` for interactive login; AUP-gated",
+            "description": "Spawn the rev-auth helper to perform an interactive login against --url for the given --profile. The captured cookie blob is sealed and written to AuthStore. AUP-gated; --i-have-authorization is required for hosts outside the authorized.toml allowlist.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--profile",
@@ -1273,13 +1371,6 @@
                 "takes_value": true,
                 "value_name": "URL",
                 "description": ""
-              },
-              {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
               },
               {
                 "long": "--domain",
@@ -1335,7 +1426,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth login --profile work --url https://x.test $ rev-stealth auth login --profile work --url https://x.test --domain x.test --require-vpn $ rev-stealth auth login --profile demo --url https://x.test --rev-auth-bin /usr/local/bin/rev-auth EXIT CODES: 0  Ok               Profile saved. 1  UserError        Bad args / AUP rejection / unknown profile mode. 3  PermanentError   rev-auth missing / AuthStore IO failure. 4  AuthExpired      Captured profile is empty/unusable. ENV: REV_OBSCURA_BIN              Override the obscura binary path. REV_AUTH_BIN                 Override the rev-auth helper binary. REV_SCRAPING_AUTH_DIR        Override the AuthStore directory. REV_SCRAPING_AUTH_PASSPHRASE Sealed-store passphrase (else keystore-derived). REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN-required guard."
               }
             ],
             "positionals": [],
@@ -1352,14 +1443,14 @@
               "auth",
               "list"
             ],
-            "description": "List saved profiles (metadata only, cookie values never disclosed)",
+            "description": "List every saved AuthStore profile. Only metadata is emitted (profile name, domain, created_at, expires_at, source); cookie values are never disclosed.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -1373,7 +1464,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth list $ rev-stealth --format json auth list EXIT CODES: 0  Ok               Listing emitted. 1  UserError        Bad args. 3  PermanentError   AuthStore unavailable. ENV: REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
               }
             ],
             "positionals": [],
@@ -1389,14 +1480,14 @@
               "auth",
               "show"
             ],
-            "description": "Show a single profile's metadata (redacted)",
+            "description": "Show a single profile's metadata. Cookie values are redacted; only domain / timestamps / source / AAD context are returned.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--profile",
@@ -1417,7 +1508,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth show --profile work $ rev-stealth --format json auth show --profile work EXIT CODES: 0  Ok               Metadata emitted. 1  UserError        Bad args / unknown profile. 3  PermanentError   AuthStore unavailable. ENV: REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
               }
             ],
             "positionals": [],
@@ -1433,14 +1524,42 @@
               "auth",
               "delete"
             ],
-            "description": "Delete a profile with shred-on-delete",
+            "description": "Delete a profile with best-effort shred-on-delete (overwrite then unlink). Refuses without --force when stdin is a TTY; --force is required for non-interactive use.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--profile",
@@ -1457,18 +1576,11 @@
                 "description": "Skip the interactive confirmation prompt"
               },
               {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
-              },
-              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth delete --profile work $ rev-stealth auth delete --profile work --force EXIT CODES: 0  Ok               Profile removed. 1  UserError        Bad args / user declined / unknown profile. 3  PermanentError   AuthStore unavailable / shred IO failure. ENV: REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
               }
             ],
             "positionals": [],
@@ -1484,14 +1596,14 @@
               "auth",
               "status"
             ],
-            "description": "Report freshness/expiry status for a profile",
+            "description": "Report freshness / expiry status for the given profile. Returns exit 4 when the stored profile is expired or empty, so callers can distinguish refresh-needed from hard failures.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--profile",
@@ -1512,7 +1624,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth status --profile work $ rev-stealth --format json auth status --profile work EXIT CODES: 0  Ok               Profile is fresh. 1  UserError        Bad args / unknown profile. 3  PermanentError   AuthStore unavailable. 4  AuthExpired      Profile expired / unusable. ENV: REV_SCRAPING_AUTH_DIR        Override the AuthStore directory."
               }
             ],
             "positionals": [],
@@ -1529,14 +1641,42 @@
               "auth",
               "refresh"
             ],
-            "description": "Re-run interactive login, overwriting an existing profile",
+            "description": "Re-run the rev-auth interactive login flow, overwriting an existing profile. Same surface as `auth login` but treats an existing profile as expected.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--profile",
@@ -1551,13 +1691,6 @@
                 "takes_value": true,
                 "value_name": "URL",
                 "description": ""
-              },
-              {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
               },
               {
                 "long": "--domain",
@@ -1613,7 +1746,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth auth refresh --profile work --url https://x.test $ rev-stealth auth refresh --profile work --url https://x.test --require-vpn EXIT CODES: 0  Ok               Profile refreshed. 1  UserError        Bad args / AUP rejection. 3  PermanentError   rev-auth missing / AuthStore IO failure. 4  AuthExpired      Captured profile is empty/unusable after refresh. ENV: REV_OBSCURA_BIN              Override the obscura binary path. REV_AUTH_BIN                 Override the rev-auth helper binary. REV_SCRAPING_AUTH_DIR        Override the AuthStore directory. REV_SCRAPING_AUTH_PASSPHRASE Sealed-store passphrase (else keystore-derived). REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN-required guard."
               }
             ],
             "positionals": [],
@@ -1631,14 +1764,21 @@
         "path": [
           "measure"
         ],
-        "description": "v1.1.0 (P15): local fingerprint diagnostics for monitoring. External SaaS calls are opt-in via `--enable-external`",
+        "description": "Local fingerprint diagnostics for monitoring (P15). Validates the target --url and emits a deterministic fingerprint snapshot. External SaaS probes (CreepJS / bot.sannysoft) require --enable-external. The VPS egress probe requires --enable-egress-probe AND the `vps-egress-probe` Cargo feature.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--url",
@@ -1648,18 +1788,18 @@
             "description": "URL to measure against. The page is not actually fetched unless `--enable-external` is set; we only validate the URL shape here"
           },
           {
-            "long": "--enable-external",
-            "short": null,
-            "takes_value": false,
-            "value_name": null,
-            "description": "Opt-in to external fingerprint SaaS calls (CreepJS, bot.sannysoft.com, etc.). Default: disabled"
-          },
-          {
             "long": "--verbose",
             "short": "-v",
             "takes_value": false,
             "value_name": null,
             "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+          },
+          {
+            "long": "--enable-external",
+            "short": null,
+            "takes_value": false,
+            "value_name": null,
+            "description": "Opt-in to external fingerprint SaaS calls (CreepJS, bot.sannysoft.com, etc.). Default: disabled"
           },
           {
             "long": "--enable-egress-probe",
@@ -1680,7 +1820,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth measure --url https://example.com $ rev-stealth measure --url https://x.test --enable-external $ rev-stealth measure --url https://x.test --enable-egress-probe EXIT CODES: 0  Ok               Measurement emitted. 1  UserError        Bad args. 2  TransientError   External probe transient failure (when --enable-external). 3  PermanentError   Bad --url / measurement path unavailable. ENV: REV_STEALTH_EGRESS_PROBE_URL  Override the egress probe endpoint."
           }
         ],
         "positionals": [],
@@ -1696,14 +1836,14 @@
         "path": [
           "config"
         ],
-        "description": "v1.2.0 (P6.1): inspect the layered config (`show` / `paths` / `validate` / `diff` / `get`)",
+        "description": "Layered config inspection + mutation (P6.x). show/paths/validate/diff/get are read-only; set/edit/migrate/init/history/rollback/gc write through the atomic ConfigWriter (0600 + `.bak.<epoch>` backups). `profile` manages per-profile config trees.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
           },
           {
             "long": "--output-format",
@@ -1724,7 +1864,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config show $ rev-stealth config validate $ rev-stealth config set policy.require_vpn true $ rev-stealth config init --target all EXIT CODES: 0  Ok               Action completed. 1  UserError        Bad args / validation failure / unknown key. 3  PermanentError   Config IO failure / unsupported target. ENV: REV_SCRAPING_HOME            Override `~/.rev_scraping/` base. REV_SCRAPING_POLICY          Override the policy.toml path. REV_SCRAPING_AUTHORIZED      Override the authorized.toml path. REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory. REV_SCRAPING_CONFIG_LENIENT  Loosen validate strictness (test/CI). EDITOR                       Editor used by `config edit` (fallback: vi)."
           }
         ],
         "positionals": [],
@@ -1739,14 +1879,14 @@
               "config",
               "show"
             ],
-            "description": "Print the merged effective config from all 4 source layers (policy.toml / authorized.toml / sites/* / env). Secret-looking env values are replaced with `<redacted>`",
+            "description": "Print the merged effective config across the 4 source layers (policy.toml / authorized.toml / sites/* / env). Secret-looking env values are replaced with `<redacted>`.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -1760,7 +1900,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config show $ rev-stealth config --output-format json show $ rev-stealth config --output-format yaml show EXIT CODES: 0  Ok               Config emitted. 1  UserError        Bad args / parse error. 3  PermanentError   Config IO failure. ENV: REV_SCRAPING_HOME        Override `~/.rev_scraping/` base. REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
             "positionals": [],
@@ -1776,14 +1916,14 @@
               "config",
               "paths"
             ],
-            "description": "List each config file path (absolute), its existence, and permission bits (unix mode)",
+            "description": "List each layered-config file path (absolute), its existence, and its unix permission bits. Useful for ops debugging 0600 / 0700 expectations.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -1797,7 +1937,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config paths $ rev-stealth config --output-format json paths EXIT CODES: 0  Ok               Paths emitted. 1  UserError        Bad args. 3  PermanentError   stat() failure. ENV: REV_SCRAPING_HOME        Override `~/.rev_scraping/` base."
               }
             ],
             "positionals": [],
@@ -1813,14 +1953,14 @@
               "config",
               "validate"
             ],
-            "description": "Run the P5.1 validate engine over the live config files. Exit 0 on LGTM; exit 1 with structured issue list on violations",
+            "description": "Run the P5.1 validate engine over the live config files. Exit 0 on LGTM; exit 1 with a structured issue list on violations.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -1834,7 +1974,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config validate $ rev-stealth config --output-format json validate EXIT CODES: 0  Ok               No violations. 1  UserError        Validation violations (issue list emitted). 3  PermanentError   Config IO / parse failure. ENV: REV_SCRAPING_HOME            Override `~/.rev_scraping/` base. REV_SCRAPING_CONFIG_LENIENT  Loosen strictness for test/CI."
               }
             ],
             "positionals": [],
@@ -1850,7 +1990,7 @@
               "config",
               "diff"
             ],
-            "description": "Print a unified diff between the live `<path>` and the in-repo `templates/policy.toml` baseline. Headers use `---` / `+++`",
+            "description": "Print a unified diff between the live <path> and a baseline (default: in-repo templates/policy.toml). Headers use `---` / `+++` so the output drops cleanly into `patch`.",
             "flags": [
               {
                 "long": "--against",
@@ -1864,7 +2004,7 @@
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -1878,15 +2018,10 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config diff ~/.rev_scraping/policy.toml $ rev-stealth config diff ~/.rev_scraping/policy.toml --against ./templates/policy.toml EXIT CODES: 0  Ok               Diff emitted (no change is still exit 0). 1  UserError        Bad <path>. 3  PermanentError   IO failure. ENV: (none consumed directly; baseline path resolves via the binary's compile-time root.)"
               }
             ],
-            "positionals": [
-              {
-                "name": "PATH",
-                "description": "Path to the live config file (e.g. `~/.rev_scraping/policy.toml`)"
-              }
-            ],
+            "positionals": [],
             "exit_codes": [
               0,
               1,
@@ -1899,14 +2034,14 @@
               "config",
               "get"
             ],
-            "description": "Resolve a dotted key path (e.g. `policy.require_vpn`) against the merged config and print the value. Secret-looking values redacted",
+            "description": "Resolve a dotted key (e.g. `policy.require_vpn`, `env.VPN_INSTANCES`) against the merged effective config. Secret-looking values are replaced with `<redacted>`.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -1920,15 +2055,10 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config get policy.require_vpn $ rev-stealth config get env.VPN_INSTANCES $ rev-stealth config --output-format json get policy.require_vpn EXIT CODES: 0  Ok               Value emitted. 1  UserError        Bad key / unknown path. 3  PermanentError   Config IO / parse failure. ENV: REV_SCRAPING_HOME        Override `~/.rev_scraping/` base. REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
-            "positionals": [
-              {
-                "name": "KEY",
-                "description": "Dotted key, e.g. `policy.require_vpn` or `env.VPN_INSTANCES`"
-              }
-            ],
+            "positionals": [],
             "exit_codes": [
               0,
               1,
@@ -1941,21 +2071,28 @@
               "config",
               "set"
             ],
-            "description": "P6.3: Set a dotted-path key on `policy.toml` (or another target file) to a value. Type is inferred from the literal text (`true`/`false` \u2192 bool, all-digits \u2192 int, otherwise string). The value is written through the atomic ConfigWriter only after the resulting document passes strict validation. Secret values are NOT echoed back",
+            "description": "Set a dotted-path key on policy.toml (or another target file). Type is inferred from the literal text. Writes go through the atomic ConfigWriter after strict validation. Secret values are NOT echoed back.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
-                "long": "--target",
+                "long": "--explain",
                 "short": null,
-                "takes_value": true,
-                "value_name": "TARGET",
-                "description": "Which file to mutate. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
               },
               {
                 "long": "--verbose",
@@ -1965,23 +2102,28 @@
                 "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
               },
               {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file to mutate. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config set policy.require_vpn true $ rev-stealth config set vpn.cooldown_seconds 30 --target policy $ rev-stealth config set hosts.allow_x_test true --target authorized EXIT CODES: 0  Ok               Key set and file committed. 1  UserError        Bad key / type mismatch / validation failure. 3  PermanentError   ConfigWriter IO failure. ENV: REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
-            "positionals": [
-              {
-                "name": "KEY",
-                "description": "Dotted key, e.g. `policy.require_vpn` or `require_vpn`. A leading `policy.` / `authorized.` segment is treated as a layer hint and stripped before traversing the TOML document"
-              },
-              {
-                "name": "VALUE",
-                "description": "Value as a literal token. Inferred as bool (`true`/`false`), int (all-digits, optional leading `-`), or string (everything else). To force string mode wrap the value in quotes from the shell"
-              }
-            ],
+            "positionals": [],
             "exit_codes": [
               0,
               1,
@@ -1994,14 +2136,42 @@
               "config",
               "edit"
             ],
-            "description": "P6.3: Open the target file in `$EDITOR` (falling back to `vi`). On editor exit, the candidate is validated. If validation succeeds the file is committed via ConfigWriter (atomic 0600 + `.bak.<epoch>`). If validation fails, the original file is left untouched and the temp file is preserved so the operator can recover their edits",
+            "description": "Open the target config file in $EDITOR (default vi). On exit, the candidate is validated; on LGTM the file is committed via ConfigWriter (atomic 0600 + .bak.<epoch>). On validation failure the original is untouched and the temp file is preserved.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--target",
@@ -2018,18 +2188,11 @@
                 "description": "Override `$EDITOR`. Mostly for tests (e.g. `--editor \"cp my.toml\"`)"
               },
               {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
-              },
-              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config edit $ rev-stealth config edit --target authorized $ EDITOR=nano rev-stealth config edit EXIT CODES: 0  Ok               Edit committed. 1  UserError        Editor exit / candidate validation failure. 3  PermanentError   ConfigWriter IO failure. ENV: EDITOR                   Editor used (fallback: vi). REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
             "positionals": [],
@@ -2045,21 +2208,28 @@
               "config",
               "migrate"
             ],
-            "description": "P6.3: Migrate `policy.toml` (and authorized.toml) from its current `schema_version` to the latest known version. v1 \u2192 v1 is a no-op (returns exit 0 + an audit-trail line). The harness is in place for future v2+ migrations to plug into",
+            "description": "Migrate policy.toml + authorized.toml from their current schema_version to the latest known version. v1 \u2192 v1 is a no-op (exit 0 + audit-trail line). --dry-run prints the migration plan without writing.",
             "flags": [
               {
                 "long": "--dry-run",
                 "short": null,
                 "takes_value": false,
                 "value_name": null,
-                "description": "Dry-run: print the migration plan without writing. (v1\u2192v1 is a no-op either way; the flag is here so the future v2 migration path has a stable name.)"
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
               },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
               },
               {
                 "long": "--verbose",
@@ -2069,11 +2239,18 @@
                 "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
               },
               {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+              },
+              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config migrate $ rev-stealth config migrate --dry-run EXIT CODES: 0  Ok               Migration completed (or no-op). 1  UserError        Schema not migratable / unsupported version. 3  PermanentError   ConfigWriter IO failure. ENV: REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
             "positionals": [],
@@ -2089,14 +2266,42 @@
               "config",
               "init"
             ],
-            "description": "P6.2: Initialize the per-user config tree under `~/.rev_scraping/` (or `$REV_SCRAPING_HOME`). Creates `policy.toml` (0600), `authorized.toml` (0600), and `sites/` (0700) via the atomic ConfigWriter. Existing files are preserved unless `--force` is passed (which routes the overwrite through `.bak.<epoch>` backup)",
+            "description": "Initialize the per-user config tree under ~/.rev_scraping/ (or $REV_SCRAPING_HOME). Creates policy.toml (0600), authorized.toml (0600), and sites/ (0700) atomically. --force routes overwrites through .bak.<epoch>.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--target",
@@ -2113,13 +2318,6 @@
                 "description": "Overwrite existing files (routes through `.bak.<epoch>` backup via the P5.2 ConfigWriter \u2014 never destructive)"
               },
               {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
-              },
-              {
                 "long": "--non-interactive",
                 "short": null,
                 "takes_value": false,
@@ -2131,7 +2329,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config init $ rev-stealth config init --target policy --force $ rev-stealth config init --target all --non-interactive EXIT CODES: 0  Ok               Init completed. 1  UserError        Existing files present (use --force). 3  PermanentError   ConfigWriter IO failure. ENV: REV_SCRAPING_HOME        Override `~/.rev_scraping/` base."
               }
             ],
             "positionals": [],
@@ -2147,14 +2345,14 @@
               "config",
               "history"
             ],
-            "description": "P6.4: List the `.bak.<epoch>` backups for the target config file in newest\u2192oldest order (sorted by mtime, tie-broken by filename desc to match the epoch-ms suffix)",
+            "description": "List the .bak.<epoch> backups for the target config file in newest\u2192oldest order. Sorted by mtime, ties broken by filename desc (matching the epoch-ms suffix).",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--target",
@@ -2175,7 +2373,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config history $ rev-stealth config history --target authorized EXIT CODES: 0  Ok               Listing emitted. 1  UserError        Unknown target. 3  PermanentError   directory IO failure. ENV: REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
             "positionals": [],
@@ -2191,21 +2389,28 @@
               "config",
               "rollback"
             ],
-            "description": "P6.4: Restore a previously captured `.bak.<epoch>` backup onto the target's current path. The current file (if any) is preserved as a fresh `.bak.<epoch>` by routing the restore write through `ConfigWriter::write_with_backup`",
+            "description": "Restore a previously captured .bak.<epoch> backup onto the target's current path. The current file (if any) is preserved as a fresh .bak.<epoch> via ConfigWriter::write_with_backup. Path traversal is rejected.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
-                "long": "--target",
+                "long": "--explain",
                 "short": null,
-                "takes_value": true,
-                "value_name": "TARGET",
-                "description": "Which file to roll back. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
               },
               {
                 "long": "--verbose",
@@ -2215,19 +2420,28 @@
                 "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
               },
               {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+              },
+              {
+                "long": "--target",
+                "short": null,
+                "takes_value": true,
+                "value_name": "TARGET",
+                "description": "Which file to roll back. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
+              },
+              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config rollback policy.toml.bak.1700000000000 $ rev-stealth config rollback authorized.toml.bak.1700000000000 --target authorized EXIT CODES: 0  Ok               Rollback committed. 1  UserError        Bad backup name / path traversal / not found. 3  PermanentError   ConfigWriter IO failure. ENV: REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
-            "positionals": [
-              {
-                "name": "BAK_NAME",
-                "description": "The exact backup filename to restore (e.g. `policy.toml.bak.1700000000000`). Resolved relative to the target file's parent directory. Path traversal is rejected"
-              }
-            ],
+            "positionals": [],
             "exit_codes": [
               0,
               1,
@@ -2240,14 +2454,42 @@
               "config",
               "gc"
             ],
-            "description": "P6.4: Garbage-collect `.bak.<epoch>` backups for the target config file, keeping the newest `--keep` (default 5). All older backups are deleted; the current file is untouched",
+            "description": "Garbage-collect .bak.<epoch> backups for the target config file, keeping the newest --keep (default 5). Older backups are deleted; the current file is never touched.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--keep",
@@ -2264,18 +2506,11 @@
                 "description": "Which file's backups to GC. Defaults to `policy` [default: policy] [possible values: policy, authorized]"
               },
               {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
-              },
-              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config gc $ rev-stealth config gc --keep 10 $ rev-stealth config gc --target authorized --keep 3 EXIT CODES: 0  Ok               GC completed. 1  UserError        Bad --keep / unknown target. 3  PermanentError   directory IO failure. ENV: REV_SCRAPING_POLICY      Override the policy.toml path. REV_SCRAPING_AUTHORIZED  Override the authorized.toml path."
               }
             ],
             "positionals": [],
@@ -2291,14 +2526,14 @@
               "config",
               "profile"
             ],
-            "description": "P6.5: Manage per-profile config trees under `<base>/profiles/<name>/`. Profiles share the same internal layout as the top-level config (`policy.toml`, `authorized.toml`, `sites/`) and are activated by exporting `REV_SCRAPING_HOME=<base>/profiles/<name>`",
+            "description": "Manage per-profile config trees under <base>/profiles/<name>/. Each profile mirrors the top-level config layout; activation is by exporting REV_SCRAPING_HOME=<base>/profiles/<name>.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--verbose",
@@ -2312,7 +2547,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config profile list $ rev-stealth config profile create work $ rev-stealth config profile switch work $ rev-stealth config profile delete work --yes EXIT CODES: 0  Ok               Action completed. 1  UserError        Bad name / active profile / missing --yes. 3  PermanentError   ConfigWriter IO failure. ENV: REV_SCRAPING_HOME            Override `~/.rev_scraping/` base. REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
               }
             ],
             "positionals": [],
@@ -2328,14 +2563,14 @@
                   "profile",
                   "list"
                 ],
-                "description": "List every profile directory under `<base>/profiles/`",
+                "description": "List every profile directory under <base>/profiles/. Output is the bare set of profile names (no metadata).",
                 "flags": [
                   {
                     "long": "--format",
                     "short": null,
                     "takes_value": true,
                     "value_name": "FORMAT",
-                    "description": "Output format [default: human] [possible values: human, json]"
+                    "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
                   },
                   {
                     "long": "--verbose",
@@ -2349,7 +2584,7 @@
                     "short": "-h",
                     "takes_value": false,
                     "value_name": null,
-                    "description": "Print help"
+                    "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config profile list $ rev-stealth config --output-format json profile list EXIT CODES: 0  Ok               Listing emitted. 1  UserError        Bad args. 3  PermanentError   directory IO failure. ENV: REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
                   }
                 ],
                 "positionals": [],
@@ -2366,14 +2601,28 @@
                   "profile",
                   "create"
                 ],
-                "description": "Create a new profile directory and seed `policy.toml`, `authorized.toml`, and `sites/` via ConfigWriter (same skeleton as `config init`). Refuses if the profile already exists",
+                "description": "Create a new profile directory and seed policy.toml + authorized.toml + sites/ via ConfigWriter (same skeleton as `config init`). Refuses if the profile already exists. Name must match [A-Za-z0-9_-]{1,64}.",
                 "flags": [
+                  {
+                    "long": "--dry-run",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+                  },
                   {
                     "long": "--format",
                     "short": null,
                     "takes_value": true,
                     "value_name": "FORMAT",
-                    "description": "Output format [default: human] [possible values: human, json]"
+                    "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+                  },
+                  {
+                    "long": "--explain",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
                   },
                   {
                     "long": "--verbose",
@@ -2383,19 +2632,21 @@
                     "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
                   },
                   {
+                    "long": "--idempotency-key",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "IDEMPOTENCY_KEY",
+                    "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+                  },
+                  {
                     "long": "--help",
                     "short": "-h",
                     "takes_value": false,
                     "value_name": null,
-                    "description": "Print help"
+                    "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config profile create work $ rev-stealth config profile create demo-2026 EXIT CODES: 0  Ok               Profile created. 1  UserError        Bad name / path traversal / already exists. 3  PermanentError   ConfigWriter IO failure. ENV: REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
                   }
                 ],
-                "positionals": [
-                  {
-                    "name": "NAME",
-                    "description": "Profile name. Must match `[A-Za-z0-9_-]{1,64}` (no `/`, `\\`, `.`, whitespace, control chars). Path-traversal is rejected"
-                  }
-                ],
+                "positionals": [],
                 "exit_codes": [
                   0,
                   1,
@@ -2409,14 +2660,28 @@
                   "profile",
                   "switch"
                 ],
-                "description": "Print the shell-export line needed to activate the profile. We never mutate the operator's environment from inside the process \u2014 the operator must eval/source the printed line",
+                "description": "Print the shell-export line needed to activate the profile. We never mutate the operator's environment from inside the process \u2014 the operator must eval/source the printed line.",
                 "flags": [
+                  {
+                    "long": "--dry-run",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+                  },
                   {
                     "long": "--format",
                     "short": null,
                     "takes_value": true,
                     "value_name": "FORMAT",
-                    "description": "Output format [default: human] [possible values: human, json]"
+                    "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+                  },
+                  {
+                    "long": "--explain",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
                   },
                   {
                     "long": "--verbose",
@@ -2426,19 +2691,21 @@
                     "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
                   },
                   {
+                    "long": "--idempotency-key",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "IDEMPOTENCY_KEY",
+                    "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+                  },
+                  {
                     "long": "--help",
                     "short": "-h",
                     "takes_value": false,
                     "value_name": null,
-                    "description": "Print help"
+                    "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config profile switch work $ eval \"$(rev-stealth config profile switch work)\" EXIT CODES: 0  Ok               Export line emitted. 1  UserError        Bad name / profile not found. 3  PermanentError   resolution failure. ENV: REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
                   }
                 ],
-                "positionals": [
-                  {
-                    "name": "NAME",
-                    "description": "Profile name (must already exist)"
-                  }
-                ],
+                "positionals": [],
                 "exit_codes": [
                   0,
                   1,
@@ -2452,14 +2719,14 @@
                   "profile",
                   "delete"
                 ],
-                "description": "Best-effort overwrite-then-delete (`shred-like`) for the profile directory. Refuses if the profile is currently active per `$REV_SCRAPING_HOME` resolution",
+                "description": "Best-effort overwrite-then-delete (shred-like) for the profile directory. Refuses if the profile is currently active (per $REV_SCRAPING_HOME resolution). --yes is required for non-interactive deletion.",
                 "flags": [
                   {
                     "long": "--format",
                     "short": null,
                     "takes_value": true,
                     "value_name": "FORMAT",
-                    "description": "Output format [default: human] [possible values: human, json]"
+                    "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
                   },
                   {
                     "long": "--yes",
@@ -2469,6 +2736,13 @@
                     "description": "Required for non-interactive deletion. Without it we exit 2 with an error so an operator typo cannot wipe a profile"
                   },
                   {
+                    "long": "--dry-run",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+                  },
+                  {
                     "long": "--verbose",
                     "short": "-v",
                     "takes_value": false,
@@ -2476,19 +2750,28 @@
                     "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
                   },
                   {
+                    "long": "--explain",
+                    "short": null,
+                    "takes_value": false,
+                    "value_name": null,
+                    "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+                  },
+                  {
+                    "long": "--idempotency-key",
+                    "short": null,
+                    "takes_value": true,
+                    "value_name": "IDEMPOTENCY_KEY",
+                    "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+                  },
+                  {
                     "long": "--help",
                     "short": "-h",
                     "takes_value": false,
                     "value_name": null,
-                    "description": "Print help"
+                    "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth config profile delete work --yes $ rev-stealth config profile delete demo-2026 --yes EXIT CODES: 0  Ok               Profile removed. 1  UserError        Missing --yes / active profile / name not found. 3  PermanentError   shred IO failure. ENV: REV_SCRAPING_HOME            Override `~/.rev_scraping/` base. REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory."
                   }
                 ],
-                "positionals": [
-                  {
-                    "name": "NAME",
-                    "description": "Profile name to remove"
-                  }
-                ],
+                "positionals": [],
                 "exit_codes": [
                   0,
                   1,
@@ -2504,14 +2787,21 @@
         "path": [
           "hermes"
         ],
-        "description": "v1.2.0 (P7.3): manage the Hermes plugin scaffold (`install` / `uninstall` / `verify`)",
+        "description": "Manage the Hermes MCP plugin scaffold (P7.3). install copies the bundled scaffold to <prefix>; uninstall removes it; verify checks the required files + (by default) runs a python3 ast.parse syntax probe on __init__.py.",
         "flags": [
           {
             "long": "--format",
             "short": null,
             "takes_value": true,
             "value_name": "FORMAT",
-            "description": "Output format [default: human] [possible values: human, json]"
+            "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+          },
+          {
+            "long": "--output-format",
+            "short": null,
+            "takes_value": true,
+            "value_name": "OUTPUT_FORMAT",
+            "description": "Output format for this subcommand: `human` (default) or `json`. Shadows the global `--format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json-schemas/cli/<subcommand>.output.json` Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax)"
           },
           {
             "long": "--verbose",
@@ -2525,7 +2815,7 @@
             "short": "-h",
             "takes_value": false,
             "value_name": null,
-            "description": "Print help"
+            "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth hermes install $ rev-stealth hermes verify $ rev-stealth hermes uninstall --prefix /opt/hermes/plugins/rev-scraping-mcp EXIT CODES: 0  Ok               Action completed. 1  UserError        Bad --prefix / install conflict (use --force). 3  PermanentError   Scaffold IO failure / python3 syntax check failed. ENV: (none consumed directly; respects HOME for default --prefix.)"
           }
         ],
         "positionals": [],
@@ -2540,14 +2830,42 @@
               "hermes",
               "install"
             ],
-            "description": "Install the Hermes plugin scaffold into `<prefix>`",
+            "description": "Install the bundled Hermes MCP plugin scaffold into <prefix> (default: $HOME/.hermes/plugins/rev-scraping-mcp). --source overrides the scaffold origin. --force overwrites a non-empty destination.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
+              },
+              {
+                "long": "--explain",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
+              },
+              {
+                "long": "--verbose",
+                "short": "-v",
+                "takes_value": false,
+                "value_name": null,
+                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
+              },
+              {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
               },
               {
                 "long": "--prefix",
@@ -2564,13 +2882,6 @@
                 "description": "Override the scaffold source directory (defaults to the `dist/hermes/rev-scraping-mcp` shipped with the repo)"
               },
               {
-                "long": "--verbose",
-                "short": "-v",
-                "takes_value": false,
-                "value_name": null,
-                "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
-              },
-              {
                 "long": "--force",
                 "short": null,
                 "takes_value": false,
@@ -2582,7 +2893,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth hermes install $ rev-stealth hermes install --prefix /opt/hermes/plugins/rev-scraping-mcp $ rev-stealth hermes install --force --source ./dist/hermes/rev-scraping-mcp EXIT CODES: 0  Ok               Install completed. 1  UserError        Destination non-empty (use --force) / bad --source. 3  PermanentError   scaffold IO failure. ENV: (none consumed directly; respects HOME for default --prefix.)"
               }
             ],
             "positionals": [],
@@ -2598,21 +2909,28 @@
               "hermes",
               "uninstall"
             ],
-            "description": "Remove a previously installed Hermes plugin",
+            "description": "Remove a previously installed Hermes plugin directory at <prefix> (default: $HOME/.hermes/plugins/rev-scraping-mcp). No-op if the directory is absent.",
             "flags": [
+              {
+                "long": "--dry-run",
+                "short": null,
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: side-effect-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope"
+              },
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
-                "long": "--prefix",
+                "long": "--explain",
                 "short": null,
-                "takes_value": true,
-                "value_name": "PREFIX",
-                "description": "Plugin directory to remove. Defaults to `$HOME/.hermes/plugins/rev-scraping-mcp`"
+                "takes_value": false,
+                "value_name": null,
+                "description": "v1.3 Lane G.5: include the action plan in the result envelope's `result.plan` field. Can be combined with `--dry-run`. When passed without `--dry-run`, the plan is emitted alongside the real action"
               },
               {
                 "long": "--verbose",
@@ -2622,11 +2940,25 @@
                 "description": "Verbose logging (`-v`, `-vv`, `-vvv`)"
               },
               {
+                "long": "--idempotency-key",
+                "short": null,
+                "takes_value": true,
+                "value_name": "IDEMPOTENCY_KEY",
+                "description": "v1.3 Lane G.5 / G.6: opaque caller-supplied key for at-most-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6"
+              },
+              {
+                "long": "--prefix",
+                "short": null,
+                "takes_value": true,
+                "value_name": "PREFIX",
+                "description": "Plugin directory to remove. Defaults to `$HOME/.hermes/plugins/rev-scraping-mcp`"
+              },
+              {
                 "long": "--help",
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth hermes uninstall $ rev-stealth hermes uninstall --prefix /opt/hermes/plugins/rev-scraping-mcp EXIT CODES: 0  Ok               Uninstall completed (or no-op). 1  UserError        Bad --prefix. 3  PermanentError   directory IO failure. ENV: (none consumed directly; respects HOME for default --prefix.)"
               }
             ],
             "positionals": [],
@@ -2642,14 +2974,14 @@
               "hermes",
               "verify"
             ],
-            "description": "Verify a Hermes plugin install on disk",
+            "description": "Verify a Hermes plugin install on disk. Checks the required files are present and (by default) runs a python3 ast.parse syntax probe on __init__.py. Use --skip-python-check on hosts without python3.",
             "flags": [
               {
                 "long": "--format",
                 "short": null,
                 "takes_value": true,
                 "value_name": "FORMAT",
-                "description": "Output format [default: human] [possible values: human, json]"
+                "description": "Output format for agent / human consumers. Default `human`; pass `json` for machine-parseable output. v1.3 Lane G.4: the global flag remains `--format` (Human|Json) for backward compatibility with v1.2.x. Most subcommands also expose a per-subcommand `--output-format` flag with the same value enum, which shadows the global within the subtree. Two subcommands extend the enum locally \u2014 `doctor --output-format {json|text}` and `config --output-format {text|json|yaml}` \u2014 because those surfaces pre-date the unified flag. The full matrix and JSON schemas live under `docs/json-schemas/cli/`. Possible values: - human: Operator-friendly multi-line output. Aliases: `text` - json:  Machine-parseable JSON envelope - yaml:  JSON envelope re-encoded as YAML (same fields, yaml syntax) [default: human]"
               },
               {
                 "long": "--prefix",
@@ -2677,7 +3009,7 @@
                 "short": "-h",
                 "takes_value": false,
                 "value_name": null,
-                "description": "Print help"
+                "description": "Print help (see a summary with '-h') EXAMPLES: $ rev-stealth hermes verify $ rev-stealth hermes verify --prefix /opt/hermes/plugins/rev-scraping-mcp $ rev-stealth hermes verify --skip-python-check EXIT CODES: 0  Ok               Plugin verified. 1  UserError        Bad --prefix. 3  PermanentError   Required files missing or python3 ast.parse failed. ENV: (none consumed directly; respects HOME for default --prefix.)"
               }
             ],
             "positionals": [],

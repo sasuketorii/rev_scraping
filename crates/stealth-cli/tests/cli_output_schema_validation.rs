@@ -410,7 +410,11 @@ fn auth_login_refresh_flat_success_validates() {
         "expires_at": null,
         "saved_to": "/home/u/.rev_scraping/auth/p1.enc",
     });
-    validate_ok(&s, &login_success_no_expiry, "auth.login flat SuccessJson (no expiry)");
+    validate_ok(
+        &s,
+        &login_success_no_expiry,
+        "auth.login flat SuccessJson (no expiry)",
+    );
 }
 
 // ---------- 3) hermes (its own envelope) ----------------------------------

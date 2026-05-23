@@ -336,7 +336,10 @@ fn clap_parse_failure_emits_canonical_envelope() {
     // envelope at `operation: "cli.parse"`.
     let env = spawn_for_error(&["--format", "json", "measure"]);
     assert_canonical_envelope(&env, "kind", "clap parse failure");
-    assert_eq!(env["operation"], serde_json::Value::String("cli.parse".into()));
+    assert_eq!(
+        env["operation"],
+        serde_json::Value::String("cli.parse".into())
+    );
     assert_eq!(env["exit_code"], serde_json::json!(2));
 }
 
@@ -348,7 +351,10 @@ fn clap_parse_failure_combined_arg_form_emits_canonical_envelope() {
     // envelope on parse error.
     let env = spawn_for_error(&["--format=json", "measure"]);
     assert_canonical_envelope(&env, "kind", "clap parse failure (combined arg)");
-    assert_eq!(env["operation"], serde_json::Value::String("cli.parse".into()));
+    assert_eq!(
+        env["operation"],
+        serde_json::Value::String("cli.parse".into())
+    );
     assert_eq!(env["exit_code"], serde_json::json!(2));
 }
 
@@ -417,11 +423,8 @@ fn config_migrate_failure_emits_canonical_envelope() {
     // schema_version 999 > LATEST_SCHEMA_VERSION triggers an "error"
     // outcome which flips `any_error = true`.
     let policy_path = tmp_home.path().join("policy.toml");
-    std::fs::write(
-        &policy_path,
-        "schema_version = 999\nrequire_vpn = true\n",
-    )
-    .expect("seed policy.toml");
+    std::fs::write(&policy_path, "schema_version = 999\nrequire_vpn = true\n")
+        .expect("seed policy.toml");
 
     let out = Command::new(rev_stealth_bin())
         .args([
@@ -447,10 +450,7 @@ fn config_migrate_failure_emits_canonical_envelope() {
         "outcomes payload must be retained alongside G.7 envelope: {env_val}"
     );
     assert_eq!(env_val["ok"], Value::Bool(false));
-    assert_eq!(
-        env_val["operation"],
-        Value::String("config.migrate".into())
-    );
+    assert_eq!(env_val["operation"], Value::String("config.migrate".into()));
     assert_eq!(env_val["kind"], Value::String("validation".into()));
 }
 
