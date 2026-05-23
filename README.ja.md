@@ -1,6 +1,6 @@
 <!--
   rev_scraping — README.ja.md (日本語版)
-  v1.2.0 GA (2026-05-22)
+  v1.3.0 "Black-Belt CLI" (2026-05-23) — partial update; see README.md for full v1.3 coverage
   English version: README.md
 -->
 
@@ -10,17 +10,21 @@
 > Rust ワークスペース · 13 クレート · MCP ネイティブ(16 ツール) · VPN 必須デフォルト ·
 > XChaCha20-Poly1305 で cookie 暗号化保管 · `<<<UNTRUSTED_CONTENT>>>` エンベロープによる prompt injection 防御 · systemd 級 VPS デプロイ。
 
-[![tests](https://img.shields.io/badge/workspace_tests-776%20PASS%20%2F%200%20fail-success)](#テストスイート)
+[![tests](https://img.shields.io/badge/workspace_tests-911%20PASS%20%2F%200%20fail-success)](#テストスイート)
 [![python](https://img.shields.io/badge/hermes_python-20%20PASS-success)](#hermes-プラグイン)
 [![rust](https://img.shields.io/badge/rust-1.83%2B-orange)](https://www.rust-lang.org/)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![release](https://img.shields.io/badge/release-v1.2.0-blueviolet)](RELEASE_NOTES_v1.2.0.md)
+[![release](https://img.shields.io/badge/release-v1.3.0-blueviolet)](RELEASE_NOTES_v1.3.0.md)
 [![mcp](https://img.shields.io/badge/MCP-stdio_JSON--RPC_2.0-purple)](docs/MCP_REFERENCE.md)
-[![ci](https://img.shields.io/badge/CI-8_jobs-green)](.github/workflows/ci.yml)
+[![ci](https://img.shields.io/badge/CI-28_gates-green)](.github/workflows/ci.yml)
 
 🇺🇸 English: [README.md](README.md) · 🇯🇵 日本語: README.ja.md (このページ)
 
 ---
+
+
+> ⚠ **v1.3.0 注記**: この日本語版は v1.2.0 baseline を保持。v1.3 で追加された機能(`--output-format yaml` / `--dry-run --explain` / `--idempotency-key` / shell completion 4 系統 / 44 man pages / unified error envelope `{kind, message, hint, doc_url}` / mdBook docs / 12 crate rename `rev-stealth-*` prefix / 28 CI gates 等)は [README.md (英語版)](README.md) と [RELEASE_NOTES_v1.3.0.md](RELEASE_NOTES_v1.3.0.md) を参照。完全和訳は v1.3.1 で対応予定。
+
 
 ## 目次
 
@@ -946,7 +950,7 @@ A: v1.2.0 で top-level array に変更(security fix)。旧 `{doctor, vps}` obje
 
 ## 既知の制限と v1.2.1 バックログ
 
-[`RELEASE_NOTES_v1.2.0.md`](RELEASE_NOTES_v1.2.0.md) からそのまま転記、adopter が残留リスクを正確に把握できるように:
+[`RELEASE_NOTES_v1.3.0.md`](RELEASE_NOTES_v1.3.0.md) からそのまま転記、adopter が残留リスクを正確に把握できるように:
 
 - **L1 — ammonia HTML scrub。** v1.2.0 は HTML サニタイズなし。隠しテキスト (`<span style="display:none">`)、可視フローに relocate された JSON-LD ブロック、SVG `<script>` ペイロードは LLM にそのまま届く。
 - **L6 — URL scheme allowlist + length cap。** `javascript:`, `file:`, 巨大 `data:` URL は URL 層でフィルタされない。
@@ -984,7 +988,7 @@ CI(8 job、[`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
 
 ### テストスイート
 
-- **ワークスペース**: 776 PASS / 0 fail / 38 ignored(`cargo test --workspace --no-fail-fast`)
+- **ワークスペース**: 911 PASS / 0 fail / 38 ignored(`cargo test --workspace --no-fail-fast`)
 - **Python (Hermes)**: 20 PASS / 0 fail
 - **Sanitize ゴールデンコーパス**: 悪意 20 + benign 20 → Critical 100%、High 100%、FP ≤ 1 Suspicious / page
 

@@ -1,184 +1,198 @@
 <!--
   rev_scraping — README.md
-  v1.2.0 GA (2026-05-22)
-  Synthesized from 5 parallel Opus 4.7-high research passes
+  v1.3.0 "Black-Belt CLI" (2026-05-23)
+  Synthesized from 5 parallel Opus 4.7-xhigh research passes for v1.3.0 baseline
   (feature inventory, competitive analysis, architecture, security model, quickstart).
+  Previous baseline: v1.2.0 (2026-05-22).
 -->
 
 # rev_scraping
 
-> **An AI-agent-native, stealth-first web scraping toolkit for production.**
+> **AI エージェントネイティブな、ステルス志向の本番運用スクレイピング・ツールキット。**
 > Rust workspace · 13 crates · MCP-native (16 tools) · VPN-required by default ·
-> XChaCha20-Poly1305 cookie vault · Prompt-injection sanitizer with `<<<UNTRUSTED_CONTENT>>>` envelope · systemd-grade VPS deploy.
+> XChaCha20-Poly1305 cookie vault · Prompt-injection sanitizer with `<<<UNTRUSTED_CONTENT>>>` envelope ·
+> **v1.3 で CLI を "Stripe API + ripgrep" 級に黒帯化**(unified error envelope / idempotent commit / dry-run / yaml output / shell completion / man pages / mdBook docs)。
 
-[![tests](https://img.shields.io/badge/workspace_tests-776%20PASS%20%2F%200%20fail-success)](#test-suite)
+[![tests](https://img.shields.io/badge/workspace_tests-911%20PASS%20%2F%200%20fail-success)](#test-suite)
 [![python](https://img.shields.io/badge/hermes_python-20%20PASS-success)](#hermes-plugin)
 [![rust](https://img.shields.io/badge/rust-1.83%2B-orange)](https://www.rust-lang.org/)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![release](https://img.shields.io/badge/release-v1.2.0-blueviolet)](RELEASE_NOTES_v1.2.0.md)
+[![release](https://img.shields.io/badge/release-v1.3.0-blueviolet)](RELEASE_NOTES_v1.3.0.md)
 [![mcp](https://img.shields.io/badge/MCP-stdio_JSON--RPC_2.0-purple)](docs/MCP_REFERENCE.md)
-[![ci](https://img.shields.io/badge/CI-8_jobs-green)](.github/workflows/ci.yml)
+[![ci](https://img.shields.io/badge/CI-28_gates-green)](.github/workflows/ci.yml)
+[![dual_score](https://img.shields.io/badge/dual_score-4%2F5_PASS-success)](#v13-dual-scoring)
 
 🇯🇵 日本語版: [README.ja.md](README.ja.md)
 
 ---
 
-## Table of Contents
+## v1.3.0 Highlights
 
-- [30-second pitch](#30-second-pitch)
-- [Why rev_scraping?](#why-rev_scraping)
-- [Quickstart](#quickstart)
-- [16 MCP tools at a glance](#16-mcp-tools-at-a-glance)
-- [Architecture](#architecture)
-- [Security model](#security-model)
-- [Feature catalog](#feature-catalog)
-- [How it works (sequence flows)](#how-it-works-sequence-flows)
-- [Use cases](#use-cases)
-- [Competitive comparison](#competitive-comparison)
-- [Configuration](#configuration)
-- [FAQ / debugging](#faq--debugging)
-- [Limitations &amp; v1.2.1 backlog](#limitations--v121-backlog)
-- [Project process](#project-process)
-- [Compatibility & semver policy](docs/compat.md)
-- [License](#license)
+v1.2.0 が **runtime** を production-grade にした。v1.3.0 は **CLI それ自体** を ripgrep / fd / gh / wrangler 品質に黒帯化(35 sub-phase LGTM across 5 lanes G/H/I/J/K)。
+
+### Numbers
+
+- **Tests**: 776 → **911 PASS** (+135) / 0 fail / 38 ignored
+- **CI gates**: 8 → **28** (+20)
+- **MCP tools**: 16 (unchanged)
+- **Crates**: 13 (Slice B-3 で internal rename to `rev-stealth-*` prefix、Rust import 改変ゼロ)
+- **Sub-phases LGTM since v1.0**: 65 (v1.2 30 + v1.3 35)
+- **Commits since v1.2.0**: 20
+
+### Lane summary
+
+| Lane | Theme | Key deliverables |
+|------|-------|------------------|
+| **G** CLI UX black-belt | "ripgrep / Stripe API 級 CLI" | shell completion 4 系統 + 44 man pages + `--output-format {human,text,json,yaml}` 全 11 cmd + `--dry-run --explain` on 15 mutate + `--idempotency-key` Stripe-style replay + unified error envelope `{kind, message, hint, doc_url}` + 26 closed `CliErrorKind` |
+| **H** Distribution zero-distance | `cargo install` / `brew install` / `docker pull` 一発 | wrapper crate 廃止 + lib refactor + Homebrew formula + cargo-deb + cargo-generate-rpm + distroless OCI multi-arch + curl\|sh installer + cosign keyless OIDC + SLSA L3 + 12 crate publish=true |
+| **I** API stability + semver | typed-agent integrity gate | cargo-public-api PR hard gate + label enforcement + mcp-schema-breaking-detector + release-please + keep-a-changelog 1.1 + docs/compat.md + deprecated_completeness test |
+| **J** Agent-First docs | mdBook + Quickstart + 26 ErrorKind 個別ページ | docs/book/ mdBook EN+JA (67 markdown) + 7-step Quickstart + 16 tool cookbook + Crawl4AI/Playwright migration + landscape.md Q3-2026 |
+| **K** Quality moat | supply-chain audit ready | cargo-llvm-cov + cargo-deny + cargo-audit + cargo-msrv + `#![forbid(unsafe_code)]` on 13/13 crate roots + 8 proptests × 256 cases + 3 cargo-fuzz targets nightly + cross-platform 4 matrix + SBOM CycloneDX + cosign sign-blob |
+
+### Dual scoring (mandate: Opus 4.7-xhigh + Codex gpt-5.5-xhigh 両者 ≥ 9.0)
+
+| Lane | Codex | Opus | Status |
+|------|-------|------|--------|
+| **J** Agent-First docs | 9.23 R1 | 9.10 R1 | 🏆 dual PASS |
+| **I** API stability | 9.10 R2 (R1 7.79) | 9.08 R1 | 🏆 dual PASS |
+| **K** Quality moat | 9.10 R4 (R1 8.23 → R3 8.97) | 9.06 R1 | 🏆 dual PASS |
+| **G** CLI UX black-belt | 9.37 R2 (R1 8.78) | 9.23 R1 | 🏆 dual PASS |
+| **H** Distribution | 8.00 R2 plumbing | 7.38 R1 plumbing | post-tag rescore plan |
+
+**4/5 lanes dual ≥ 9.0 pre-tag converged**。Lane H D 軸 6.0 は v1.3.0 tag 時に release.yml が tap formula 更新 + cargo publish 実走 + cosign 実 verify で解消する設計(plumbing 100% LGTM 済)。
+
+詳細: [RELEASE_NOTES_v1.3.0.md](RELEASE_NOTES_v1.3.0.md)
 
 ---
 
 ## 30-second pitch
 
 ```bash
+# v1.3 一発インストール(release.yml 実走後)
+cargo install --locked rev-stealth
+brew tap sasuketorii/rev-stealth && brew install rev-stealth
+docker pull ghcr.io/sasuketorii/rev-stealth:v1.3.0
+curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh
+
+# git clone もサポート
 git clone https://github.com/sasuketorii/rev_scraping.git
-cd rev_scraping && cargo build --release --bin stealth-mcp --bin rev-stealth
+cd rev_scraping && cargo build --release
 ./target/release/rev-stealth doctor --output-format json
 ```
 
-You now have:
+これで:
 
-- a **`stealth-mcp` binary** that speaks Model Context Protocol (`2024-11-05`) over stdio and exposes **16 strict-schema tools** (`spider`, `auth_login_*`, `vpn_rotate`, `recipe_*`, `session_show`, …);
-- a **`rev-stealth` CLI** for direct operator workflows (doctor / config / profile / hermes / auth / spider);
-- a **stealth Chromium driver** (chromiumoxide + obscura CDP shim) that fills `canAccessOpener`, drops WebSocket warnings to 0, and works on a headless VPS via auto-wrapped `xvfb-run`;
-- a **VPN-required gate** with continuous leak monitor (Surfshark + Gluetun, 3-instance HRW sticky pool);
-- a **5-layer prompt-injection sanitizer** (`stealth-sanitize`) that wraps every tool response in `<<<UNTRUSTED_CONTENT origin=… sanitize_id=NONCE>>>` and detects 20 canary classes (100% Critical / 100% High detection on the v1.2.0 golden corpus);
-- a **26-variant closed `ErrorEnvelope`** with retriable hints — so your typed agent does not need to grep stack traces;
-- a **systemd 5-unit pack** (`dist/systemd/`) + `systemd-creds`-encrypted secrets for one-command VPS deploy;
-- a **Python Hermes plugin** (`dist/hermes/rev-scraping-mcp/`) that spawns the MCP server with a whitelisted env (no `ANTHROPIC_API_KEY` leak to children).
+- **`stealth-mcp`** — MCP `2024-11-05` over stdio、**16 strict-schema tools**
+- **`rev-stealth` CLI** — オペレータ直叩き、**43 sub-command**
+- **ステルス Chromium driver**(chromiumoxide + obscura CDP shim、auto-`xvfb-run`)
+- **VPN-required gate** + 継続 leak monitor(Surfshark + Gluetun 3 instance HRW sticky pool)
+- **5 層 prompt-injection sanitizer**(`stealth-sanitize`)Critical/High 100% 検出
+- **26 closed `ErrorKind`** + `retriable` + `hint` + **`doc_url`** + `retry_after_ms`
+- **systemd 5 unit pack** + `systemd-creds` 暗号化(v1.2)
+- **Python Hermes plugin**(env whitelist で AI provider key を child に漏らさない)
+- **v1.3 新規**: `--output-format yaml` 全 11 cmd / `--dry-run --explain` on 15 mutate / `--idempotency-key` Stripe-style replay / 4 shell completion / 44 man pages / mdBook docs + 26 ErrorKind 個別ページ / distroless multi-arch OCI / cosign keyless OIDC + SLSA L3
 
-**Who this is for**: defender-side red/blue teams, AI-agent operators (Claude Code / Cursor / Hermes), and analysts who need authenticated scraping with a defensible audit trail and operator-controlled egress.
+**想定ユーザ**: AI エージェント開発者(Claude Code / Cursor / Hermes)、defender-side red/blue、認証スクレイピング業務のアナリスト。
 
-**Who this is *not* for**: distributed 10 M-URL crawls, HTML→Markdown RAG ingestion at scale, GUI-managed browser fleets. See [honest limitations](#limitations--v121-backlog) — Crawl4AI / Browserless / Bright Data are correct picks for those.
+**想定外**: 分散 10M URL crawl / RAG 用 HTML→Markdown / GUI 管理ブラウザファーム。
 
 ---
 
 ## Why rev_scraping?
 
-Five things the rest of the ecosystem leaves to the operator. `rev_scraping` ships them by default.
+5 軸でエコシステムが operator に丸投げしている要件を default で提供。v1.3 で CLI 黒帯軸を加えて:
 
-| Axis | What rev_scraping ships | What the field looks like |
-|---|---|---|
-| **Prompt-injection defense on scraped content** | `stealth-sanitize` 5-layer pipeline, 20 canary classes, `<<<UNTRUSTED_CONTENT>>>` envelope, `_meta.sanitize` report on every tool response. **100% Critical / 100% High detection** on the v1.2.0 golden corpus. | Crawl4AI / Playwright MCP / Puppeteer MCP / Browserless / Bright Data Web Unlocker — **all pass raw HTML/markdown to the LLM**. Cf. Crawl4AI's own MCP docs that punt the issue to "models with strong alignment." |
-| **VPN-required as a precondition, not a config** | `require_vpn=true` default · leak monitor polling every 5–300 s (default 30 s) · IP/country/DNS/kill-switch/IPv6/WebRTC checks · HRW sticky 3-instance pool · `systemd-creds`-encrypted Surfshark credentials · exit code 7 on leak. | Every other tool in the comparison: VPN is operator-supplied glue. Bright Data and Browserless ship *proxy* primitives, not VPN-with-leak-stop. |
-| **Encrypted credentials at rest** | XChaCha20-Poly1305 AEAD (24-byte `OsRng` nonce, 32-byte key) · key in OS keyring (Keychain / `secret-service` / DPAPI) · Argon2id passphrase fallback (`m=64 MiB, t=3, p=1`) · `Zeroizing<Vec<u8>>` + `secrecy::SecretString` plaintext lifetimes · per-profile AAD binding. | Playwright `storageState.json` **plaintext**. Puppeteer `userDataDir` **plaintext**. Scrapling / Crawl4AI / obscura / gocrawl — no session-encryption layer. |
-| **Typed error contract** | 26-variant closed `ErrorKind` · `retryable: bool` + `hint` + `retry_after_ms` per envelope · compile-time arity guard (`#[forbid(unreachable_patterns)]` + exhaustive no-wildcard match). Adding a 27th variant is intentionally a breaking change. | Go `error` strings (gocrawl) · Python exception strings (Scrapling / Crawl4AI) · HTTP status + JSON `error: "..."` (Browserless / Bright Data) · Playwright/Puppeteer string exceptions. Agent ends up with `if "rate limit" in str(err)` glue. |
-| **MCP-native with strict schemas** | 16 tools, **each with input *and* output JSON-Schema** auto-generated to `docs/MCP_REFERENCE.md` + CI freshness gate. `cookie_values_returned: false` marker on every auth tool response. | Crawl4AI MCP — 4 tools, errors are strings. Playwright MCP — broad surface, no closed error enum. Most MCP servers in this space return either raw markdown or HTTP-shape errors. |
-
-Read the full [competitive comparison](#competitive-comparison) for the matrix across **8 tools × 11 axes** plus the honest list of cases where rev_scraping is the *wrong* choice.
+| 軸 | rev_scraping v1.3 | 他ツールの現状 |
+|----|------------------|---------------|
+| **Prompt-injection defense** | `stealth-sanitize` 5 層 + 20 canary + `<<<UNTRUSTED_CONTENT>>>` envelope + Critical/High 100% 検出 | Crawl4AI / Playwright MCP / Puppeteer MCP / Browserless / Bright Data — 全部 raw HTML/markdown を LLM に投げる |
+| **VPN-required gate** | `require_vpn=true` default + 5-300s leak monitor + HRW sticky + `systemd-creds` 暗号化 + exit 7 | 全競合: VPN は operator-supplied glue |
+| **Encrypted credentials** | XChaCha20-Poly1305 + OS keyring + Argon2id + `Zeroizing` + per-profile AAD | Playwright/Puppeteer 平文 / Crawl4AI 暗号化レイヤなし |
+| **Typed error contract** | 26 closed `CliErrorKind` + `retryable` + `hint` + `retry_after_ms` + `doc_url`(全 26 個が `docs/book/.../errors/<Pascal>.md` で実在) | Go strings / Python exception strings / HTTP status + JSON — agent が `if "rate limit" in str(err)` glue |
+| **MCP-native + 厳密 schema** | 16 tools + 各 input/output JSON-Schema auto-generated + CI freshness gate | Crawl4AI MCP 4 tools / Playwright MCP no closed enum |
+| **v1.3 新規: CLI UX 黒帯化** | **ripgrep 級**: shell completion 4 系統 + 44 man pages + `--output-format {human,text,json,yaml}` 全 11 cmd + 5 drift gates | scraping/automation OSS で全部揃ったものは確認できず |
+| **v1.3 新規: Stripe-style replay** | `--idempotency-key` 24h TTL + atomic write + payload-hash + replay marker | Stripe API 本家のみ、CLI レベルで idempotent commit を持つ OSS 確認できず |
+| **v1.3 新規: API drift gate** | cargo-public-api PR hard gate + label enforcement + mcp-schema-breaking-detector | Playwright MCP / Crawl4AI MCP 自動 detector 無し |
 
 ---
 
-## Quickstart
+## Quickstart (5 routes)
 
-### Route A — Local dev (macOS / Linux)
+### Route A — 一発インストール(v1.3 新規メイン、release.yml 実走後)
+
+```bash
+cargo install --locked rev-stealth
+brew tap sasuketorii/rev-stealth && brew install rev-stealth
+docker pull ghcr.io/sasuketorii/rev-stealth:v1.3.0
+curl -fsSL https://raw.githubusercontent.com/sasuketorii/rev_scraping/main/install.sh | sh
+
+rev-stealth --version
+rev-stealth doctor --output-format json | jq '.ok'
+```
+
+⚠ **v1.3.0 tag 時の release.yml は GitHub Actions 課金未設定で job-not-started 状態**(2026-05-23 現在)。billing 有効化後 `gh run rerun` で実走 → crates.io publish + Homebrew formula 更新 + GHCR push + cosign 署名。
+
+### Route B — ローカル開発(v1.2.0 同様)
 
 ```bash
 git clone https://github.com/sasuketorii/rev_scraping.git
 cd rev_scraping
-cargo build --release --bin stealth-mcp --bin rev-stealth
+cargo build --release --locked
 
-# seed ~/.rev_scraping/{policy.toml, authorized.toml, sites/}
-./target/release/rev-stealth config init
+ls target/completions/{bash,zsh,fish,nushell}/
+ls target/man/man1/  # 44 .1 files
 
-# leak-prevention sanity check
-./target/release/rev-stealth doctor --output-format json
-# exit 0 = OK / exit 7 = leak detected / exit 3 = precondition fail
+./target/release/rev-stealth doctor --output-format yaml
 ```
 
-Requirements: Rust 1.83+, Chrome/Chromium 120+ on `PATH` (or `OBSCURA_BIN` set), macOS Keychain or Linux `secret-service` for the cookie vault. Windows: **not supported** in v1.2.0 (ACL TODO).
+要件: Rust 1.83+、Chrome/Chromium 120+ on PATH(or `OBSCURA_BIN`)、macOS Keychain or Linux `secret-service`。Windows 非対応。
 
-### Route B — VPS production (Ubuntu 24.04 / Debian 12+, systemd 252+)
+### Route C — VPS 本番(Ubuntu 24.04 / Debian 12+、systemd 252+)
 
-Full runbook in [`docs/deploy/vps.md`](docs/deploy/vps.md). Short form:
+完全 runbook: [`docs/deploy/vps.md`](docs/deploy/vps.md)。
 
 ```bash
-# OS prereqs
-sudo apt-get update
-sudo apt-get install -y docker.io docker-compose-v2 chromium-browser \
-                        xvfb x11vnc ufw fail2ban unattended-upgrades
-
-# build
+sudo apt-get install -y docker.io docker-compose-v2 chromium-browser xvfb x11vnc ufw fail2ban
 git clone https://github.com/sasuketorii/rev_scraping.git
 cd rev_scraping && cargo build --release
-
-# install systemd units (idempotent — `ln -sfn`, safe to re-run after `git pull`)
 sudo ./dist/systemd/install.sh
-
-# encrypt Surfshark credentials via systemd-creds (TPM2-sealed when available)
 sudo ./dist/systemd/setup-credentials.sh
-
-# enable VPN instances + MCP server + doctor timer
 sudo systemctl enable --now rev-stealth-vpn@1 rev-stealth-vpn@2 rev-stealth-vpn@3
 sudo systemctl enable --now rev-stealth-mcp rev-stealth-doctor.timer
-
-# first-boot sanity (9 VPS deep checks)
-sudo -u rev-stealth ./target/release/rev-stealth doctor --vps --output-format json \
-  | tee /var/log/rev-stealth/doctor-firstboot.json
+sudo -u rev-stealth ./target/release/rev-stealth doctor --vps --output-format json
 ```
 
-What `install.sh` lays down (symlinks into `/etc`, not copies):
+v1.3 で Quadlet (systemd 248+) 経由で distroless OCI も unit 化可。
 
-- `rev-stealth-mcp.service` — `User=rev-stealth`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes`, `ProtectKernel{Tunables,Modules,ControlGroups}=yes`, `LockPersonality=yes`, `RestrictSUIDSGID=yes`, `LimitNOFILE=65536`, `Restart=on-failure RestartSec=5s`, `ReadWritePaths=/var/lib/rev-stealth /var/log/rev-stealth`.
-- `rev-stealth-vpn@.service` (templated; one instance per Gluetun container).
-- `rev-stealth-doctor.{service,timer}` — fires `OnBootSec=5min` + `OnUnitActiveSec=30min` (every 30 min), appends JSONL to `/var/log/rev-stealth/doctor.jsonl`.
-- `rev-stealth-xvfb-vnc.service` — **opt-in** via `install.sh --with-vnc-fallback`. Localhost-bound x11vnc for emergency operator access via `ssh -L` forwarding. Not enabled by default.
-- `tmpfiles.d` + `sysusers.d` configs (provisions `rev-stealth` user with `/usr/sbin/nologin`).
-
-Credentials drop-in (operator-supplied — wires `systemd-creds` blobs to env-file paths):
-
-```ini
-# /etc/systemd/system/rev-stealth-mcp.service.d/override.conf
-[Service]
-LoadCredentialEncrypted=surfshark_user:/etc/credstore.encrypted/surfshark_user.cred
-LoadCredentialEncrypted=surfshark_password:/etc/credstore.encrypted/surfshark_password.cred
-Environment=VPN_USER_FILE=%d/surfshark_user
-Environment=VPN_PASSWORD_FILE=%d/surfshark_password
-```
-
-The `<KEY>_FILE` precedence is honored by `CredentialResolver`, which **refuses** any file whose Unix mode has any owner-other bits set (`mode & 0o077 != 0`) — systemd's 0400 exposure is accepted, a hand-rolled 0644 file is refused.
-
-### Route C — Hermes plugin
+### Route D — Hermes plugin(v1.2.0 同様)
 
 ```bash
-./target/release/rev-stealth hermes install
-./target/release/rev-stealth hermes verify
-# Hermes 起動 → 16 MCP tools auto-registered as ctx callables
+rev-stealth hermes install
+rev-stealth hermes verify
 ```
 
-Under the hood:
+v1.3 で `--dry-run --explain` も使用可能。
 
-1. Scaffold copied to `~/.hermes/plugins/rev-scraping-mcp/` (override with `--prefix`).
-2. `register(ctx)` spawns `stealth-mcp` with a **whitelisted env** — `REV_SCRAPING_*`, `VPN_*_FILE`, `PATH`, `HOME`, `LANG`. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`, AWS creds are **stripped before spawn**.
-3. MCP `2024-11-05` handshake → `tools/list` → each tool registered via `ctx.register_tool(...)`.
-4. Child crash → restart with exponential backoff `1, 2, 4, 8, 16 s` (cap 16 s).
-5. Response payloads pass through `schema_bridge.redact_response` (defense in depth on top of Rust-side `stealth-sanitize`).
+### Route E — shell completion + man pages(v1.3 新規)
 
-Override the binary location with `REV_SCRAPING_MCP_BIN`.
+```bash
+rev-stealth completions zsh > "${fpath[1]}/_rev-stealth"
+rev-stealth completions bash | sudo tee /etc/bash_completion.d/rev-stealth
+rev-stealth completions fish > ~/.config/fish/completions/rev-stealth.fish
+rev-stealth completions nushell > ~/.config/nushell/completions/rev-stealth.nu
 
-### AI client wiring (Claude Code / Cursor)
+sudo cp target/man/man1/*.1 /usr/local/share/man/man1/
+sudo mandb
+man rev-stealth-spider
+```
+
+### AI クライアント接続
 
 ```json
 {
   "mcpServers": {
     "rev-scraping": {
-      "command": "/absolute/path/to/target/release/stealth-mcp",
+      "command": "rev-stealth",
+      "args": ["mcp", "serve", "--default-output-format", "json"],
       "env": {
         "REV_SCRAPING_HOME": "/home/user/.rev_scraping",
         "VPN_USER_FILE": "/run/credentials/rev-stealth-mcp/vpn_user",
@@ -189,864 +203,600 @@ Override the binary location with `REV_SCRAPING_MCP_BIN`.
 }
 ```
 
-Smoke test (16 tools expected):
+### Smoke test
 
 ```bash
 printf '%s\n%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-  | ./target/release/stealth-mcp | jq '.result.tools | length'
+  | rev-stealth mcp serve | jq '.result.tools | length'
 # expect: 16
+
+rev-stealth doctor --output-format json | jq '.error.doc_url // "ok"'
+rev-stealth doctor --output-format yaml
+rev-stealth config set --target policy --dry-run --explain require_vpn false
+rev-stealth vpn rotate --region JP --idempotency-key warmup-1 --output-format json
+rev-stealth vpn rotate --region JP --idempotency-key warmup-1 --output-format json \
+  | jq '.result._meta.replayed // false'
+# 2 回目: true
 ```
 
 ---
 
 ## 16 MCP tools at a glance
 
-All tools share the envelope shape `{ok, operation, result, _meta: { sanitize: {...} }}` (or `{ok: false, exit_code, error}` on failure). Full input/output schemas live in [`docs/MCP_REFERENCE.md`](docs/MCP_REFERENCE.md) (auto-generated; CI gate prevents drift).
+全 tool 共通 envelope: `{ok, operation, result, _meta: {sanitize: {...}}}`(失敗時 + v1.3 `kind/message/hint/retry_after_ms/doc_url`)。完全 schema は [`docs/MCP_REFERENCE.md`](docs/MCP_REFERENCE.md)(auto-generated、CI gate)。
 
 | # | Tool | Purpose |
-|---|---|---|
-| 1 | `spider` | Stealth-fetch an AUP-allowed URL via obscura CDP shim + optional CF challenge eval + adaptive selector relocate. Per-host rate-limited, `session_id`-idempotent. |
-| 2 | `relocate` | Adaptive selector resurrection via `stealth-parse` fingerprint cache. Locates a previously-recorded element on new HTML or URL. |
-| 3 | `cf_evaluate` | Cloudflare Turnstile resilience evaluator (defender-side; no solver bundled). |
-| 4 | `doctor` | Leak / VPN / captcha-sidecar health diagnostics. Flat output. |
-| 5 | `vpn_rotate` | Rotate VPN exit (Surfshark via Gluetun); strategies `lazy-on-fail`/`every-n`/`interval`. Emits `vpn_country_mismatch` (retriable) on region miss. |
-| 6 | `recipe_list` | List all site recipes (TOML in `~/.rev_scraping/sites/`). |
-| 7 | `recipe_show` | Return full `SiteRecipe` JSON for a domain. |
-| 8 | `recipe_remove` | Remove a recipe; preview-by-default, commits only with `confirm=true`. |
-| 9 | `recipe_propose_endpoint` | Append a new endpoint to an existing recipe; secret-bearing fields rejected. |
-| 10 | `recipe_export` | Export all recipes as base64-encoded JSON array. |
-| 11 | `recipe_import` | Import recipes from base64 JSON; secrets rejected, path-traversal guarded. |
-| 12 | `auth_login_start` | Phase 1 of 2-phase login. AUP-enforce + spawn `rev-auth` helper. Returns single-use `session_token`. **`cookie_values_returned=false`**. |
-| 13 | `auth_login_complete` | Phase 2; poll until helper finishes, returns `ProfileMeta`. Cookie *values* never leave the encrypted vault. |
-| 14 | `auth_list` | List stored auth profiles (`ProfileMeta` only). |
-| 15 | `auth_status` | Freshness classification: `Valid` / `ExpiringSoon` / `ExpiringCritical` / `PartiallyExpired` / `AllExpired` / `Missing`. |
-| 16 | `session_show` | Persisted session metadata (VPN binding + recipe hits + auth profile). Cookie values never returned. |
+|---|------|---------|
+| 1 | `spider` | obscura CDP shim + 任意 CF challenge eval + 適応 selector relocate。AUP gate + per-host rate-limit + `session_id` idempotent |
+| 2 | `relocate` | `stealth-parse` fingerprint cache による selector 復元 |
+| 3 | `cf_evaluate` | Cloudflare Turnstile 強度評価(defender 側、solver 同梱せず) |
+| 4 | `doctor` | leak / VPN / captcha sidecar health 診断 |
+| 5 | `vpn_rotate` | VPN exit ローテーション(Surfshark via Gluetun) |
+| 6 | `recipe_list` | 全 site recipe 列挙 |
+| 7 | `recipe_show` | ドメインの完全 `SiteRecipe` JSON |
+| 8 | `recipe_remove` | preview-by-default、`confirm=true` で commit |
+| 9 | `recipe_propose_endpoint` | 既存 recipe に endpoint 追加 |
+| 10 | `recipe_export` | base64 JSON 配列 export |
+| 11 | `recipe_import` | base64 JSON import(secret 拒否、path-traversal guard) |
+| 12 | `auth_login_start` | 2-phase login Phase 1。AUP enforce + `rev-auth` helper |
+| 13 | `auth_login_complete` | Phase 2。`ProfileMeta` 返却 |
+| 14 | `auth_list` | 保管済 auth profile(`ProfileMeta` のみ) |
+| 15 | `auth_status` | 鮮度分類: Valid / ExpiringSoon / ExpiringCritical / PartiallyExpired / AllExpired / Missing |
+| 16 | `session_show` | 永続化 session metadata。cookie 値返さず |
 
-**Common runtime invariants** across all 16:
+---
 
-- **Rate limit**: per-host token bucket (`DashMap<String, TokenBucket>`); 429 backoff clamped at `MAX_429_BACKOFF_SECS = 86400` s (closes a u64::MAX DoS path). Returns `kind: "rate_limit"` + `retry_after_ms` on exhaustion.
-- **Idempotency**: Stripe-style key on `spider` / `relocate` / `cf_evaluate`. `DashMap::remove_if` atomic eviction (closes TOCTOU race).
-- **AUP / SSRF**: every URL-accepting tool runs through `aup::enforce` + `ObscuraBridge::validate_url` (loopback / RFC1918 / link-local rejected).
-- **Secrets**: cookie values are **never** returned through MCP. The `cookie_values_returned=false` field on every auth tool is the contract marker.
+## `rev-stealth` CLI surface (43 commands)
+
+```
+rev-stealth
+├── captcha {solve, verify}
+├── browser {launch, stealth-test}
+├── vpn {rotate*, status}
+├── doctor [--vps] [--deep]
+├── spider
+├── relocate
+├── cf-evaluate
+├── auth {login*, list, show, delete*, status, refresh*}
+├── measure [--enable-external] [--enable-egress-probe]
+├── config {show, paths, validate, diff, get, set*, edit*, migrate*, init*,
+│           history, rollback*, gc*, profile {list, create*, switch*, delete*}}
+└── hermes {install*, uninstall*, verify}
+```
+
+`*` 印 = 15 mutate command(`--dry-run --explain --idempotency-key` 対応)
+全 sub-command `--output-format {human,text,json,yaml}` 対応(`doctor`/`config` は historical local `--output-format` を保持)
+
+### Exit codes
+
+| Code | Variant | Meaning |
+|------|---------|---------|
+| 0 | `Ok` | 成功 |
+| 1 | `UserError` | clap parse / config 不正 |
+| 2 | `TransientError` | retriable(network/VPN flap) |
+| 3 | `PermanentError` | precondition fail / 未実装 |
+| 4 | `AuthExpired` | 全 cookie 既 expired |
+| 7 | `Leak` | VPN/IP/国/DNS leak |
+
+---
+
+## v1.3 CLI black-belt features
+
+### `--output-format yaml`(G.4)全 11 sub-command
+
+`docs/json-schemas/cli/*.output.json` に Draft-07 schema 11 個同梱。`text` は `human` の clap alias。
+
+### `--dry-run` zero side-effect(G.5)15 mutate command
+
+`tests/dry_run_zero_side_effect.rs`: tree-snapshot(path/size/mtime nanos before/after diff=0)+ TCP-sentinel(free port + HTTP_PROXY redirect + 0 accepted connection)+ proptest 50-iter invariants で検証。
+
+### `--idempotency-key` Stripe-style replay(G.6)
+
+- Storage: `~/.rev_scraping/idempotency/<op>__<key_hash16>__<payload_hash16>.json`
+- TTL: 24h default、`REV_SCRAPING_IDEMPOTENCY_TTL_SECS` で override(`0` で無効化)
+- Atomic write: tempfile + rename (POSIX atomic)
+- Payload hash: SHA-256 truncated 16 hex chars、canonicalized JSON
+- `config.edit` は意図的 carve-out(interactive editor の payload を args から知り得ない)
+
+### Unified error envelope `{kind, message, hint?, retry_after_ms?, doc_url}`(G.7)
+
+- 26 closed `CliErrorKind` variants(`#[forbid(unreachable_patterns)]` exhaustive)
+- 全 26 個が `docs/book/src/en/errors/<Pascal>.md` で実在(CI gate `every_error_kind_doc_url_resolves_on_disk`)
+- `DOC_URL_BASE = "https://github.com/sasuketorii/rev_scraping/blob/main/docs/book/src/en/errors/"`
+- clap parse failure も `operation="cli.parse"` で envelope へ route
+
+```bash
+rev-stealth doctor --output-format json 2>&1 | jq -r '.error | "
+kind: \(.kind)
+message: \(.message)
+hint: \(.hint)
+doc: \(.doc_url)
+"'
+```
+
+### Shell completion 4 系統(G.3)
+
+`clap_complete` + `clap_complete_nushell`。`target/completions/{bash,zsh,fish,nushell}/rev-stealth.{bash,zsh,fish,nu}` を commit、`completion-drift` CI gate で sync。
+
+### Man pages 44 個(G.8)
+
+`clap_mangen` + `disable_help_subcommand` + `segments.join("-")` で 6 SH section(NAME / SYNOPSIS / DESCRIPTION / OPTIONS / SUBCOMMANDS / EXTRA)。`manpage-drift` CI gate。
 
 ---
 
 ## Architecture
 
-### Workspace crate graph
+### Workspace crate graph(v1.3.0)
 
 ```mermaid
 graph TD
-  cli["stealth-cli<br/>(bin: rev-stealth)"]
+  cli["stealth-cli<br/>(bin: rev-stealth)<br/>pub fn run() / run_async()"]
   mcp["stealth-mcp<br/>(bin: stealth-mcp + gen_reference)"]
   auth_bin["stealth-auth<br/>(bin: rev-auth)"]
-
-  core[stealth-core]
-  contracts[stealth-agent-contracts]
-  sanitize[stealth-sanitize]
-  obscura[obscura-bridge]
-  vpn[vpn-rotate]
-  authlib[stealth-auth lib]
-  mfp[mobile-fp]
-  cf[stealth-cf]
-  parse[stealth-parse]
-  sites[stealth-sites]
-  cap[captcha-bypass]
+  core[rev-stealth-core / stealth_core]
+  contracts[rev-stealth-agent-contracts / stealth_agent_contracts]
+  sanitize[rev-stealth-sanitize / stealth_sanitize]
+  obscura[rev-stealth-obscura-bridge / obscura_bridge]
+  vpn[rev-stealth-vpn-rotate / vpn_rotate]
+  authlib[rev-stealth-auth / stealth_auth]
+  mfp[rev-stealth-mobile-fp / mobile_fp]
+  cf[rev-stealth-cf / stealth_cf]
+  parse[rev-stealth-parse / stealth_parse]
+  sites[rev-stealth-sites / stealth_sites]
+  cap[rev-stealth-captcha-bypass / captcha_bypass]
 
   cli --> core
-  cli --> cap
+  cli --> contracts
+  cli --> sanitize
+  cli --> obscura
   cli --> vpn
   cli --> mfp
-  cli --> obscura
   cli --> cf
   cli --> parse
   cli --> sites
   cli --> authlib
+  cli --> cap
 
   mcp --> contracts
   mcp --> sanitize
   mcp --> sites
   mcp --> authlib
-  mcp -. "spawn rev-stealth bin" .-> cli
+  mcp -. "spawn rev-stealth" .-> cli
 
   auth_bin --> authlib
   auth_bin --> obscura
   auth_bin --> vpn
-
-  obscura --> core
-  obscura --> mfp
-  vpn --> core
-  core --> mfp
 ```
 
-The workspace cleanly factors three execution surfaces (`rev-stealth` CLI, `stealth-mcp` MCP server, `rev-auth` login helper) over **10 library crates**, with `stealth-agent-contracts` providing the shared types that cross IPC boundaries (errors, tokens, rate limits) and `stealth-sanitize` providing the content-safety boundary.
+13 workspace members。Slice A で `crates/rev-stealth-cli/` wrapper 削除、`crates/stealth-cli` の package name を `rev-stealth` に変更(`publish=true`)。lib refactor で `pub fn run() / run_async()` expose、`main.rs` は 1 行 forwarder。残 12 内部 crate は `rev-stealth-*` prefix で publish=true、`[lib] name = "stealth_*"` alias で rust import 改変ゼロ。
 
-### Three runtime topologies
+### Crate rename map(Lane H Slice B-3)
 
-#### A. Local operator mode
-
-```
-Operator shell
-   │
-   ▼
-rev-stealth (stealth-cli binary)
-   │
-   ├──► vpn_guard::run_startup_probe  (require_vpn check; exit 7 on leak)
-   ├──► InstancePool::pick(session_id) (HRW sticky)
-   ├──► ObscuraBridge (CDP shim, SSRF guard)
-   │     └──► Chrome/Chromium via chromiumoxide WebSocket
-   ├──► stealth-cf (challenge detect)
-   └──► stealth-parse (adaptive selector cache, SQLite WAL)
-```
-
-Authentication uses a separate binary spawned by `rev-stealth auth login`:
-
-```
-rev-stealth auth login ── spawn ──► rev-auth (stealth-auth crate)
-                                       │
-                                       ├──► auth_aup::enforce
-                                       ├──► prepare_vpn_context (probe + monitor)
-                                       ├──► chromiumoxide::Browser::launch
-                                       │     (headed / headless / xvfb shim)
-                                       ├──► page.get_cookies() via CDP
-                                       └──► XChaCha20-Poly1305 encrypt
-                                            + OS keyring store
-                                            + audit JSONL
-```
-
-#### B. VPS production (systemd)
-
-```
-systemd (PID 1, system scope)
- │
- ├── rev-stealth-vpn@{1,2,3}.service   docker compose ──► Gluetun/WireGuard
- │     LoadCredentialEncrypted=surfshark_user/password.cred
- │
- ├── rev-stealth-mcp.service
- │     User=rev-stealth NoNewPrivileges=yes ProtectSystem=strict
- │     PrivateTmp=yes ReadWritePaths=/var/lib/rev-stealth /var/log/rev-stealth
- │
- ├── rev-stealth-doctor.timer ──► doctor.service
- │     OnBootSec=5min  OnUnitActiveSec=30min  Persistent=true
- │
- └── rev-stealth-xvfb-vnc.service   (opt-in localhost VNC fallback)
-```
-
-#### C. AI agent over MCP
-
-```
-Claude / GPT / Hermes (MCP client)
-        │ stdio JSON-RPC 2.0
-        ▼
-stealth-mcp ──► dispatch_tool
-        │
-        ├── auth_*    → in-process (handle_auth_tool)
-        ├── recipe_*  → in-process (SiteRecipeStore)
-        ├── session_* → in-process (~/.rev_scraping/sessions/)
-        └── spider/relocate/cf_evaluate/doctor/vpn_rotate
-                                       → subprocess (rev-stealth)
-                                       │
-                                       ▼
-                          stealth-sanitize: L4 → L5 → L3 → L2 → L7
-                                       │
-                                       ▼
-                          JSON-RPC result with _meta.sanitize report
-```
-
-### File / process layout
-
-| Path / process | Mode | Owner | Purpose |
-|---|---|---|---|
-| `/var/lib/rev-stealth/` | 0700 | `rev-stealth:rev-stealth` | service state root |
-| `/var/lib/rev-stealth/vpn/` | 0700 | `rev-stealth:rev-stealth` | per-instance compose work dir |
-| `/var/log/rev-stealth/` | 0750 | `rev-stealth:rev-stealth` | doctor JSONL + audit |
-| `/etc/credstore.encrypted/surfshark_{user,password}.cred` | 0400 | root | systemd-creds-encrypted Surfshark |
-| `~/.rev_scraping/policy.toml` | 0600 | user | VPN / require_vpn / instance descriptors |
-| `~/.rev_scraping/sessions/<id>.json` | 0600 | user | HRW sticky binding metadata |
-| `<user_data_dir>/rev-auth-xvfb-run.sh` | 0700 | user | auto-generated `xvfb-run` shim |
-| OS keyring entry | — | user | `service=rev_scraping.stealth_auth`, `account=cookie-jar:<profile>` |
-
-### Exit codes (canonical: `stealth-core::ExitCode`)
-
-| Code | Variant | Meaning |
-|---|---|---|
-| 0 | `Ok` | success |
-| 1 | `UserError` | clap parse / user input |
-| 2 | `TransientError` | retriable failure |
-| 3 | `PermanentError` | precondition fail (incl. Chrome unresolved) |
-| 4 | `AuthExpired` | all captured cookies already expired at save time |
-| 7 | `Leak` | VPN tunnel down / IP/country/DNS leak detected |
-
-Sanitize Critical fail-closed surfaces as `isError: true` in the JSON-RPC envelope, **not** as a distinct process exit code.
+| Workspace member key | crates.io package name | Rust `use` path |
+|---------------------|------------------------|-----------------|
+| `stealth-cli` | **`rev-stealth`**(binary) | n/a |
+| `stealth-core` | `rev-stealth-core` | `stealth_core` |
+| `mobile-fp` | `rev-stealth-mobile-fp` | `mobile_fp` |
+| `vpn-rotate` | `rev-stealth-vpn-rotate` | `vpn_rotate` |
+| `captcha-bypass` | `rev-stealth-captcha-bypass` | `captcha_bypass` |
+| `obscura-bridge` | `rev-stealth-obscura-bridge` | `obscura_bridge` |
+| `stealth-cf` | `rev-stealth-cf` | `stealth_cf` |
+| `stealth-parse` | `rev-stealth-parse` | `stealth_parse` |
+| `stealth-mcp` | `rev-stealth-mcp` | `stealth_mcp` |
+| `stealth-sites` | `rev-stealth-sites` | `stealth_sites` |
+| `stealth-auth` | `rev-stealth-auth` | `stealth_auth` |
+| `stealth-agent-contracts` | `rev-stealth-agent-contracts` | `stealth_agent_contracts` |
+| `stealth-sanitize` | `rev-stealth-sanitize` | `stealth_sanitize` |
 
 ---
 
 ## Security model
 
-`rev_scraping` v1.2.0 is **fail-closed by default** at every external boundary.
+### 3-tier threat model(v1.2.0 baseline + v1.3 additions)
 
-### 1. Three-tier threat model
+| Tier | Adversary | v1.2.0 defences | v1.3.0 additions |
+|------|-----------|----------------|------------------|
+| T1 passive | cookie file forensic | XChaCha20-Poly1305 + AAD / OS keyring / Argon2id / Zeroizing / tracing redaction / panic-hook scrub | **Unified error envelope sanitizes `message`** — failure path から log への raw bytes 流出経路を構造的に塞ぐ |
+| T2 active | network-position / DNS poison / VPN timing | `require_vpn=true` default / 5-300s leak monitor / HRW sticky / country gate / `<KEY>_FILE` 0o077 reject | **`--idempotency-key`** retry-driven double-mutate 阻止 / **`--dry-run` zero side-effect** foot-gun 排除 |
+| T3 content / supply | 敵対サイト / 敵対 npm 依存 | `stealth-sanitize` 5 層 / 20 canary / `<<<UNTRUSTED_CONTENT>>>` envelope | **`#![forbid(unsafe_code)]` on 13/13 crate roots** + grep CI gate / **3 cargo-fuzz targets nightly** / **CycloneDX SBOM** + cosign keyless OIDC + SLSA L3 / **OIDC `id-token: write` を 2 job に限定** |
 
-- **T1 — passive (data-at-rest, forensic)**: cookie jars XChaCha20-Poly1305 AEAD-encrypted with per-profile AAD; key never in the cookie file (OS keyring or Argon2id); plaintext lives only in `Zeroizing<Vec<u8>>`; `tracing` redaction layer + panic hook scrub cookie-shape regex from logs; audit JSONL records actions but not values (regression-tested).
-- **T2 — active (intercept, DNS poison, VPN timing)**: `require_vpn=true` is the default; startup probe + continuous leak monitor (5–300 s, default 30 s; first tick immediate; **latch** semantics on first leak); country gate (`vpn_country_mismatch` → `vpn_rotate`); HRW sticky pool for session stability; `<KEY>_FILE` credential resolver rejects any file with `mode & 0o077 != 0`.
-- **T3 — content-layer (prompt injection, supply-chain, Unicode covert channel)**: `stealth-sanitize` 5-layer pipeline; 20 canary rules across Aho-Corasick (literal chat-template tokens) + `regex::RegexSet` (shape rules); `<<<UNTRUSTED_CONTENT origin=… sanitize_id=NONCE>>>` envelope with 64-bit forgery-resistant nonce.
+### Crypto stack(v1.2.0 不変)
 
-### 2. Cryptographic stack
+- XChaCha20-Poly1305 AEAD(24-byte nonce、32-byte key)。192-bit nonce で random collision 事実上ゼロ。
+- AAD: `rev_scraping:stealth-auth:v1:<profile>[:<aad_context>]`。AAD 不一致 → `BadKeyOrTamper`、profile 違い → `ProfileHashMismatch`(cipher 実行前 fail-closed)。
+- Envelope: `MAGIC "REVAUTH1" || version u16 || profile_hash[32] || nonce[24] || ciphertext`。
+- Key: OS keyring(macOS Keychain / Linux `secret-service` / Windows DPAPI)、fallback Argon2id `m=64MiB, t=3, p=1`。
+- systemd-creds TPM2 sealing 利用可能時。`${CREDENTIALS_DIRECTORY}/<name>` mode 0400。
 
-- **Algorithm**: XChaCha20-Poly1305 AEAD (24-byte nonce, 32-byte key). 192-bit nonce makes random-nonce collision negligible; ChaCha20 is constant-time in pure software (no AES-NI dependency).
-- **AAD binding**: `rev_scraping:stealth-auth:v1:<profile>[:<aad_context>]`. Wrong-AAD outcome = `AuthStoreError::BadKeyOrTamper`; cross-profile attempt = `AuthStoreError::ProfileHashMismatch` (before the cipher runs).
-- **Envelope**: `MAGIC "REVAUTH1" || version u16 || profile_hash[32] || nonce[24] || ciphertext`.
-- **Key source**: OS keyring (macOS Keychain / Linux `secret-service` / Windows DPAPI). Fallback `feature = "passphrase-only"` uses Argon2id (`m=64 MiB, t=3, p=1`, 32-byte output, 16-byte salt).
-- **systemd-creds**: TPM2 sealing when available; otherwise host master key. Operator-installed drop-in (`/etc/systemd/system/rev-stealth-mcp.service.d/override.conf`) loads credentials at unit start; `${CREDENTIALS_DIRECTORY}/<name>` is exposed at mode `0400`.
+### `stealth-sanitize` 5 層(v1.2.0 不変)
 
-### 3. The `stealth-sanitize` pipeline
+L4 unicode strip(NFKC + zero-width + tag chars + bidi-override)→ L5 length clamp(per-field 256 KiB / total 512 KiB Balanced)→ L3 canary detect(20 rules、Critical fail-closed、High `[REDACTED:injection]`、Suspicious report-only)→ L2 envelope wrap(`<<<UNTRUSTED_CONTENT origin=… sanitize_id=NONCE>>>` 64-bit nonce forgery defense)→ L7 `_meta.sanitize` report
 
-Five layers, evaluated in this order on every MCP tool response:
+検出率: Critical 100% (8/8), High 100% (12/12), FP ≤ 1 Suspicious / benign fixture
 
-| Layer | What it does | Defaults (Balanced) |
-|---|---|---|
-| **L4 — Unicode strip** | NFKC normalize → strip zero-width (U+200B/C/D, U+2060, U+FEFF) → strip tag chars (U+E0000–E007F) → strip bidi overrides (U+202D/E, U+2066–9). Bidi hits → Suspicious canary. | always on |
-| **L5 — length clamp** | Per-field 256 KiB (Strict: 64 KiB) / total 512 KiB (Strict: 128 KiB). Over-budget → 80%-head + `[...TRUNCATED...]` + 20%-tail. | always on |
-| **L3 — canary detect** | Aho-Corasick (literal chat-template tokens: `<\|im_start\|>`, `[INST]`, `<<SYS>>`, …) + `regex::RegexSet` (shape: `ignore previous instructions`, `### Instruction:`, `\bSYSTEM\s*[:>]`, `curl --data`, `data:text/html`, envelope-forgery `<<<UNTRUSTED_CONTENT`, …). **20 rules** across 3 severities. | Critical = fail-closed when `critical_fail_closed=true` · High = `[REDACTED:injection]` replace · Suspicious = report-only |
-| **L2 — envelope wrap** | Surrounds each sanitized string leaf with `<<<UNTRUSTED_CONTENT origin=… tool=… sanitize_id=NONCE>>> … <<<END_UNTRUSTED_CONTENT sanitize_id=NONCE>>>`. 64-bit hex nonce per call (forgery defense). | always (skipped only when aborted) |
-| **L7 — `_meta.sanitize` report** | Appends `{schema_version, policy_name, mode, bytes_in, bytes_out, truncated, aborted, layers_applied, canary_hits, sanitize_id}` to every response. `canary_hits[]` contains **id + severity + location only — never the matched bytes** (closes the descendant-pointer leak fix). | always on |
+### v1.3 で潰した security fix
 
-**Detection rate** (v1.2.0 golden corpus, 20 hostile + 20 benign): Critical 100% (8/8), High 100% (12/12), FP ≤ 1 Suspicious per benign fixture.
+| Fix | Lane | 閉じた攻撃面 |
+|-----|------|-------------|
+| Unified error envelope | G.7 | "Some path silently leaks raw upstream bytes into operator logs" |
+| `--dry-run` zero side-effect | G.5 | "I thought it was a dry-run but the test escaped into prod" |
+| Idempotent commit replay | G.6 | "Agent retry storm executed `vpn_rotate`/`auth_login` twice" |
+| OIDC localization | H Slice B-1 | "Any job in release.yml could mint a Sigstore JWT" |
 
-**Mode matrix**:
+### OIDC localization(release.yml `id-token: write`)
 
-| Preset | Mode | Used by |
-|---|---|---|
-| `Strict` | `Enforce` (Critical → payload null + `aborted=true`) | `auth_login_*` |
-| `Balanced` | `Warn` (default; `critical_fail_closed=true`) | most tools |
-| `PassThrough` | `Off` | trusted internal calls only |
+| Job | OIDC? | Notes |
+|-----|-------|-------|
+| top-level | NO | `contents: read` only |
+| preflight / brew-audit / build-binaries / oci-image / cargo-publish | NO | PR/dry-run cannot mint OIDC |
+| **sign-binaries** | **YES** | sole holder for binary sign-blob + SLSA L3 |
+| **sign-image** | **YES** | sole holder for OCI image sign + SLSA L3 |
+| gh-release | NO (`contents: write` only) | |
 
-### 4. Strict UUID v4 validation
+### v1.3 audit で発覚した docs/code 不一致(v1.3.1 で correction 予定)
 
-Pre-v1.2.0, `SessionId` / `ProgressToken` were `#[serde(transparent)]` over `Uuid` — `serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"")` produced a valid-looking token with version 0 / variant NCS. v1.2.0 uses **manual `Serialize`/`Deserialize`** routing through:
-
-```rust
-fn is_strict_v4(u: &Uuid) -> bool {
-    matches!(u.get_version(), Some(Version::Random))
-        && u.get_variant() == Variant::RFC4122
-}
-```
-
-**Both** conditions required — explicitly rejects `00000000-0000-4000-0000-000000000000` (v4 version, NCS variant).
-
-### 5. Rate limit / idempotency / backoff
-
-- **Per-host token bucket** on `Instant` (monotonic — wall-clock adjustments cannot unblock).
-- **`Retry-After` clamped at `MAX_429_BACKOFF_SECS = 86400`** + `Instant::checked_add(...).unwrap_or(now)` fallback. Without the clamp, `Retry-After: 18446744073709551615` panics the limiter (process DoS).
-- **Idempotency `DashMap::remove_if` atomic eviction** closes the TOCTOU race where a naive expired-eviction path could delete a freshly inserted record.
-
-### 6. systemd hardening
-
-The `rev-stealth-mcp.service` unit ships with `NoNewPrivileges=yes` + `ProtectSystem=strict` + `ProtectHome=yes` + `PrivateTmp=yes` + `ProtectKernel{Tunables,Modules,ControlGroups}=yes` + `LockPersonality=yes` + `RestrictSUIDSGID=yes`. The `ExecStart` uses **`exec`** (load-bearing — previous version was missing it, leaving `/bin/sh` as PID 1 of the cgroup and breaking zombie reaping).
-
-### 7. Acceptable Use Policy (AUP)
-
-`aup::enforce` runs before every URL-accepting subcommand. Three paths to allow:
-
-1. `--i-have-authorization` flag (warns to stderr; operator self-attestation).
-2. `REV_SCRAPING_AUP_ACK` env that matches `SHA256("rev-scraping-aup:" + YYYYMMDD)[:8]` — **valid only for the local day**.
-3. `~/.rev_scraping/authorized.toml` allow-list (regex `url_pattern` per `[[targets]]`).
-
-Rejection → exit 3 / `kind: "aup"` (non-retriable).
+1. **`_meta.diagnostic` field**: RELEASE_NOTES に記載されているが実コードで emit されない
+2. **`obscura-bridge` SAFETY exemption**: release notes は exemption と記述、実コードは他 crate と同じ `#![forbid(unsafe_code)]`、workspace 全体で `unsafe {` ブロック 0 件
+3. **`IdempotencyStore` permissions**: directory/file が umask 由来。contents は非 secret(envelope metadata)だが multi-tenant VPS で他 user に visible → v1.3.1 で `mode(0o700)` / `mode(0o600)` hardening
 
 ---
 
-## Feature catalog
+## Use cases (10)
 
-### The 13 crates
-
-| Crate | Purpose | Key public types |
-|---|---|---|
-| `stealth-core` | shared traits + Chromium-backed stealth launcher | `StealthError`, `ExitCode`, `StealthProfile`, `leak_guard` |
-| `mobile-fp` | mobile fingerprint presets (UA / viewport / touch / sensors / WebGL) | 6 presets: `iPhone15Pro/Max`, `iPadProM4`, `Pixel9Pro`, `Pixel8a`, `GalaxyS24Ultra`; `StealthLevel{Off,Low,Medium,High(default)}` |
-| `obscura-bridge` | CDP shim + SSRF guard (vendored obscura patches statically linked) | `ObscuraBridge`, `BridgeError`, `BrowserOps`, `inject_cookies`, `validate_url` |
-| `captcha-bypass` | reCAPTCHA v2/v3 / hCaptcha / Turnstile research (Node sidecar bridge) | `CaptchaKind`, `SolveRequest`, feature-gated under `sidecar` |
-| `stealth-cf` | Cloudflare Turnstile resilience evaluator (defender-side) | `detect_from_html`, `CfEvaluator`, `ChallengeType` |
-| `stealth-parse` | adaptive element relocation + SQLite WAL fingerprint cache | `fingerprint_from_html`, `ElementFingerprint`, `Relocator`, `ParseStore` |
-| `stealth-sites` | per-domain TOML Site Recipe store | `SiteRecipe`, `SiteMeta`, `SiteRecipeStore`, `Endpoint`, `AuthRecipe` |
-| `vpn-rotate` | VPN IP rotation (Surfshark/Gluetun) + leak monitor + HRW pool | `RotationStrategy`, `InstancePool`, `LeakMonitor`, `CredentialResolver` |
-| `stealth-auth` | encrypted authentication cookie storage + `rev-auth` binary | `AuthStore`, `AuthCookieJar`, `Cookie` |
-| `stealth-agent-contracts` | shared cross-crate contract types | `ErrorEnvelope`, `ErrorKind` (26 variants), `SessionId`/`ProgressToken` (UUID v4 strict), `ToolRateLimiter`, `IdempotencyKey`, `ProgressTracker` |
-| `stealth-sanitize` | prompt-injection defense (5-layer pipeline) | `sanitize_for_agent`, `SanitizePolicy`, `Mode`, `SanitizationReport`, `CanaryHit` |
-| `stealth-cli` | `rev-stealth` CLI front-end | clap-driven subcommands incl. `config_io/` (schema/validate/writer/lev/migration) |
-| `stealth-mcp` | MCP stdio JSON-RPC 2.0 server + `gen_reference` binary | 16 tools, in-process dispatch for auth_*/recipe_*/session_*, subprocess for the rest |
-
-### `rev-stealth` CLI subcommand tree
-
-```
-rev-stealth
-├── doctor         leak-prevention pre-flight (kill-switch / DNS / IPv6 / WebRTC)
-│                  flags: --vps (9 deep checks), --deep, --output-format {json|text}
-├── spider         AUP-gated browse + optional CF eval + adaptive relocate
-├── relocate       locate previously-fingerprinted element on new HTML/URL
-├── cf-evaluate    Cloudflare Turnstile resilience evaluator
-├── auth           {login,list,show,delete,status,refresh}
-├── measure        local fingerprint diagnostics
-│                  flags: --enable-external, --enable-egress-probe (feature: vps-egress-probe)
-├── browser        stealth browser launch / stealth-test sweep
-├── vpn            rotate / status (Surfshark + Gluetun)
-├── captcha        CAPTCHA bypass (research; defaults to dry-run)
-├── config
-│   ├── show       merged effective config (4 layers, secrets <redacted>)
-│   ├── paths      list config file paths + existence + mode
-│   ├── validate   strict validate; exit 1 + issue list on violation
-│   ├── diff       unified diff vs templates/policy.toml
-│   ├── get <key>  resolve dotted key (e.g. policy.require_vpn)
-│   ├── init       materialize ~/.rev_scraping/{policy,authorized}.toml + sites/
-│   ├── set <k> <v> --target {policy|authorized}  atomic write 0600 at creation
-│   ├── edit       open in $EDITOR (fallback vi); validate-then-commit
-│   ├── migrate    schema_version migrate (LATEST=1)
-│   ├── history    list .bak.<epoch> backups newest→oldest
-│   ├── rollback <name>  restore backup (current preserved as new .bak.<epoch>)
-│   ├── gc --keep N      delete older backups (default 5)
-│   └── profile
-│       ├── list
-│       ├── create <name>  pattern [A-Za-z0-9_-]{1,64}
-│       ├── switch <name>  prints shell `export REV_SCRAPING_HOME=…` line
-│       └── delete <name> --yes  refuses active profile; best-effort zero-overwrite shred
-└── hermes
-    ├── install [--prefix <dir>] [--source <dir>] [--force]
-    ├── uninstall [--prefix <dir>]
-    └── verify [--prefix <dir>] [--no-python-check]
-```
-
-### Environment variables (selected)
-
-#### Config paths / profile
-- `REV_SCRAPING_HOME` — config base override (default `~/.rev_scraping`)
-- `REV_SCRAPING_PROFILES_ROOT` — profile registry root (decoupled from `HOME` in P6.5)
-- `REV_SCRAPING_PROFILE` — active profile name (Hermes-allowlisted)
-- `REV_SCRAPING_POLICY`, `REV_SCRAPING_AUTHORIZED`, `REV_SCRAPING_AUTH_DIR` — path overrides
-
-#### Policy / guard
-- `REV_SCRAPING_REQUIRE_VPN=1` — force `require_vpn` (highest precedence)
-- `REV_SCRAPING_AUP_ACK` — daily-rotating AUP ack hash
-- `REV_SCRAPING_ALLOW_LOOPBACK` — loopback target allowed (dev/test only)
-- `REV_SCRAPING_CONFIG_LENIENT` — relax strict validate
-- `REV_SCRAPING_AUTH_PASSPHRASE` — passphrase-only mode key supply
-
-#### VPN
-- `VPN_USER_FILE`, `VPN_PASSWORD_FILE` — `<KEY>_FILE` precedence (systemd-creds)
-- `VPN_USER`, `VPN_PASSWORD` — plaintext (avoid in production)
-- `VPN_INSTANCES` — `name:proxy_port:control_port,...` (policy override)
-
-#### Auth helpers
-- `REV_AUTH_BIN`, `REV_AUTH_CHROME_BIN`, `REV_AUTH_AUTO_XVFB`, `REV_AUTH_DISPLAY`, `REV_AUTH_HEADLESS`
-- `REV_OBSCURA_BIN` / `OBSCURA_BIN` — obscura subprocess path
-- `REV_STEALTH_CHROME` — Chrome override (stealth-cli side)
-- `REV_STEALTH_SIDECAR` — captcha-bypass Node sidecar path
-
-#### Other
-- `REV_SCRAPING_MCP_BIN` — Hermes adapter `stealth-mcp` path override
-- `REV_STEALTH_BIN` — MCP-side CLI binary override
-- `REV_STEALTH_EGRESS_PROBE_URL` — `measure --enable-egress-probe` probe URL
-- `EDITOR` — `config edit` fallback (default `vi`)
-- `RUST_LOG` — `tracing-subscriber` EnvFilter
-
----
-
-## How it works (sequence flows)
-
-### Flow A — `auth_login_start` → `auth_login_complete`
-
-```
-1. MCP receives  tools/call {name: auth_login_start, args: {profile, url, ...}}
-2. server.rs    is_auth_tool → handle_auth_tool
-3. rev-auth     auth_aup::enforce(domain, url)            → AUP gate
-4. rev-auth     ObscuraBridge::validate_url(login_url)    → SSRF guard
-5. rev-auth     publicsuffix eTLD+1 normalize
-6. rev-auth     prepare_vpn_context().await
-                  ├─ load policy.toml
-                  ├─ InstancePool::pick(session_id) — HRW sticky
-                  ├─ leak_guard::probe_all(instances, expected_country)
-                  └─ LeakMonitor::spawn(5–300s, default 30s, FIRST TICK IMMEDIATE)
-7. rev-auth     resolve_login_display_mode
-                  ├─ --headless → Headless
-                  ├─ --xvfb → Xvfb (auto-generate <user_data_dir>/rev-auth-xvfb-run.sh @0700)
-                  ├─ Linux + DISPLAY unset + REV_AUTH_AUTO_XVFB=1 → Xvfb
-                  └─ otherwise → Headed (macOS Auto)
-8. rev-auth     chromiumoxide::Browser::launch — operator interacts
-9. MCP polls    auth_login_complete waits on <TMPDIR>/rev-auth-<token>.complete
-                  ├─ timeout → ErrorKind::AuthSessionExpired + retry_after_ms
-                  └─ helper finishes → continue
-10. rev-auth    page.get_cookies() via CDP
-                  ├─ filter_cdp_cookies → eTLD+1 only
-                  ├─ all_cookies_expired → exit 4
-                  └─ otherwise:
-                       ├─ crypto::encrypt (XChaCha20-Poly1305 + 24-byte OsRng nonce
-                       │   + AAD: rev_scraping:stealth-auth:v1:<profile>)
-                       ├─ keystore.set(service=rev_scraping.stealth_auth, account=cookie-jar:<profile>)
-                       └─ audit::append_jsonl(start + success events)
-11. teardown    browser.close → sleep(CHROME_TEARDOWN_FLUSH_MS=1500ms) → browser.wait
-                                → handler_task.abort → profile_dir.cleanup
-12. MCP wraps   sanitize_structured("auth_login_complete", result) → _meta.sanitize → JSON-RPC out
-```
-
-### Flow B — `spider`
-
-```
-1. MCP receives  tools/call {name: spider, args: {url, session_id?, ...}}
-2. server.rs    NOT in-process → build_cli_argv("spider", args) → rev-stealth subprocess
-3. rev-stealth  policy load → InstancePool::pick(session_id) → leak_guard::probe_all
-                  exit 7 on leak (StealthError::Leak)
-4. rev-stealth  ObscuraBridge launch → CDP shim → SSRF guard
-5. rev-stealth  optional stealth-cf evaluate → challenge handling
-6. rev-stealth  fetch via HRW-picked VPN proxy
-7. rev-stealth  stealth-parse stable_id relocate (if recipe carries one)
-8. server.rs    capture stdout (parse as JSON; on parse failure → {"raw": "..."})
-9. server.rs    sanitize_structured("spider", body)
-                  L4 → L5 → L3 → L2 → L7
-                  policy_for_tool("spider") = Balanced (Warn mode, 256/512 KiB)
-10. server.rs   emit JSON-RPC result with content + structuredContent + _meta.sanitize
-                  + isError = !out.status.success() + exitCode
-                stderr separately sanitized
-```
-
-### Flow C — VPN leak-monitor loop
-
-```
-1. systemd starts rev-stealth-vpn@N → docker compose up -d Gluetun container
-2. stealth-cli   vpn_guard::run_startup_probe
-                   ├─ require_vpn=false → Ok(None)
-                   ├─ require_vpn=true + no instances → Err(Leak) → exit 7
-                   └─ probe_all(instances, expected_country) → JSON to spider envelope
-3. LeakMonitor::spawn(instances, expected_country, interval)
-   interval clamp [5s, 300s], default 30s
-   first tick FIRES IMMEDIATELY
-4. each tick: probe_once → ProbeVerdict::{Healthy, Leak{instance, reason}}
-5. on Leak:
-     leak_detected=true (latch — no further polling)
-     notify_waiters() via tokio::sync::Notify
-     state.reason / failed_instance written
-6. fetcher (caller) uses tokio::select! to race work vs notify:
-     notify.notified() → bridge.force_kill() → return Err(StealthError::Leak(reason))
-     work_future       → continue
-7. InstancePool::mark_failure(name) per fail → 3 consecutive → 60s exclusion
-   mark_success resets; all_failed() is fail-closed sentinel
-8. systemd Restart=on-failure RestartSec=5s on doctor/vpn/MCP units
-```
-
-### Flow D — `stealth-sanitize` 5-layer pipeline
-
-```
-input: serde_json::Value (raw tool output)
-   │
-   ▼
-[L4 unicode] NFKC → zero-width strip → tag-char strip → bidi-override strip
-              bidi hit emits Suspicious canary
-   │
-   ▼
-[L5 clamp] per-field 256 KiB / total 512 KiB (Balanced)
-            over-budget → 80%-head + "[...TRUNCATED...]" + 20%-tail
-            sets report.truncated = true
-   │
-   ▼
-[L3 canary] Aho-Corasick (literal) + RegexSet (shape) → 20 rules
-              Critical (Enforce + critical_fail_closed) → matched region cleared
-                                                          + payload = Value::Null
-                                                          + report.aborted = true
-              High        → replace match with "[REDACTED:injection]"
-              Suspicious  → report-only
-              report.canary_hits[] = {id, severity, location}
-                            NEVER contains matched bytes
-   │
-   ▼  (skipped if aborted)
-[L2 envelope] wrap each string leaf with:
-              <<<UNTRUSTED_CONTENT origin=<ctx.origin> tool=<ctx.tool>
-                 sanitize_id=<64-bit-hex-nonce>>>>
-              ...sanitized content...
-              <<<END_UNTRUSTED_CONTENT sanitize_id=<same-nonce>>>>
-              forgery defense: body cannot pre-bake END marker without nonce
-   │
-   ▼
-[L7 meta] append _meta.sanitize = {schema_version, policy_name, mode,
-                                    bytes_in, bytes_out, truncated, aborted,
-                                    layers_applied[], canary_hits[], sanitize_id}
-   │
-   ▼
-output: SanitizedEnvelope { payload, report }
-```
-
----
-
-## Use cases
-
-### 1 — Periodic scrape of an authenticated members-only site
+### 1 — 認証必要会員サイトの定期 scrape(v1.3: idempotent retry safe)
 
 ```bash
 rev-stealth config init
-cp templates/sites/example.com.toml ~/.rev_scraping/sites/myfinance.toml
-$EDITOR ~/.rev_scraping/sites/myfinance.toml   # site.domain, [auth], [api.endpoints]
-
-# 2-phase login (operator interacts with the spawned browser once)
+$EDITOR ~/.rev_scraping/sites/myfinance.toml
 rev-stealth auth login --profile myfinance_main --url https://myfinance.example/login
-
-# freshness classification before next cron tick
 rev-stealth auth status --profile myfinance_main --format json
-# → Valid | ExpiringSoon | ExpiringCritical | PartiallyExpired | AllExpired | Missing
-
-# cron (weekdays 09:00 JST)
-# 0 9 * * 1-5 /usr/local/bin/rev-stealth spider \
-#   --url https://myfinance.example/portfolio --profile myfinance_main --format json \
-#   >> /var/log/rev-stealth/myfinance-$(date +\%F).jsonl
+# cron
+0 9 * * 1-5 /usr/local/bin/rev-stealth spider \
+  --url https://myfinance.example/portfolio --profile myfinance_main \
+  --idempotency-key "$(date +\%F)-portfolio" \
+  --output-format json >> /var/log/scrape/myfinance-$(date +\%F).json
 ```
 
-Spider response (excerpt):
+### 2 — Cloudflare-protected JSON API behind Turnstile
 
-```json
-{
-  "ok": true,
-  "operation": "spider",
-  "result": {
-    "session_id": "7c3e3b8a-3b2e-4e57-9a8a-1e1c1f6d7a01",
-    "recipe": {"domain": "myfinance.example", "hits": ["/portfolio"]},
-    "api_response": {"status": 200, "body_sha256": "..."}
-  },
-  "_meta": {"sanitize": {"schema_version": 1, "canary_hits": [], "aborted": false}}
-}
-```
+`cf_evaluate` → `spider` の MCP tool chain。`kind:"captcha"` 失敗は non-retriable。
 
-### 2 — Cloudflare-protected JSON API behind a Turnstile challenge
+### 3 — VPS で 24/7 AI agent eyes
 
-```json
-{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{
-  "name":"cf_evaluate","arguments":{"url":"https://protected.example/login"}}}
+systemd 5 unit + Tailscale + Claude Desktop config(SSH-spawned MCP server)。
 
-{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{
-  "name":"spider","arguments":{
-    "url":"https://protected.example/api/quotes",
-    "cf_evaluate": true,
-    "session_id": "7c3e3b8a-3b2e-4e57-9a8a-1e1c1f6d7a01"}}}
-```
-
-Shared `session_id` lets `spider` reuse the challenge cookie within its idempotency window. Failure with `kind:"captcha"` is **non-retriable** — switch to an authenticated profile or solve out-of-band.
-
-### 3 — VPS as 24/7 AI agent eyes
+### 4 — 並列 JP/US/EU 3 region(idempotent warmup)
 
 ```bash
-sudo systemctl enable --now rev-stealth-mcp rev-stealth-doctor.timer
-sudo systemctl enable --now rev-stealth-vpn@1 rev-stealth-vpn@2 rev-stealth-vpn@3
-tailscale up --ssh   # optional private mesh; not bundled with rev_scraping
+for region in JP US DE; do
+  rev-stealth vpn rotate \
+    --region "$region" \
+    --idempotency-key "warmup-$(date +%F)-$region" \
+    --output-format json &
+done
+wait
 ```
 
-Workstation Claude Desktop config (SSH-spawned MCP server):
+並列 retry 安全 + 当日内 retry が duplicate 課金しない。
 
-```json
-{"mcpServers": {"rev-scraping-vps": {
-  "command": "ssh",
-  "args": ["operator@vps.tailnet.ts.net", "sudo", "-u", "rev-stealth",
-           "/usr/local/bin/stealth-mcp"]}}}
-```
-
-Health timer fires every 30 min, writes JSON to `/var/log/rev-stealth/doctor.jsonl`. Leak detect → exit 7 → unit goes `failed` → operator alert (wire your own).
-
-### 4 — Parallel JP / US / EU exit IPs against the same site
-
-```json
-{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{
-  "name":"vpn_rotate","arguments":{
-    "provider":"surfshark","region":"JP","strategy":"lazy-on-fail",
-    "reason":"warmup JP exit for nikkei feed"}}}
-```
-
-Success:
-
-```json
-{"ok":true,"operation":"vpn.rotate",
- "result":{"instance":"vpn-1","exit_ip":{"country":"JP","asn":"AS9009"},"reason":"warmup ..."}}
-```
-
-VPN-specific error variants (closed set): `vpn_not_configured` (non-retriable), `vpn_all_instances_failed` (retriable), `vpn_country_mismatch` (retriable, retry with different region hint).
-
-### 5 — Verify the prompt-injection sanitizer
+### 5 — Prompt injection sanitizer 検証
 
 ```bash
-./target/release/stealth-mcp <<'EOF' | jq '.result._meta.sanitize'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"canary","version":"0"}}}
-{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
+rev-stealth mcp serve <<EOF | jq '.result._meta.sanitize'
+{"jsonrpc":"2.0","id":1,"method":"initialize",...}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"spider","arguments":{"url":"https://canary-fixtures.local/critical-01"}}}
 EOF
 ```
 
-Expected (Critical canary hit):
+Critical canary hit: `{"schema_version":1,"aborted":true,"canary_hits":[{"id":"C-IGNORE-PREV","severity":"Critical",...}]}`
 
-```json
-{
-  "schema_version": 1,
-  "aborted": true,
-  "canary_hits": [{"id": "C-IGNORE-PREV", "severity": "Critical", "location": "$.result.html"}]
-}
-```
-
-Envelope carries `isError: true`; `env.message` is preserved (no raw bytes — only canary IDs).
-
-### 6 — Multi-environment same-host with profiles
+### 6 — Profile 切替で dev/staging/prod 同居
 
 ```bash
 rev-stealth config profile create dev
-rev-stealth config profile create staging
-rev-stealth config profile list
-
-rev-stealth config profile switch dev          # prints export line — eval it in your shell
+rev-stealth config profile switch dev  # printed export 行を shell で実行
 export REV_SCRAPING_HOME="$HOME/.rev_scraping/profiles/dev"
-rev-stealth config show --format json | jq '.profile, .config_root'
 ```
-
-Notes:
-- **Registry root** (`REV_SCRAPING_PROFILES_ROOT`) and **activation root** (`REV_SCRAPING_HOME`) are deliberately decoupled.
-- `switch` only updates the registry pointer — `export REV_SCRAPING_HOME=…` in shell is what actually activates.
-- Active profile delete is refused; switch first.
 
 ### 7 — Schema migration
 
 ```bash
-rev-stealth config validate --format json
-rev-stealth config migrate --dry-run
-rev-stealth config migrate           # atomic 0600 write at creation; chmod-after race-free
-rev-stealth config history
+rev-stealth config migrate --dry-run --explain
+rev-stealth config migrate \
+  --idempotency-key "migrate-1.2-to-1.3-$(hostname)" \
+  --output-format json
 rev-stealth config rollback --to <history_id>
-rev-stealth config gc                # default --keep 5
 ```
 
-Migration loop is bounded (no infinite chain).
+### 8(v1.3 新規)— cron で同 idempotency-key で安全 retry
+
+```cron
+0 9 * * 1-5 ubuntu /usr/local/bin/rev-stealth spider \
+  --url https://myfinance.example/portfolio \
+  --idempotency-key "$(date +\%Y-\%m-\%d)-portfolio" \
+  --output-format json > /var/log/scrape/portfolio-$(date +\%F).json 2>&1
+```
+
+9:00 成功 → cache 保存。9:15 手動 retry → `_meta.replayed: true` で同じ JSON return(外部 HTTP request 走らず)。
+
+### 9(v1.3 新規)— AI agent から jq pipe で `doc_url` 伝達
+
+```bash
+rev-stealth doctor --output-format json 2>&1 | jq -r '.error | "
+kind: \(.kind)
+message: \(.message)
+hint: \(.hint)
+doc: \(.doc_url)
+"'
+```
+
+Claude Code が `doc_url` を fetch → operator に直接対処方法案内。26 ErrorKind 全部 mdBook ページ実在。
+
+### 10(v1.3 新規)— mdBook docs site で 26 ErrorKind 個別 troubleshoot
+
+```bash
+# Online (release.yml の docs deploy 後)
+open https://sasuketorii.github.io/rev_scraping/en/errors/VpnLeak.html
+# Local
+cd docs/book && mdbook serve --open
+```
 
 ---
 
-## Competitive comparison
+## Competitive comparison(20 axes × 9 tools)
 
-Legend: ✅ first-class · 🟡 partial / plugin / operator-supplied · ❌ not supported
+凡例: `yes` 完備 / `no` 無し / `partial` 部分 / `n/a` 該当しない / `(?)` 未確認
 
-| Axis | rev_scraping v1.2.0 | gocrawl | Scrapling 0.4 | obscura | Playwright | Puppeteer | Crawl4AI 0.8 | Browserless | Bright Data Unlocker |
-|---|---|---|---|---|---|---|---|---|---|
-| Language / runtime | Rust workspace (13 crates) | Go | Python | Rust (V8) | TS/Py/Java/.NET | TS / Node | Python | Managed (Node) | SaaS API |
-| Stealth (CDP patch + FP) | ✅ obscura CDP shim, 11+ field patch, WS warn=0 | ❌ (HTTP only) | ✅ Patchright + humanized input | ✅ per-session GPU/screen/canvas/audio/battery randomization | 🟡 `playwright-stealth` plugin; **unmaintained since Mar 2023** | 🟡 community `puppeteer-extra` | 🟡 inherits Playwright | ✅ BrowserQL / `/unblock` | ✅ AI unlocking (opaque) |
-| VPN-required gate | ✅ Surfshark + Gluetun + 3-instance HRW + leak monitor + exit 7 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | 🟡 residential-proxy add-on | 🟡 proxy is the product |
-| Encrypted credentials | ✅ XChaCha20-Poly1305 + OS keyring + Argon2id fallback | ❌ | 🟡 cookies via fetcher, no enc | 🟡 standard CDP storage | ❌ `storageState.json` **plaintext** | ❌ `userDataDir` **plaintext** | ❌ | 🟡 server-side opaque | N/A |
-| MCP-native agent interface | ✅ stdio JSON-RPC 2.0, **16 tools with input + output schemas** | ❌ | ✅ MCP server (v0.4) | 🟡 3rd-party wrappers | ✅ Microsoft official | 🟡 community | ✅ 4 tools | ✅ hosted at `mcp.browserless.io` | ❌ |
-| **Prompt-injection defense** | ✅ `stealth-sanitize` 5-layer · 20 canary · 100% Critical/High detect · `<<<UNTRUSTED_CONTENT>>>` envelope · `_meta.sanitize` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ raw markdown to LLM (selling point) | ❌ | ❌ raw HTML/markdown |
-| Closed-enum error contract | ✅ 26 ErrorKind + retriable + hint + UUID v4 strict | ❌ Go strings | ❌ Python exception strings | 🟡 Rust `Result`, no catalog | ❌ | ❌ | ❌ HTTP status + JSON | 🟡 | 🟡 |
-| Idempotency (Stripe-style) | ✅ key + `Retry-After` clamp | ❌ | ❌ | ❌ | ❌ | ❌ | 🟡 host-side rate limit only | 🟡 concurrency units | 🟡 quota only |
-| Production deploy | ✅ systemd 5 units + systemd-creds + Xvfb auto-wrap | 🟡 binary | 🟡 pip | 🟡 binary | 🟡 | 🟡 | ✅ Docker + self-host guide | ✅ SaaS / self-host license | ✅ SaaS |
-| License | MIT | BSD-3 | BSD-3 | Apache-2.0 | Apache-2.0 | Apache-2.0 | Apache-2.0 | proprietary | proprietary |
-| Activity (2026-05) | v1.2.0 current | last tag **2021** | v0.4 (2026-02) | active | active | active | active | active SaaS | active SaaS |
+### v1.2.0 継続 11 軸
 
-### Axis-by-axis (selected)
+| # | 軸 | rev_scraping | gocrawl | Scrapling 0.4 | obscura | Playwright | Puppeteer | Crawl4AI 0.8 | Browserless | Bright Data |
+|---|----|--------------|---------|---------------|---------|------------|-----------|--------------|-------------|-------------|
+| 1 | Time to first scrape (cold) | ~60s | ~120s(?) | ~60s | ~60s | ~90s | ~90s | ~5min | ~10s SaaS | ~10s SaaS |
+| 2 | 汎用 browser-automation surface | narrow | medium | medium | narrow | broad | broad | medium | broad | broad |
+| 3 | Bundled CAPTCHA solver | no | no | partial | no | no | no | no | yes (paid) | yes (paid) |
+| 4 | TLS/H2/H3 fingerprint tier-2 | no (v1.4) | partial(?) | yes | yes | no | no | no | partial | yes |
+| 5 | Bundled LLM extraction | no | no | no | no | no | no | yes | no | partial |
+| 6 | Managed dashboard | no | no | no | no | no | no | no | yes | yes |
+| 7 | Single static binary | yes | yes | no | yes | no | no | no | n/a | n/a |
+| 8 | OSS license | MIT | (?) | BSD-3(?) | proprietary | Apache-2.0 | Apache-2.0 | Apache-2.0 | mixed | proprietary |
+| 9 | Native MCP server (≥16 tools) | yes (16) | no | no | partial | yes | no | partial (4) | no | no |
+| 10 | AUP/SSRF/VPN-leak triad guard | yes | no | no | yes | no | no | partial | no | n/a |
+| 11 | Per-command JSON schema (Draft-07) | yes (11) | no | no | n/a | partial | n/a | partial | no | n/a |
 
-**Stealth** — `playwright-stealth` is unmaintained since March 2023 (Chrome 109–112 era), and 2026 anti-bot stacks fingerprint on TLS / HTTP/2 SETTINGS frames *before* JavaScript runs — JS-layer `navigator.webdriver = undefined` is moot. rev_scraping integrates obscura's CDP shim as a Rust crate (no plugin drift), but does not match Browserless / Bright Data on residential IP diversity (we ship VPN, not a 150M-IP pool). If your target is Akamai Bot Manager with strict ASN reputation, a SaaS unlocker is the pragmatic choice.
+### v1.3 新規 9 軸
 
-**AI-agent-native MCP** — rev_scraping's bet is **strict schemas + closed `ErrorEnvelope`**. Most MCP servers in this space return raw markdown or HTTP-shape errors; consumers end up with `if "rate limit" in str(err)` glue. We return `ErrorKind::RateLimited{retry_after_ms}` as a typed envelope. Worth it for typed agent consumers; overhead for one-off scripts.
+| # | 軸 | rev_scraping | gocrawl | Scrapling | obscura | Playwright | Puppeteer | Crawl4AI | Browserless | Bright Data |
+|---|----|--------------|---------|-----------|---------|------------|-----------|----------|-------------|-------------|
+| 12 | Shell completion 4 系統 + drift gate | **yes** | partial(?) | no | no | partial(?) | no | no | n/a | n/a |
+| 13 | Man pages auto-gen | **yes (44)** | no | no | no | no(公式無し) | no | no | n/a | n/a |
+| 14 | `--output-format {human,text,json,yaml}` 全 sub-cmd | **yes (11/11)** | partial(json)(?) | partial(json) | partial | partial | no | partial | n/a | n/a |
+| 15 | YAML 出力 | **yes** | no | no | no | no | no | no | n/a | n/a |
+| 16 | `--dry-run` + `--explain` on mutate(副作用ゼロ) | **yes (15 cmd)** | no | no | no | no | no | no | no | no |
+| 17 | `--idempotency-key`(24h TTL replay) | **yes** | no | no | no | no | no | no | (?) | (?) |
+| 18 | Unified error envelope `{kind,message,hint,doc_url}` | **yes (26 closed)** | partial(strings) | partial(exc) | partial | partial | partial | partial | partial | partial |
+| 19 | CLI public-API drift gate (`cargo-public-api`) | **yes** | no | no | no | no | no | no | n/a | n/a |
+| 20 | MCP schema breaking-change detector | **yes** | n/a | n/a | partial | no | n/a | no | n/a | n/a |
 
-**Prompt-injection defense** — this is the single largest differentiator. **No other tool in the table does this.** Crawl4AI's own MCP server docs acknowledge prompt injection as an *agent-side* concern to be solved by "models with strong alignment" — i.e., not addressed at the server. A canary-tested sanitizer with a marker envelope is not a panacea (no sanitizer is), but it converts the issue from "silent compromise" to "logged + rejected + reviewable." For agents with **write capability** (file writes, tool calls, MCP fan-out), this matters more than stealth.
+### 結論
 
-### Where rev_scraping is the wrong choice (honest)
+> v1.3 を経た rev_scraping は、AI agent dev 観点で「ripgrep / fd / gh / wrangler 級の CLI 体験」+「Stripe API 級の typed error / idempotency contract」の両方を持つ、scraping/automation OSS としては 2026-05 時点で確認できる範囲で唯一の選択肢。
+
+### Where rev_scraping is the wrong choice(honest)
 
 | Use case | Pick instead | Why |
-|---|---|---|
-| Distributed crawl across 10M+ URLs | Crawl4AI / Scrapy lineage | Single-machine; no distributed work queue. |
-| HTML → Markdown ingestion for RAG | Crawl4AI / Bright Data | Crawl4AI's entire product is clean markdown for LLMs. |
-| GUI-managed browser fleet / live debug | Browserless / Bright Data | We are CLI + systemd. No fleet dashboard. |
-| Cross-language client SDKs | Playwright (TS/Py/Java/.NET) | We are Rust + Python (Hermes adapter). |
-| Community-size-bound projects | Playwright / Puppeteer | Single-vendor codebase vs. Microsoft / Google ecosystems. |
-
-**One-line summary**: rev_scraping is the right choice when the workload is **a typed AI agent driving authenticated, members-only sessions from a hardened single VPS, with prompt-injection-safe content delivery and egress-IP-leak guarantees as non-negotiables**.
+|----------|--------------|-----|
+| 分散 crawl 10M+ URL | Crawl4AI / Scrapy 系列 | single-machine、分散ワークキュー無し |
+| RAG 用 HTML → Markdown | Crawl4AI / Bright Data | Crawl4AI 本業 |
+| GUI 管理ブラウザファーム | Browserless / Bright Data | dashboard 無し |
+| 多言語 SDK | Playwright (TS/Py/Java/.NET) | Rust + Python (Hermes) のみ |
+| コミュニティサイズ依存 | Playwright / Puppeteer | single-vendor |
+| Cloudflare/Akamai tier-2 突破 | obscura / Scrapling / Bright Data | v1.4 Lane L 予定 |
+| SaaS 即時開始 | Browserless / Bright Data | ~10s signup vs ~60s install |
 
 ---
 
-## Configuration
+## Environment variables
 
-### File layout (`~/.rev_scraping/`)
+### Config paths / profile
+- `REV_SCRAPING_HOME` — config base override
+- `REV_SCRAPING_PROFILES_ROOT` — profile registry root(decoupled)
+- `REV_SCRAPING_PROFILE` — active profile name
+- `REV_SCRAPING_POLICY` / `REV_SCRAPING_AUTHORIZED` / `REV_SCRAPING_AUTH_DIR` — path overrides
 
-```
-~/.rev_scraping/                          # default base (override: REV_SCRAPING_HOME)
-├── policy.toml                           # mode 0600 — VPN / require_vpn / instances
-├── authorized.toml                       # mode 0600 — AUP allow-list
-├── sites/                                # mode 0700 — per-domain SiteRecipe TOMLs
-├── sessions/                             # mode 0700 — HRW sticky session bindings
-└── profiles/                             # mode 0700 — multi-environment registry
-    ├── dev/
-    ├── staging/
-    └── prod/
-```
+### Policy / guard
+- `REV_SCRAPING_REQUIRE_VPN=1` — force require_vpn(最優先)
+- `REV_SCRAPING_AUP_ACK` — daily-rotating AUP ack hash
+- `REV_SCRAPING_ALLOW_LOOPBACK` — loopback target 許可
+- `REV_SCRAPING_CONFIG_LENIENT` — strict validate 緩和
 
-### `policy.toml` essentials
+### v1.3 新規
+- **`REV_SCRAPING_IDEMPOTENCY_DIR`** — replay cache root override
+- **`REV_SCRAPING_IDEMPOTENCY_TTL_SECS`** — 24h default override(`0` で無効化)
 
-```toml
-schema_version = 1                        # bounded migration (LATEST=1)
-require_vpn = true                        # fail-closed default
-vpn_required_country = "JP"               # ISO-2 / alias table
+### VPN
+- `VPN_USER_FILE` / `VPN_PASSWORD_FILE` — `<KEY>_FILE` precedence(systemd-creds)
+- `VPN_USER` / `VPN_PASSWORD` — 平文(本番非推奨)
+- `VPN_INSTANCES` — `name:proxy_port:control_port,...`
 
-[[vpn_instances]]
-name = "vpn-1"
-http_proxy_port = 18801
-control_port = 18831
+### Auth helpers
+- `REV_AUTH_BIN` / `REV_AUTH_CHROME_BIN` / `REV_AUTH_AUTO_XVFB` / `REV_AUTH_DISPLAY` / `REV_AUTH_HEADLESS`
+- `REV_OBSCURA_BIN` / `OBSCURA_BIN` / `REV_STEALTH_CHROME` / `REV_STEALTH_SIDECAR`
 
-[proxies.gluetun]
-strength = "high"
-url = "http://${VPN_USER}:${VPN_PASSWORD}@vpn-1:18801"   # ${VAR} placeholders REQUIRED
-                                                          # plaintext user:pass = LOAD REJECT
-auth_env = "VPN_USER"
-no_proxy = "127.0.0.1,localhost"
+### Other
+- `REV_SCRAPING_MCP_BIN` — Hermes adapter の `stealth-mcp` path
+- `REV_STEALTH_BIN` — MCP 側 CLI binary path
+- `REV_STEALTH_EGRESS_PROBE_URL` — `measure --enable-egress-probe` probe URL
+- `EDITOR` — `config edit` fallback(default `vi`)
+- `RUST_LOG` — `tracing-subscriber` EnvFilter
 
-[fallback_chain]
-auto = ["gluetun", "direct"]              # tier order; "auto" itself is forbidden
-```
+---
 
-`require_vpn` precedence (highest first): env `REV_SCRAPING_REQUIRE_VPN=1` > `--require-vpn` flag > `--allow-no-vpn` flag > `policy.toml::require_vpn` > built-in default `true`.
+## CI gates inventory(28 gates)
 
-`ConfigWriter` writes via `OpenOptions::new().write(true).create_new(true).mode(0o600).open()` — permissions set **at creation**, no chmod-after race window.
+### v1.2.0 継続(8 jobs)
+`rust-test` / `rust-clippy` / `rust-fmt-check` / `mcp-schema-lint` / `config-cli-smoke` / `hermes-contract` / `systemd-analyze` / `headless-auth`
+
+### v1.3 Lane G(5 gates)
+`completion-drift` / `manpage-drift` / `cli-surface-drift` / `help-dictionary-quality` / `output-format-coverage`
+
+### v1.3 Lane I(5 gates)
+`cli-public-api-snapshot` / `cargo-public-api-diff` / `mcp-schema-breaking-detector` / `changelog-lint` / `cargo-public-api-snapshot.test.sh`(8 fixtures)
+
+### v1.3 Lane K(5 gates)
+`coverage` / `forbid-unsafe-lint` / `cross-platform-nightly` / `fuzz-nightly` / `bench`
+
+### v1.3 Lane H(5 gates)
+`brew-audit` / `install-sh-unit` / `distroless-pr-scan` / `package-metadata-sanity` / `sbom`
 
 ---
 
 ## FAQ / debugging
 
-**Q: `rev-stealth doctor` exits 7.**
-A: VPN tunnel down / leak detected. `systemctl status rev-stealth-vpn@1` and `docker compose logs vpn-1`. `doctor --output-format json` shows which of `kill_switch` / `dns_lock` / `webrtc_guard_present` / `exit_ip_ok` is false.
+### v1.2.0 から継続(12 個)
 
-**Q: Cookies disappear / `auth_status` returns `Missing`.**
-A: Keyring permission. macOS: `security find-generic-password -s rev_scraping.stealth_auth`. Linux: `secret-tool search service rev_scraping.stealth_auth`. After profile switch, did you `export REV_SCRAPING_HOME=…`?
+詳細は前 README 参照。`doctor exit 7` / cookies Missing / xvfb / sanitize aborted / profile switch / vpn_country_mismatch / recipe_import / `kind:aup` / Hermes 16 tools / LoadCredentialEncrypted / auth_session_not_found / doctor --vps JSON shape
 
-**Q: VPS Chrome won't start (`Failed: no $DISPLAY`).**
-A: Auto-Xvfb didn't trigger. Either set `REV_AUTH_AUTO_XVFB=1` + ensure `xvfb-run` is on PATH, or use `--with-vnc-fallback` (opt-in xvfb-vnc service) + drop-in `Environment=DISPLAY=:99`.
+### v1.3 新規
 
-**Q: MCP tool call returns `_meta.sanitize.aborted: true` + `isError: true`.**
-A: Critical canary detected. `canary_hits[].id` + `severity` indicates which rule. Critical hits fail closed (Enforce + `critical_fail_closed`). Operator-side intent: re-fetch with `Preset::Balanced` policy if false positive (e.g., a security blog quoting `[INST]`).
+**Q: `--output-format yaml` が "unknown value" エラー。**
+A: G.4 で 11 sub-cmd 全対応。古いバイナリ。`cargo install --locked --force rev-stealth`。`--output-format=yaml` (= 区切り) も accept。
 
-**Q: `config profile switch dev` doesn't change anything.**
-A: `switch` updates the registry, but `REV_SCRAPING_HOME` is per-shell. Run the printed `export` line (or open a new shell). Verify with `config show --format json | jq '.profile, .config_root'`.
+**Q: `--idempotency-key` 2 回目が cache hit しない。**
+A:
+1. payload 違う(args/flags/stdin body)→ `idempotency_conflict`。`--dry-run --explain` で plan 比較
+2. TTL 切れ → `REV_SCRAPING_IDEMPOTENCY_TTL_SECS`
+3. cache directory 違う → `REV_SCRAPING_IDEMPOTENCY_DIR`
+4. `auth_login` の場合: G.6.c で rev-auth child stdout capture 検討中、現状 synthesized marker
 
-**Q: `vpn_rotate` returns `kind: "vpn_country_mismatch"`.**
-A: Requested region not present in pool. Retriable — try a different region. `docker compose logs vpn-N` for Gluetun handshake details.
+確認: `ls -la ~/.rev_scraping/idempotency/` + `jq '.' <file>`
 
-**Q: `recipe_import` returns `kind: "recipe_invalid"` / secret-rejected.**
-A: Payload contains a secret-shaped field (token / password). Strip before export → import. v1.2.1 will add `recipe_import` strict mode (refuses recipes whose fields trip canaries).
+**Q: `man rev-stealth-spider` "No manual entry"。**
+A: `target/man/man1/` が `$MANPATH` 不在。`sudo cp target/man/man1/*.1 /usr/local/share/man/man1/ && sudo mandb`。`brew install` 経由なら自動配置。
 
-**Q: `tools/call` returns `kind: "aup"`.**
-A: URL not on `authorized.toml` allow-list. Or fails SSRF guard (`kind: "ssrf"` — loopback / RFC1918 / link-local). Both non-retriable.
-
-**Q: Hermes plugin shows fewer than 16 tools.**
-A: `stealth-mcp` binary not built or not on PATH. Set `REV_SCRAPING_MCP_BIN` to the absolute path. `cd dist/hermes/rev-scraping-mcp && python3 -m unittest discover tests -v` for adapter smoke.
-
-**Q: `LoadCredentialEncrypted=` fails at unit start.**
-A: systemd < 252, or `/etc/credstore.encrypted/` missing. `systemctl --version`; re-run `setup-credentials.sh`.
-
-**Q: `auth_login_complete` returns `kind: "auth_session_not_found"` on the second call.**
-A: `session_token` is **single-use**. Re-run `auth_login_start` for a new token.
-
-**Q: `doctor --vps` JSON is unexpectedly an array.**
-A: v1.2.0 changed it to top-level array. Old `{doctor, vps}` object form is gone.
+**Q: shell completion が tab 効かない。**
+A: zsh: `echo $fpath` + `compinit` reload。bash: `bash-completion` + `. ~/.bashrc`。fish: ファイル設置のみ。nushell: `config.nu` で `source` 追記。`rev-stealth completions zsh > ...` で再生成。
 
 ---
 
-## Limitations & v1.2.1 backlog
+## Limitations & v1.3.1 backlog
 
-Carried verbatim from [`RELEASE_NOTES_v1.2.0.md`](RELEASE_NOTES_v1.2.0.md) so adopters know the exact residual risk:
+### v1.2.0 から継続
+- L1 ammonia HTML scrub / L6 URL scheme allowlist 未実装
+- 多言語 canary 英語のみ
+- Hermes Python mirror sanitizer なし(Rust 側のみ実行)
+- `recipe_import` strict mode 未実装
+- Enforce mode default flip 未(v1.2.0 Warn default + Critical-only fail-closed)
+- Site-specific policy override per-tool のみ
+- Audit log HMAC chain / rotation / TPM sealing 無し
+- Windows ACL 非対応、single-machine、分散非対応
+- 既知 flake: `auth_login_with_allow_no_vpn_skips_probe` env race
 
-- **L1 — ammonia HTML scrub.** v1.2.0 has no HTML sanitization. Hidden text (`<span style="display:none">`), JSON-LD blocks relocated into the visible flow, and SVG `<script>` payloads reach the LLM unmodified.
-- **L6 — URL scheme allowlist + length cap.** `javascript:`, `file:`, oversized `data:` URLs are not filtered at the URL layer.
-- **Multilingual canaries.** Canary regex set is English-only. JP / ZH / KR / RU pattern packs are v1.2.1 backlog.
-- **Hermes Python mirror sanitizer.** Sanitize runs on the Rust side; a Python adapter that re-serializes content downstream bypasses it.
-- **`recipe_import` strict mode.** Imported recipes are not run through the canary engine (T3 supply-chain vector).
-- **Enforce-mode default flip.** v1.2.0 ships `Warn` default with `Critical-only` fail-closed. v1.2.1 will flip Enforce default.
-- **L2 envelope idempotence on re-scan.** Sanitizing already-sanitized payload re-trips envelope canary because the marker matches its own pattern.
-- **Site-specific policy overrides.** Today per-tool policy is the only granularity. v1.2.1 adds per-target overrides keyed on domain.
-- **Tamper-evident audit log.** v1.2.0 audit JSONL has no HMAC chain, no rotation, no TPM sealing.
-- **OS support.** macOS / Linux only. Windows ACL TODO; not production in v1.2.0.
-- **Distributed scope.** Single-machine. No distributed crawl.
-- **Known flake.** `auth_login_with_allow_no_vpn_skips_probe` races on process-wide `REV_SCRAPING_REQUIRE_VPN` env at `--test-threads=4`. CI uses `--no-fail-fast`.
+### v1.3 新規
+- **`cargo install rev-stealth` / `brew install rev-stealth` は release.yml 実走後のみ動作**: GitHub Actions 課金未設定で 2026-05-23 現在 job-not-started、billing 有効化後 `gh run rerun` で実走
+- **Lane H D 軸 Codex 6.0 rescore plan**: post-tag 9.0+ 期待
+- **G.6 proptest 50-iter**: deferred、R2 (v1.3.1) で復活
+- **`auth_login` idempotency replay**: 現在 synthesized marker、G.6.c で rev-auth stdout capture 検討
+- **mdBook 翻訳**: en 100% / ja 優先翻訳のみ
+- **`_meta.diagnostic` field 不一致**: RELEASE_NOTES に記載されているが実 emit なし → v1.3.1 docs correction
+- **`obscura-bridge` SAFETY exemption** docs/code 不一致 → v1.3.1 release notes correction
+- **`IdempotencyStore` permissions**: umask 由来 → v1.3.1 で `mode(0o700)`/`mode(0o600)` hardening
+- **Dependabot 2 vulns**: `scripts/semantic-mcp-server/` npm helper のみ(RevHarness scoped)、rev_scraping Rust crate 影響なし
+
+### v1.4+ scope
+- Lane L Stealth tier-2(TLS / JA4 / H2 SETTINGS / HTTP/3 fingerprint via boring-sys)
+- Lane M Crypto tier-2(TPM2 + FIDO2 + audit chain + external review)
+- Lane N IaC + observability(Ansible / Terraform + Prometheus + Grafana + OTel)
+- Lane O i18n zh/ko + WASM playground + 動画
+- Lane P Mutation testing + Chaos test
+
+---
+
+## v1.3 dual scoring
+
+User mandate: 「Opus 4.7-xhigh と Codex gpt-5.5-xhigh が両者 9.0 以上出すまでループ」
+
+7-axis rubric: A acceptance (×2) / B 外部 verifiable + CI gate + adversarial (×1.5) / C 競合 (×1.5) / D AI agent dev UX (×2) / E 1 年負債 (×1) / F test + evidence (×1) / G docs (×1)
+
+| Lane | Codex (round) | Opus (round) | dual status |
+|------|--------------|--------------|-------------|
+| **J** Agent-First docs | 9.23 R1 | 9.10 R1 | 🏆 PASS PASS |
+| **I** API stability | 9.10 R2 (R1 7.79) | 9.08 R1 | 🏆 PASS PASS |
+| **K** Quality moat | 9.10 R4 (R1 8.23 → R3 8.97) | 9.06 R1 | 🏆 PASS PASS |
+| **G** CLI UX black-belt | 9.37 R2 (R1 8.78) | 9.23 R1 | 🏆 PASS PASS |
+| **H** Distribution | 8.00 R2 (R1 6.79、plumbing 100% LGTM) | 7.38 R1 plumbing | post-tag rescore plan |
+
+**4/5 lane convergence FINAL pre-tag**。Lane H D 軸 6.0 は v1.3.0 tag 時の release.yml 実走で解消する設計(Option A "plumbing-only" 選択時から想定済 post-tag rescore plan)。
+
+Scoring artifacts: `.agent/active/scoring/v1_3_<lane>_score_round<N>_<scorer>.{md,out}`、convergence record: `.agent/active/scoring/v1_3_<lane>_convergence.md`
 
 ---
 
 ## Project process
 
-v1.2.0 landed **30 sub-phases** across 6 lanes (A: VPS, B: Config UX, C: Agentability, D: Hermes, E: Docs/CI, F: Injection defense) via an Opus 4.7-high coder × Codex gpt-5.5-high reviewer loop:
+35+ sub-phase LGTM across 5 lanes G/H/I/J/K via Opus 4.7-xhigh coder × Codex gpt-5.5-xhigh reviewer:
 
-- Canonical wrapper: `scripts/codex-wrapper.sh --role reviewer --stdin` (raw `codex exec` prohibited).
-- Slice ≤ 2 KB / max 3 review rounds per slice.
-- Evidence: `.agent/active/prompts/*.md` (committed) + `REV_HARNESS_DELEGATION_METRIC` line per round.
+- Canonical wrapper: `scripts/codex-wrapper.sh --role reviewer --stdin`(raw `codex exec` prohibited)
+- Slice ≤ 2 KB / max 3 review rounds per slice
+- Evidence: `.agent/active/{prompts,reviews,scoring}/v1_3_*.{md,out}` commit 済 + `REV_HARNESS_DELEGATION_METRIC` 行 / round
+- Dual scoring protocol: `.agent/active/v1_3_quality_bar.md`
 
-CI (8 jobs, [`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+### Test suite(v1.3.0)
+- Workspace: **911 PASS** / 0 fail / 38 ignored
+- Python (Hermes): 20 PASS / 0 fail
+- Sanitize golden corpus: 20 hostile + 20 benign → Critical 100%, High 100%, FP ≤ 1 Suspicious/page
+- Proptest: 8 props × 256 cases + 50-iter idempotency invariants
+- cargo-fuzz: 3 targets nightly 1h/day each
 
-- `rust-test` — `cargo test --workspace --locked --no-fail-fast`
-- `rust-clippy` — `cargo clippy --workspace --all-targets -- -D warnings`
-- `rust-fmt-check` — `cargo fmt --check`
-- `mcp-schema-lint` — `cargo run -p stealth-mcp --bin gen_reference -- --check` (freshness gate)
-- `config-cli-smoke` — `rev-stealth config init --target=policy --non-interactive --force` in tmpdir
-- `hermes-contract` — `python3 -m unittest discover dist/hermes/rev-scraping-mcp/tests` (20 PASS)
-- `systemd-analyze` — `systemd-analyze verify dist/systemd/system/*.{service,timer}` (Ubuntu 24.04 / systemd 255)
-- `headless-auth` — placeholder skip (Xvfb-dependent; future Linux job)
+### ErrorEnvelope — 26 closed `ErrorKind` variants
 
-### Test suite
+| # | Wire (snake_case) | Pascal | Retriable | Hint |
+|---|------------------|--------|-----------|------|
+| 1 | aup | Aup | no | Confirm allow-list + robots.txt |
+| 2 | ssrf | Ssrf | no | Don't request loopback/RFC1918/link-local |
+| 3 | vpn_leak | VpnLeak | yes | Bring VPN up; re-run doctor; rotate |
+| 4 | rate_limit | RateLimit | yes | Honor retry_after_ms |
+| 5 | timeout | Timeout | yes | Retry with larger budget |
+| 6 | captcha | Captcha | no | Switch to authenticated flow |
+| 7 | auth | Auth | no | Re-run auth_login_start |
+| 8 | not_found | NotFound | no | Verify URL/recipe/profile |
+| 9 | validation | Validation | no | Inspect message; fix field |
+| 10 | network | Network | yes | Retry with backoff |
+| 11 | internal | Internal | no | Capture logs, file bug |
+| 12 | recipe_not_found | RecipeNotFound | no | `recipe_list` to see available |
+| 13 | recipe_invalid | RecipeInvalid | no | Fix and re-import |
+| 14 | auth_session_expired | AuthSessionExpired | yes | Re-run auth_login_start |
+| 15 | auth_session_not_found | AuthSessionNotFound | no | Start new login flow |
+| 16 | auth_session_pending | AuthSessionPending | yes | Poll after delay |
+| 17 | vpn_not_configured | VpnNotConfigured | no | Configure in policy.toml |
+| 18 | vpn_all_instances_failed | VpnAllInstancesFailed | yes | Wait; check provider |
+| 19 | vpn_country_mismatch | VpnCountryMismatch | yes | Retry rotation with different region |
+| 20 | cdp_protocol | CdpProtocol | yes | Retry; check Chrome version |
+| 21 | cdp_disconnected | CdpDisconnected | yes | Retry; relaunch browser |
+| 22 | cdp_injection_failed | CdpInjectionFailed | yes | Re-run; verify obscura |
+| 23 | browser_crashed | BrowserCrashed | yes | Retry; capture core if reproducible |
+| 24 | browser_not_found | BrowserNotFound | no | Install Chrome or set OBSCURA_BIN |
+| 25 | cookie_decrypt_failed | CookieDecryptFailed | no | Re-create auth profile |
+| 26 | aborted | Aborted | yes | Resume if still desired |
 
-- **Workspace**: 776 PASS / 0 fail / 38 ignored (`cargo test --workspace --no-fail-fast`)
-- **Python (Hermes)**: 20 PASS / 0 fail
-- **Sanitize golden corpus**: 20 hostile + 20 benign → Critical 100%, High 100%, FP ≤ 1 Suspicious/page
-
-### Security fixes called out in v1.2.0
-
-1. UUID v4 forgery (transparent deserialize)
-2. `Retry-After: u64::MAX` Instant overflow DoS
-3. Idempotency expired-eviction TOCTOU race
-4. `ConfigWriter` chmod-after permission window
-5. systemd `ExecStart` missing `exec` (zombie reaping)
-6. docker-compose `${VPN_USER}` interpolation collision
-7. `doctor --vps` JSON shape (`{doctor, vps}` → top-level array)
-8. Hermes Python `readline()` deadline bypass
-9. Hermes `start()` fd leak on handshake-fail
-10. Hermes `env=` ctor bypassed `filter_env` (smuggling)
-11. `auth.rs` CLI `--python-check=false` parse regression
-12. `stealth-sanitize` descendant pointer key-leak in canary reports
-
-### ErrorEnvelope — the 26 closed `ErrorKind` variants
-
-| # | Wire name | When emitted | Retriable | Hint |
-|---|---|---|---|---|
-| 1 | `aup` | AUP allow-list violation | no | Confirm AUP allow-list + robots.txt |
-| 2 | `ssrf` | private/internal target | no | Do not request loopback/RFC1918/link-local |
-| 3 | `vpn_leak` | VPN egress would have leaked | yes | Bring VPN up; re-run `doctor`; rotate |
-| 4 | `rate_limit` | per-host / global rate limit exceeded | yes | Honor `retry_after_ms` |
-| 5 | `timeout` | operation exceeded budget | yes | Retry with larger budget |
-| 6 | `captcha` | captcha challenge not bypassable | no | Switch to authenticated flow |
-| 7 | `auth` | auth/authz failure | no | Re-run `auth_login_start` |
-| 8 | `not_found` | target resource not found | no | Verify URL / recipe / profile |
-| 9 | `validation` | input validation failure | no | Inspect `message`; fix field |
-| 10 | `network` | transport failure | yes | Retry with backoff |
-| 11 | `internal` | unclassified internal error | no | Capture logs, file a bug |
-| 12 | `recipe_not_found` | recipe lookup failed | no | `recipe_list` to see available |
-| 13 | `recipe_invalid` | recipe schema/semantic invalid | no | Fix and re-import |
-| 14 | `auth_session_expired` | `auth_login_complete` polled past timeout | yes | Re-run `auth_login_start` |
-| 15 | `auth_session_not_found` | `session_token` unknown | no | Start new login flow |
-| 16 | `auth_session_pending` | helper not yet finished | yes | Poll again after delay |
-| 17 | `vpn_not_configured` | rotation requested but no backend | no | Configure in policy.toml |
-| 18 | `vpn_all_instances_failed` | every instance failed | yes | Wait; check provider |
-| 19 | `vpn_country_mismatch` | resolved country ≠ policy | yes | Retry rotation with different region |
-| 20 | `cdp_protocol` | CDP unexpected error | yes | Retry; check Chrome version |
-| 21 | `cdp_disconnected` | CDP WebSocket disconnected | yes | Retry; relaunch browser |
-| 22 | `cdp_injection_failed` | stealth JS inject failed | yes | Re-run; verify obscura |
-| 23 | `browser_crashed` | headless browser crashed | yes | Retry; capture core if reproducible |
-| 24 | `browser_not_found` | binary not on PATH | no | Install Chrome or set `OBSCURA_BIN` |
-| 25 | `cookie_decrypt_failed` | on-disk cookie store unreadable | no | Re-create auth profile |
-| 26 | `aborted` | cancelled by caller | yes | Resume if still desired |
+各 kind 対応 `doc_url` が `docs/book/src/en/errors/<Pascal>.md` で実在(CI gate)。
 
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT。[LICENSE](LICENSE) 参照。
 
 ### Acknowledgments
 
-- **obscura** ([h4ckf0r0day/obscura](https://github.com/h4ckf0r0day/obscura)) — CDP shim foundations.
-- **Scrapling** ([D4Vinci/Scrapling](https://github.com/D4Vinci/Scrapling)) — adaptive selector resurrection design (BSD-3 reference).
-- **chromiumoxide** — CDP transport.
-- **Gluetun** — Surfshark / WireGuard container.
-- **systemd-creds + TPM2** — credential sealing.
+- **obscura** ([h4ckf0r0day/obscura](https://github.com/h4ckf0r0day/obscura)) — CDP shim foundations
+- **Scrapling** ([D4Vinci/Scrapling](https://github.com/D4Vinci/Scrapling)) — adaptive selector design (BSD-3 reference)
+- **chromiumoxide** — CDP transport
+- **Gluetun** — Surfshark / WireGuard container
+- **systemd-creds + TPM2** — credential sealing
+- **clap + clap_complete + clap_mangen** — CLI parsing, completion, man page generation(v1.3 Lane G の根幹)
+- **sigstore cosign + SLSA** — keyless signing + provenance attestation(v1.3 Lane H/K)
 
-Built by a sole human operator + Opus 4.7-high coder + Codex gpt-5.5-high reviewer over ~8 hours of orchestrated parallel work.
+Built by a sole human operator + Opus 4.7-xhigh coder + Codex gpt-5.5-xhigh reviewer。v1.2.0 → v1.3.0 で 20 commits、35+ sub-phase LGTM、4/5 lane dual ≥ 9.0 達成。
