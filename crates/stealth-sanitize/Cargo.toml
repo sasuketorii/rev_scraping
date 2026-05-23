@@ -1,17 +1,25 @@
 [package]
-name = "stealth-sanitize"
+# Lane H Slice B-3: flipped to `publish = true` and renamed to
+# `rev-stealth-sanitize` for crates.io namespace squat-resistance. The lib
+# alias remains `stealth_sanitize` so the workspace `use stealth_sanitize::...`
+# import surface is unchanged.
+name = "rev-stealth-sanitize"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-# Workspace-internal Lane F crate. Marked `publish = false` so the Lane H
-# release preflight (`cargo package -p rev-stealth`) reflects the actual
-# publish policy: only the `rev-stealth` crate is published to crates.io
-# in Slice A; every other workspace member stays internal-only until Slice B
-# flips the transitive publish chain (see `docs/distribution.md`).
-publish = false
-description = "Prompt-injection defense sanitizer for RevHarness MCP surface (L2 envelope + L3 canary + L4 unicode + L5 clamp + L7 meta)."
+publish = true
+description = "rev-stealth prompt-injection defense sanitizer for the RevHarness MCP surface (L2 envelope + L3 canary + L4 unicode + L5 clamp + L7 meta)."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "sanitize", "mcp"]
+categories = ["web-programming::http-client", "text-processing"]
+
+[lib]
+name = "stealth_sanitize"
+path = "src/lib.rs"
 
 [dependencies]
 serde = { workspace = true }

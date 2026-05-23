@@ -1,12 +1,24 @@
 [package]
-name = "stealth-core"
+# Lane H Slice B-3: published as `rev-stealth-core` (defensive namespace squat
+# resistance). `[lib] name = "stealth_core"` is preserved so `use stealth_core::...`
+# across the workspace remains unchanged.
+name = "rev-stealth-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Core traits and shared types for rev_stealth (browser stealth / captcha bypass / VPN rotation)"
+publish = true
+description = "stealth-core: shared traits + Chromium launcher for rev_scraping (stealth browser / captcha bypass / VPN rotation)"
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "cdp", "chromium"]
+categories = ["web-programming::http-client"]
+
+[lib]
+name = "stealth_core"
+path = "src/lib.rs"
 
 [features]
 default = ["browser"]

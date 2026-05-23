@@ -1,12 +1,22 @@
 [package]
-name = "vpn-rotate"
+# Lane H Slice B-3: published as `rev-stealth-vpn-rotate`; lib alias preserved.
+name = "rev-stealth-vpn-rotate"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "VPN IP rotation (Surfshark / Gluetun) with lazy-rotate-on-fail strategy"
+publish = true
+description = "rev-stealth VPN IP rotation (Surfshark / Gluetun) with lazy-rotate-on-fail strategy"
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "vpn", "rotation"]
+categories = ["web-programming::http-client", "network-programming"]
+
+[lib]
+name = "vpn_rotate"
+path = "src/lib.rs"
 
 [features]
 default = []

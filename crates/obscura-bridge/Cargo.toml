@@ -1,12 +1,22 @@
 [package]
-name = "obscura-bridge"
+# Lane H Slice B-3: published as `rev-stealth-obscura-bridge`; lib alias preserved.
+name = "rev-stealth-obscura-bridge"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Bridge between rev_scraping and the vendored obscura browser binary (subprocess + CDP)."
+publish = true
+description = "rev-stealth bridge to the vendored obscura browser binary (subprocess + CDP)."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "cdp", "chromium"]
+categories = ["web-programming::http-client"]
+
+[lib]
+name = "obscura_bridge"
+path = "src/lib.rs"
 
 [features]
 default = []
@@ -32,8 +42,8 @@ futures-util = "0.3"
 reqwest = { workspace = true }
 chrono = { workspace = true }
 secrecy = { workspace = true }
-mobile-fp = { path = "../mobile-fp" }
-stealth-core = { path = "../stealth-core" }
+mobile-fp = { workspace = true }
+stealth-core = { workspace = true }
 dashmap = "6"
 
 [dev-dependencies]

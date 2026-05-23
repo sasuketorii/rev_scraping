@@ -33,27 +33,31 @@ license = "MIT"
 authors = ["Sasuke Torii"]
 
 [workspace.dependencies]
-# Internal workspace crates. `version` + `path` both specified so the
-# `rev-stealth` publish target satisfies cargo's "all dependencies must have
-# a version requirement specified when publishing" manifest verification.
-# Local builds still resolve via `path`; the `version` field is only used
-# in the packaged Cargo.toml uploaded to crates.io.
-stealth-core = { path = "crates/stealth-core", version = "1.2.0" }
-mobile-fp = { path = "crates/mobile-fp", version = "1.2.0" }
-vpn-rotate = { path = "crates/vpn-rotate", version = "1.2.0" }
-captcha-bypass = { path = "crates/captcha-bypass", version = "1.2.0" }
+# Lane H Slice B-3: every internal crate is published to crates.io under the
+# `rev-stealth-*` namespace for defensive squat-resistance. The
+# `package = "rev-stealth-*"` aliasing here lets in-tree crates keep their
+# historical short dependency keys (`stealth-core = { workspace = true }`)
+# and the rust-side `use stealth_core::...` import paths unchanged — only
+# the actual crates.io package name on the wire is the `rev-stealth-` form.
+#
+# `version` + `path` are both specified so the publish-target manifests
+# satisfy cargo's "all dependencies must have a version requirement" check.
+stealth-core = { package = "rev-stealth-core", path = "crates/stealth-core", version = "1.2.0" }
+mobile-fp = { package = "rev-stealth-mobile-fp", path = "crates/mobile-fp", version = "1.2.0" }
+vpn-rotate = { package = "rev-stealth-vpn-rotate", path = "crates/vpn-rotate", version = "1.2.0" }
+captcha-bypass = { package = "rev-stealth-captcha-bypass", path = "crates/captcha-bypass", version = "1.2.0" }
 # Lane H Slice A (v1.3): the workspace member directory stays `stealth-cli/`
 # but the published crate name is `rev-stealth`. Other workspace crates use
 # this alias for path resolution; no crate currently depends on it.
 rev-stealth = { path = "crates/stealth-cli", version = "1.2.0" }
-obscura-bridge = { path = "crates/obscura-bridge", version = "1.2.0" }
-stealth-cf = { path = "crates/stealth-cf", version = "1.2.0" }
-stealth-parse = { path = "crates/stealth-parse", version = "1.2.0" }
-stealth-mcp = { path = "crates/stealth-mcp", version = "1.2.0" }
-stealth-sites = { path = "crates/stealth-sites", version = "1.2.0" }
-stealth-auth = { path = "crates/stealth-auth", version = "1.2.0" }
-stealth-agent-contracts = { path = "crates/stealth-agent-contracts", version = "1.2.0" }
-stealth-sanitize = { path = "crates/stealth-sanitize", version = "1.2.0" }
+obscura-bridge = { package = "rev-stealth-obscura-bridge", path = "crates/obscura-bridge", version = "1.2.0" }
+stealth-cf = { package = "rev-stealth-cf", path = "crates/stealth-cf", version = "1.2.0" }
+stealth-parse = { package = "rev-stealth-parse", path = "crates/stealth-parse", version = "1.2.0" }
+stealth-mcp = { package = "rev-stealth-mcp", path = "crates/stealth-mcp", version = "1.2.0" }
+stealth-sites = { package = "rev-stealth-sites", path = "crates/stealth-sites", version = "1.2.0" }
+stealth-auth = { package = "rev-stealth-auth", path = "crates/stealth-auth", version = "1.2.0" }
+stealth-agent-contracts = { package = "rev-stealth-agent-contracts", path = "crates/stealth-agent-contracts", version = "1.2.0" }
+stealth-sanitize = { package = "rev-stealth-sanitize", path = "crates/stealth-sanitize", version = "1.2.0" }
 
 # Async runtime / utility
 tokio = { version = "1", features = ["full"] }

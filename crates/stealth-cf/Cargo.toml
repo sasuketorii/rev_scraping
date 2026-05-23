@@ -1,12 +1,22 @@
 [package]
-name = "stealth-cf"
+# Lane H Slice B-3: published as `rev-stealth-cf`; lib alias preserved.
+name = "rev-stealth-cf"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Cloudflare Turnstile resilience evaluation (defender-facing) for rev_scraping."
+publish = true
+description = "rev-stealth Cloudflare Turnstile resilience evaluation (defender-facing surface)."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "cloudflare", "turnstile"]
+categories = ["web-programming::http-client"]
+
+[lib]
+name = "stealth_cf"
+path = "src/lib.rs"
 
 [dependencies]
 tokio = { workspace = true }

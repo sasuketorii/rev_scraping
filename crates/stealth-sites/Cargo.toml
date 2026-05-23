@@ -1,12 +1,22 @@
 [package]
-name = "stealth-sites"
+# Lane H Slice B-3: published as `rev-stealth-sites`; lib alias preserved.
+name = "rev-stealth-sites"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Site Recipe L2 discovery cache (per-domain TOML store) for rev_scraping."
+publish = true
+description = "rev-stealth Site Recipe L2 discovery cache (per-domain TOML store)."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "recipe", "cache"]
+categories = ["web-programming::http-client", "caching"]
+
+[lib]
+name = "stealth_sites"
+path = "src/lib.rs"
 
 [dependencies]
 serde = { workspace = true }

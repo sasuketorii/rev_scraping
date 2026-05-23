@@ -1,12 +1,22 @@
 [package]
-name = "stealth-agent-contracts"
+# Lane H Slice B-3: published as `rev-stealth-agent-contracts`; lib alias preserved.
+name = "rev-stealth-agent-contracts"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Shared cross-crate contract types (error envelope, rate limits, opaque ids) for the stealth-* crates."
-publish = false
+description = "rev-stealth shared cross-crate contract types (error envelope, rate limits, opaque ids) for the stealth-* crates."
+publish = true
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "contracts", "types"]
+categories = ["web-programming::http-client", "data-structures"]
+
+[lib]
+name = "stealth_agent_contracts"
+path = "src/lib.rs"
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }

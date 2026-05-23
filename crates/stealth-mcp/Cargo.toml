@@ -1,12 +1,18 @@
 [package]
-name = "stealth-mcp"
+# Lane H Slice B-3: published as `rev-stealth-mcp`; lib alias preserved.
+name = "rev-stealth-mcp"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "MCP (stdio transport) server exposing rev_scraping CLI tools to AI agents."
+publish = true
+description = "rev-stealth MCP (stdio transport) server exposing rev_scraping CLI tools to AI agents."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "mcp", "agent"]
+categories = ["web-programming::http-client", "command-line-utilities"]
 
 [[bin]]
 name = "stealth-mcp"
@@ -17,6 +23,7 @@ name = "gen_reference"
 path = "src/bin/gen_reference.rs"
 
 [lib]
+name = "stealth_mcp"
 path = "src/lib.rs"
 
 [dependencies]

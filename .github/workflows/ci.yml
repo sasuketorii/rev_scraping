@@ -904,3 +904,47 @@ jobs:
       - name: Run install.sh POSIX unit test
         # Pure /bin/sh (dash on ubuntu) to catch any latent bashism.
         run: sh tests/install_sh_unit.sh
+
+  package-metadata-sanity:
+    name: cargo-deb / cargo-generate-rpm metadata sanity
+    # Lane H Slice B-3: lightweight metadata-only check that the dpkg & rpm
+    # package envelopes produced from `crates/stealth-cli/Cargo.toml`
+    # (`[package.metadata.deb]` + `[package.metadata.generate-rpm]`) are
+    # well-formed and carry the required fields. We deliberately use the
+    # pre-built release binary so the heavy compile happens in `release.yml`,
+    # not on every PR — this job only validates the *envelope*.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deb + cargo-generate-rpm
+        run: |
+          set -euo pipefail
+          cargo install --locked cargo-deb
+          cargo install --locked cargo-generate-rpm
+      - name: Build release binary (needed for asset reference)
+        run: cargo build --release --bin rev-stealth
+      - name: cargo-deb metadata sanity
+        run: |
+          set -euo pipefail
+          cargo deb --no-build -p rev-stealth
+          DEB="$(ls target/debian/*.deb | head -n1)"
+          echo "Inspecting ${DEB}"
+          dpkg-deb -I "${DEB}"
+          # Required fields must be present.
+          dpkg-deb -I "${DEB}" | grep -E '^ Package: rev-stealth$'
+          dpkg-deb -I "${DEB}" | grep -E '^ Maintainer: '
+          dpkg-deb -I "${DEB}" | grep -E '^ Section: utils$'
+          dpkg-deb -I "${DEB}" | grep -E '^ Priority: optional$'
+      - name: cargo-generate-rpm metadata sanity
+        run: |
+          set -euo pipefail
+          cargo generate-rpm -p rev-stealth
+          RPM="$(ls target/generate-rpm/*.rpm | head -n1)"
+          echo "Inspecting ${RPM}"
+          rpm -qip "${RPM}"
+          rpm -qip "${RPM}" | grep -E '^Name *: rev-stealth$'
+          rpm -qip "${RPM}" | grep -E '^License *: MIT$'

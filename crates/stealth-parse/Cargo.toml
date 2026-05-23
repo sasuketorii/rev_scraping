@@ -1,12 +1,22 @@
 [package]
-name = "stealth-parse"
+# Lane H Slice B-3: published as `rev-stealth-parse`; lib alias preserved.
+name = "rev-stealth-parse"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Adaptive element relocation + SQLite WAL cache (design adapted from Scrapling, BSD-3-Clause)."
+publish = true
+description = "rev-stealth adaptive element relocation + SQLite WAL cache (design adapted from Scrapling, BSD-3-Clause)."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "html", "parser"]
+categories = ["web-programming::http-client", "parser-implementations"]
+
+[lib]
+name = "stealth_parse"
+path = "src/lib.rs"
 
 [dependencies]
 tokio = { workspace = true }

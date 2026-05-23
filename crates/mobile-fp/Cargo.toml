@@ -1,12 +1,22 @@
 [package]
-name = "mobile-fp"
+# Lane H Slice B-3: published as `rev-stealth-mobile-fp`; lib alias preserved.
+name = "rev-stealth-mobile-fp"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Mobile fingerprint presets (UA / viewport / touch / sensors / WebGL) for stealth browser sessions"
+publish = true
+description = "rev-stealth mobile fingerprint presets (UA / viewport / touch / sensors / WebGL) for stealth browser sessions"
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "fingerprint", "browser"]
+categories = ["web-programming::http-client"]
+
+[lib]
+name = "mobile_fp"
+path = "src/lib.rs"
 
 [dependencies]
 serde = { workspace = true }

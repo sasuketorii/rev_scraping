@@ -1,12 +1,22 @@
 [package]
-name = "stealth-auth"
+# Lane H Slice B-3: published as `rev-stealth-auth`; lib alias preserved.
+name = "rev-stealth-auth"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish = false
-description = "Encrypted authentication cookie storage for rev_scraping Phase 9."
+publish = true
+description = "rev-stealth encrypted authentication cookie storage (Phase 9 surface)."
+repository = "https://github.com/sasuketorii/rev_scraping"
+homepage = "https://github.com/sasuketorii/rev_scraping"
+readme = "../../README.md"
+keywords = ["scraping", "stealth", "auth", "cookie"]
+categories = ["web-programming::http-client", "authentication"]
+
+[lib]
+name = "stealth_auth"
+path = "src/lib.rs"
 
 [[bin]]
 name = "rev-auth"
