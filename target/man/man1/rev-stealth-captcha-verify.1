@@ -1,0 +1,39 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-captcha-verify 1  "rev-stealth-captcha-verify " 
+.SH NAME
+rev\-stealth\-captcha\-verify \- Verify a previously\-issued token (round\-trips through the challenge provider\*(Aqs verify endpoint)
+.SH SYNOPSIS
+\fBrev\-stealth captcha verify\fR <\fB\-\-type\fR> <\fB\-\-token\fR> <\fB\-\-secret\fR> [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Verify a CAPTCHA token by calling the challenge provider\*(Aqs server\-side verify endpoint. Returns the provider\*(Aqs structured verdict; the exit code reflects RPC outcome only (not the verdict itself).
+.SH OPTIONS
+.TP
+\fB\-\-type\fR \fI<TYPE>\fR
+Challenge type, same vocabulary as `solve \-\-type`
+.TP
+\fB\-\-token\fR \fI<TOKEN>\fR
+Token returned by `solve`
+.TP
+\fB\-\-secret\fR \fI<SECRET>\fR
+Provider secret (loaded from env in production)
+.RS
+May also be specified with the \fBREV_STEALTH_CAPTCHA_SECRET\fR environment variable. 
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth captcha verify \-\-type recaptcha\-v2 \-\-token <TOKEN>
+  $ rev\-stealth captcha verify \-\-type hcaptcha \-\-token <TOKEN> \-\-secret <SECRET>
+  $ REV_STEALTH_CAPTCHA_SECRET=... rev\-stealth captcha verify \-\-type turnstile \-\-token <TOKEN>
+
+EXIT CODES:
+  0  Ok               Verify RPC completed (read verdict from output).
+  1  UserError        Bad args (unknown \-\-type, missing \-\-secret).
+  2  TransientError   Provider network/timeout (retryable).
+  3  PermanentError   Provider permanently rejected (unsupported type, bad config).
+
+ENV:
+  REV_STEALTH_CAPTCHA_SECRET  Provider secret. Preferred over `\-\-secret` for ops use.

@@ -57,6 +57,10 @@ stealth-auth = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
 clap_complete_nushell = { workspace = true }
+# v1.3 Lane G.8: build-time man page generator driven by the hidden
+# `rev-stealth manpages <output-dir>` subcommand. Output is committed to
+# `target/man/man1/` and gated by the `manpage-drift` CI job.
+clap_mangen = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

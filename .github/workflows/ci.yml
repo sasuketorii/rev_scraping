@@ -803,6 +803,82 @@ jobs:
             exit 1
           fi
 
+  # Lane G.8 (v1.3 Black-Belt CLI): roff(7) man(1) page drift gate.
+  #
+  # Regenerates `target/man/man1/rev-stealth*.1` via
+  # `scripts/gen_manpages.sh` and fails if the committed pages disagree
+  # with a fresh render. The script invokes the hidden
+  # `rev-stealth manpages <out>` subcommand, which reads the clap
+  # CommandFactory tree — so this gate also covers --help drift in
+  # `long_about` / `after_help` text reachable from man pages.
+  #
+  # Mirrors the G.3 `completion-drift` job: enumerate REQUIRED files, run
+  # the regen, then `git diff` + `git status --porcelain` to catch both
+  # modifications and untracked additions/deletions.
+  manpage-drift:
+    name: man page drift
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-22.04-stable
+          workspaces: |
+            . -> target
+      - name: assert root + representative subcommand man pages are tracked
+        # Round-1 reviewer (G.3) finding #1 applied here too: `git diff
+        # --exit-code` alone ignores untracked files, so a contributor could
+        # accidentally delete the committed pages and the gate would still
+        # pass after regen. Enumerate a stable required-set BEFORE regen.
+        # The byte-level drift gate below catches everything else.
+        run: |
+          set -euo pipefail
+          missing=0
+          for f in \
+              target/man/man1/rev-stealth.1 \
+              target/man/man1/rev-stealth-spider.1 \
+              target/man/man1/rev-stealth-doctor.1 \
+              target/man/man1/rev-stealth-config-set.1 \
+              target/man/man1/rev-stealth-auth-login.1 \
+              target/man/man1/rev-stealth-vpn-rotate.1 \
+              target/man/man1/rev-stealth-hermes-install.1; do
+            if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+              echo "::error::expected man page is not tracked: $f" >&2
+              missing=1
+            fi
+          done
+          if [[ "$missing" -eq 1 ]]; then
+            echo "::error::commit the missing target/man/man1/ files (regen via ./scripts/gen_manpages.sh)." >&2
+            exit 1
+          fi
+      - name: regenerate man pages
+        run: ./scripts/gen_manpages.sh
+      - name: diff committed vs regenerated (modifications)
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- target/man/; then
+            echo "::error::man pages drifted (modified content). Run \`./scripts/gen_manpages.sh\` and commit the result." >&2
+            exit 1
+          fi
+      - name: diff committed vs regenerated (untracked / additions / deletions)
+        # Defensive sibling to the previous step: `git diff --exit-code`
+        # does not flag untracked files, so a regen producing a *new* file
+        # (e.g. a new subcommand was added without committing its man page)
+        # would silently pass the diff above. `git status --porcelain`
+        # lists tracked-modified AND untracked AND deleted entries; we fail
+        # if anything under target/man/ is reported.
+        run: |
+          set -euo pipefail
+          drift="$(git status --porcelain -- target/man/)"
+          if [[ -n "$drift" ]]; then
+            echo "::error::untracked / unexpected / deleted man pages detected:" >&2
+            echo "$drift" >&2
+            echo "::error::commit them via ./scripts/gen_manpages.sh + git add." >&2
+            exit 1
+          fi
+
   # I.8 (R2): fixture tests for scripts/mcp-schema-breaking.sh. Asserts the
   # 3-valued exit-code contract (0/2/other) and the four breaking-change
   # detectors (tool removal, required-arg tightening, input enum narrowing,

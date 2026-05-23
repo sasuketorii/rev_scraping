@@ -1,0 +1,64 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-auth 1  "rev-stealth-auth " 
+.SH NAME
+rev\-stealth\-auth \- Authenticated session capture / lifecycle (Phase 9d). Subcommands: login / list / show / delete / status / refresh
+.SH SYNOPSIS
+\fBrev\-stealth auth\fR [\fB\-\-output\-format\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+Authenticated session lifecycle (Phase 9d). Login captures cookies via rev\-auth and stores them sealed under AuthStore; list/show emit redacted metadata; status reports freshness; refresh re\-runs login; delete shreds the profile.
+.SH OPTIONS
+.TP
+\fB\-\-output\-format\fR \fI<OUTPUT_FORMAT>\fR
+Output format for this subcommand: `human` (default) or `json`. Shadows the global `\-\-format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json\-schemas/cli/<subcommand>.output.json`
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+human
+.IP \(bu 2
+json
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH SUBCOMMANDS
+.TP
+rev\-stealth\-auth\-login(1)
+Spawn `rev\-auth` for interactive login; AUP\-gated
+.TP
+rev\-stealth\-auth\-list(1)
+List saved profiles (metadata only, cookie values never disclosed)
+.TP
+rev\-stealth\-auth\-show(1)
+Show a single profile\*(Aqs metadata (redacted)
+.TP
+rev\-stealth\-auth\-delete(1)
+Delete a profile with shred\-on\-delete
+.TP
+rev\-stealth\-auth\-status(1)
+Report freshness/expiry status for a profile
+.TP
+rev\-stealth\-auth\-refresh(1)
+Re\-run interactive login, overwriting an existing profile
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth auth login \-\-profile work \-\-url https://x.test
+  $ rev\-stealth auth list
+  $ rev\-stealth auth status \-\-profile work
+  $ rev\-stealth auth delete \-\-profile work \-\-force
+
+EXIT CODES:
+  0  Ok               Action completed.
+  1  UserError        Bad args / unknown profile / AUP rejection.
+  3  PermanentError   AuthStore unavailable / rev\-auth not installed.
+  4  AuthExpired      Profile expired or unusable (login/status/refresh paths).
+
+ENV:
+  REV_OBSCURA_BIN              Override the obscura binary path.
+  REV_AUTH_BIN                 Override the rev\-auth helper binary.
+  REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.
+  REV_SCRAPING_AUTH_PASSPHRASE Sealed\-store passphrase (else keystore\-derived).
+  REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN\-required guard.

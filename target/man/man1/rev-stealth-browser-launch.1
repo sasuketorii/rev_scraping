@@ -1,0 +1,48 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-browser-launch 1  "rev-stealth-browser-launch " 
+.SH NAME
+rev\-stealth\-browser\-launch \- Launch a stealth browser, navigate to a URL, and emit JSON about the resulting page (UA / viewport / title / final URL). Useful as a smoke test that the launcher works on this host
+.SH SYNOPSIS
+\fBrev\-stealth browser launch\fR [\fB\-\-profile\fR] [\fB\-\-stealth\fR] [\fB\-\-url\fR] [\fB\-\-headed\fR] [\fB\-\-chrome\fR] [\fB\-\-dwell\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Launch a chromiumoxide\-driven stealth browser with the chosen profile and stealth level, navigate to \-\-url, and dump page metadata (UA / viewport / title / final URL). Use for launcher smoke tests on a new host.
+.SH OPTIONS
+.TP
+\fB\-\-profile\fR \fI<PROFILE>\fR [default: mobile\-ios]
+Profile slug. One of: `desktop`, `mobile\-ios`, `mobile\-android`, `ipad`, `galaxy\-ultra`
+.TP
+\fB\-\-stealth\fR \fI<STEALTH>\fR [default: full]
+Stealth level: `off`, `basic`, `full`
+.TP
+\fB\-\-url\fR \fI<URL>\fR [default: about:blank]
+Navigate to this URL after launch. Default: `about:blank`
+.TP
+\fB\-\-headed\fR
+Run with a visible chrome window instead of new\-headless mode
+.TP
+\fB\-\-chrome\fR \fI<CHROME>\fR
+Override the chrome executable path. By default, chromiumoxide auto\-detects the system chrome
+.RS
+May also be specified with the \fBREV_STEALTH_CHROME\fR environment variable. 
+.RE
+.TP
+\fB\-\-dwell\fR \fI<DWELL>\fR [default: 0]
+Hold the page for this many seconds after navigation (lets a detector finish its work). Default 0 = exit as soon as `document.readyState` settles
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth browser launch
+  $ rev\-stealth browser launch \-\-profile desktop \-\-url https://example.com \-\-dwell 3
+  $ rev\-stealth browser launch \-\-headed \-\-stealth full \-\-chrome /usr/bin/google\-chrome
+
+EXIT CODES:
+  0  Ok               Launch + navigation succeeded.
+  1  UserError        Unknown \-\-profile / \-\-stealth slug.
+  2  TransientError   Chrome launch/CDP transient failure.
+  3  PermanentError   Chrome binary missing or stealth level unsupported.
+
+ENV:
+  REV_STEALTH_CHROME  Override the chrome executable path (else auto\-detect).

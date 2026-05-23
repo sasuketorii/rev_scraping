@@ -1,0 +1,55 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-doctor 1  "rev-stealth-doctor " 
+.SH NAME
+rev\-stealth\-doctor \- Pre\-flight leak\-prevention checks (kill\-switch / DNS / IPv6 / WebRTC). Exits with code 7 when any check fails (fail\-closed)
+.SH SYNOPSIS
+\fBrev\-stealth doctor\fR [\fB\-\-container\fR] [\fB\-\-expected\-country\fR] [\fB\-\-output\-format\fR] [\fB\-\-skip\-exit\-ip\fR] [\fB\-\-deep\fR] [\fB\-\-vps\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Pre\-flight leak\-prevention diagnostics: kill\-switch, DNS lock, IPv6 disabled, WebRTC guard, and optional exit\-IP probe (ipinfo.io). Fail\-closed: any check failing yields exit code 7. `\-\-deep` runs extended stack health checks; `\-\-vps` adds VPS\-deploy readiness checks.
+.SH OPTIONS
+.TP
+\fB\-\-container\fR \fI<CONTAINER>\fR [default: gluetun]
+VPN container name to inspect
+.TP
+\fB\-\-expected\-country\fR \fI<EXPECTED_COUNTRY>\fR
+Expected VPN exit country (ISO\-2, e.g. "JP"). Skipped when omitted
+.TP
+\fB\-\-output\-format\fR \fI<OUTPUT_FORMAT>\fR [default: json]
+Output format for doctor diagnostic results: `json` (machine\-parseable, default) or `text` (human\-readable)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+json
+.IP \(bu 2
+text
+.RE
+.TP
+\fB\-\-skip\-exit\-ip\fR
+Skip the live `ipinfo.io` exit\-IP probe (offline / CI mode)
+.TP
+\fB\-\-deep\fR
+v1.1.0 (P16): run extended stack health checks (obscura binary, VPN instance pool, sites recipe count, auth profile validity, AuthStore key source). The default check set stays minimal so the existing fail\-closed contract (exit 7 on leak) is unchanged; `\-\-deep` adds non\-leak diagnostic WARN/FAIL items
+.TP
+\fB\-\-vps\fR
+P10.3: run VPS deploy readiness checks (systemd unit prerequisites, dedicated user, /var/log + /var/lib dir permissions, credstore, chrome/xvfb\-run on PATH, docker + gluetun image, DISPLAY env). FAIL items exit 3 (permanent); WARN\-only stays exit 0. Independent from the leak\-fail\-closed contract used by the base checks
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth doctor
+  $ rev\-stealth doctor \-\-expected\-country JP \-\-output\-format text
+  $ rev\-stealth doctor \-\-deep \-\-skip\-exit\-ip
+  $ rev\-stealth doctor \-\-vps
+
+EXIT CODES:
+  0  Ok               All checks passed.
+  1  UserError        Bad args (unknown \-\-container, malformed country code).
+  7  Leak             One or more leak checks failed (fail\-closed).
+
+ENV:
+  REV_STEALTH_CHROME  WebRTC guard probe respects this override.

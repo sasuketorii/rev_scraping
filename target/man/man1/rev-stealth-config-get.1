@@ -1,0 +1,31 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-config-get 1  "rev-stealth-config-get " 
+.SH NAME
+rev\-stealth\-config\-get \- Resolve a dotted key path (e.g. `policy.require_vpn`) against the merged config and print the value. Secret\-looking values redacted
+.SH SYNOPSIS
+\fBrev\-stealth config get\fR [\fB\-h\fR|\fB\-\-help\fR] <\fIKEY\fR> 
+.SH DESCRIPTION
+Resolve a dotted key (e.g. `policy.require_vpn`, `env.VPN_INSTANCES`) against the merged effective config. Secret\-looking values are replaced with `<redacted>`.
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+<\fIKEY\fR>
+Dotted key, e.g. `policy.require_vpn` or `env.VPN_INSTANCES`
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth config get policy.require_vpn
+  $ rev\-stealth config get env.VPN_INSTANCES
+  $ rev\-stealth config \-\-output\-format json get policy.require_vpn
+
+EXIT CODES:
+  0  Ok               Value emitted.
+  1  UserError        Bad key / unknown path.
+  3  PermanentError   Config IO / parse failure.
+
+ENV:
+  REV_SCRAPING_HOME        Override `~/.rev_scraping/` base.
+  REV_SCRAPING_POLICY      Override the policy.toml path.
+  REV_SCRAPING_AUTHORIZED  Override the authorized.toml path.

@@ -1,0 +1,25 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-auth-list 1  "rev-stealth-auth-list " 
+.SH NAME
+rev\-stealth\-auth\-list \- List saved profiles (metadata only, cookie values never disclosed)
+.SH SYNOPSIS
+\fBrev\-stealth auth list\fR [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+List every saved AuthStore profile. Only metadata is emitted (profile name, domain, created_at, expires_at, source); cookie values are never disclosed.
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth auth list
+  $ rev\-stealth \-\-format json auth list
+
+EXIT CODES:
+  0  Ok               Listing emitted.
+  1  UserError        Bad args.
+  3  PermanentError   AuthStore unavailable.
+
+ENV:
+  REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.

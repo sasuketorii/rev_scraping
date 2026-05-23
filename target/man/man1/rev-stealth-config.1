@@ -1,0 +1,87 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-config 1  "rev-stealth-config " 
+.SH NAME
+rev\-stealth\-config \- v1.2.0 (P6.1): inspect the layered config (`show` / `paths` / `validate` / `diff` / `get`)
+.SH SYNOPSIS
+\fBrev\-stealth config\fR [\fB\-\-output\-format\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+Layered config inspection + mutation (P6.x). show/paths/validate/diff/get are read\-only; set/edit/migrate/init/history/rollback/gc write through the atomic ConfigWriter (0600 + `.bak.<epoch>` backups). `profile` manages per\-profile config trees.
+.SH OPTIONS
+.TP
+\fB\-\-output\-format\fR \fI<config_output_format>\fR [default: text]
+Output format. Overrides the global `\-\-format` only for this subtree
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+text
+.IP \(bu 2
+json
+.IP \(bu 2
+yaml
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH SUBCOMMANDS
+.TP
+rev\-stealth\-config\-show(1)
+Print the merged effective config from all 4 source layers (policy.toml / authorized.toml / sites/* / env). Secret\-looking env values are replaced with `<redacted>`
+.TP
+rev\-stealth\-config\-paths(1)
+List each config file path (absolute), its existence, and permission bits (unix mode)
+.TP
+rev\-stealth\-config\-validate(1)
+Run the P5.1 validate engine over the live config files. Exit 0 on LGTM; exit 1 with structured issue list on violations
+.TP
+rev\-stealth\-config\-diff(1)
+Print a unified diff between the live `<path>` and the in\-repo `templates/policy.toml` baseline. Headers use `\-\-\-` / `+++`
+.TP
+rev\-stealth\-config\-get(1)
+Resolve a dotted key path (e.g. `policy.require_vpn`) against the merged config and print the value. Secret\-looking values redacted
+.TP
+rev\-stealth\-config\-set(1)
+P6.3: Set a dotted\-path key on `policy.toml` (or another target file) to a value. Type is inferred from the literal text (`true`/`false` → bool, all\-digits → int, otherwise string). The value is written through the atomic ConfigWriter only after the resulting document passes strict validation. Secret values are NOT echoed back
+.TP
+rev\-stealth\-config\-edit(1)
+P6.3: Open the target file in `$EDITOR` (falling back to `vi`). On editor exit, the candidate is validated. If validation succeeds the file is committed via ConfigWriter (atomic 0600 + `.bak.<epoch>`). If validation fails, the original file is left untouched and the temp file is preserved so the operator can recover their edits
+.TP
+rev\-stealth\-config\-migrate(1)
+P6.3: Migrate `policy.toml` (and authorized.toml) from its current `schema_version` to the latest known version. v1 → v1 is a no\-op (returns exit 0 + an audit\-trail line). The harness is in place for future v2+ migrations to plug into
+.TP
+rev\-stealth\-config\-init(1)
+P6.2: Initialize the per\-user config tree under `~/.rev_scraping/` (or `$REV_SCRAPING_HOME`). Creates `policy.toml` (0600), `authorized.toml` (0600), and `sites/` (0700) via the atomic ConfigWriter. Existing files are preserved unless `\-\-force` is passed (which routes the overwrite through `.bak.<epoch>` backup)
+.TP
+rev\-stealth\-config\-history(1)
+P6.4: List the `.bak.<epoch>` backups for the target config file in newest→oldest order (sorted by mtime, tie\-broken by filename desc to match the epoch\-ms suffix)
+.TP
+rev\-stealth\-config\-rollback(1)
+P6.4: Restore a previously captured `.bak.<epoch>` backup onto the target\*(Aqs current path. The current file (if any) is preserved as a fresh `.bak.<epoch>` by routing the restore write through `ConfigWriter::write_with_backup`
+.TP
+rev\-stealth\-config\-gc(1)
+P6.4: Garbage\-collect `.bak.<epoch>` backups for the target config file, keeping the newest `\-\-keep` (default 5). All older backups are deleted; the current file is untouched
+.TP
+rev\-stealth\-config\-profile(1)
+P6.5: Manage per\-profile config trees under `<base>/profiles/<name>/`. Profiles share the same internal layout as the top\-level config (`policy.toml`, `authorized.toml`, `sites/`) and are activated by exporting `REV_SCRAPING_HOME=<base>/profiles/<name>`
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth config show
+  $ rev\-stealth config validate
+  $ rev\-stealth config set policy.require_vpn true
+  $ rev\-stealth config init \-\-target all
+
+EXIT CODES:
+  0  Ok               Action completed.
+  1  UserError        Bad args / validation failure / unknown key.
+  3  PermanentError   Config IO failure / unsupported target.
+
+ENV:
+  REV_SCRAPING_HOME            Override `~/.rev_scraping/` base.
+  REV_SCRAPING_POLICY          Override the policy.toml path.
+  REV_SCRAPING_AUTHORIZED      Override the authorized.toml path.
+  REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory.
+  REV_SCRAPING_CONFIG_LENIENT  Loosen validate strictness (test/CI).
+  EDITOR                       Editor used by `config edit` (fallback: vi).

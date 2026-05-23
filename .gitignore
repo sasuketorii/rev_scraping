@@ -1,13 +1,16 @@
 # Lane G.3 (v1.3) — committed shell-completion scripts live under
-# `target/completions/`, so the top-level target/ ignore is expressed as a
-# children-only `/target/*` glob (not `/target/`) with an explicit
-# `!/target/completions/` un-ignore. `/target/*` does NOT ignore the parent
-# directory itself, which is what lets the un-ignore work — gitignore cannot
-# re-include files inside a directory that is itself ignored. See:
+# `target/completions/`. Lane G.8 (v1.3) — committed roff(7) man pages
+# live under `target/man/`. The top-level target/ ignore is expressed as
+# a children-only `/target/*` glob (not `/target/`) with explicit
+# `!/target/completions/` + `!/target/man/` un-ignores. `/target/*` does
+# NOT ignore the parent directory itself, which is what lets the un-ignores
+# work — gitignore cannot re-include files inside a directory that is
+# itself ignored. See:
 # https://git-scm.com/docs/gitignore "It is not possible to re-include a file
 # if a parent directory of that file is excluded."
 /target/*
 !/target/completions/
+!/target/man/
 /_refs/
 /vendor/*/target/
 /vendor/*/.git/

@@ -1,0 +1,32 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-hermes-verify 1  "rev-stealth-hermes-verify " 
+.SH NAME
+rev\-stealth\-hermes\-verify \- Verify a Hermes plugin install on disk
+.SH SYNOPSIS
+\fBrev\-stealth hermes verify\fR [\fB\-\-prefix\fR] [\fB\-\-skip\-python\-check\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Verify a Hermes plugin install on disk. Checks the required files are present and (by default) runs a python3 ast.parse syntax probe on __init__.py. Use \-\-skip\-python\-check on hosts without python3.
+.SH OPTIONS
+.TP
+\fB\-\-prefix\fR \fI<PREFIX>\fR
+Plugin directory to verify. Defaults to `$HOME/.hermes/plugins/rev\-scraping\-mcp`
+.TP
+\fB\-\-skip\-python\-check\fR
+Skip the `python3 \-c "import ast; ast.parse(...)"` syntax probe of `__init__.py`. The probe runs by default; pass this flag in environments without `python3` on `$PATH` (minimal containers, CI workers without the Python toolchain)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth hermes verify
+  $ rev\-stealth hermes verify \-\-prefix /opt/hermes/plugins/rev\-scraping\-mcp
+  $ rev\-stealth hermes verify \-\-skip\-python\-check
+
+EXIT CODES:
+  0  Ok               Plugin verified.
+  1  UserError        Bad \-\-prefix.
+  3  PermanentError   Required files missing or python3 ast.parse failed.
+
+ENV:
+  (none consumed directly; respects HOME for default \-\-prefix.)

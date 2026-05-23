@@ -30,6 +30,17 @@ mod aup;
 mod browser_cmd;
 mod captcha_cmd;
 mod commands;
+// v1.3 Lane G.7: expose the public-safe G.7 lint surface (the
+// `CliErrorKind` taxonomy and `DOC_URL_BASE`) so
+// `tests/error_template_uniform.rs` can walk every variant without
+// needing the whole `commands` module to be public. The emitter
+// helpers (`emit_err_envelope`, `augment_with_g7_fields`) intentionally
+// reference the crate-private `OutputFormat` type and are NOT
+// re-exported here — they are reached internally via `crate::commands`.
+#[doc(hidden)]
+pub mod __error_envelope_for_test {
+    pub use crate::commands::error_envelope::{CliErrorKind, DOC_URL_BASE};
+}
 pub mod config_io;
 mod doctor;
 pub mod policy;
@@ -350,6 +361,16 @@ enum CompletionShell {
     Nushell,
 }
 
+/// v1.3 (G.8): args for the hidden `manpages` subcommand. Single positional
+/// `<output-dir>` keeps the surface identical to the historical
+/// `cargo xtask manpages <dir>` referenced from
+/// `crates/stealth-cli/Cargo.toml` (cargo-deb / cargo-rpm comments).
+#[derive(clap::Args, Debug)]
+struct ManpagesArgs {
+    /// Output directory. Created if missing. One `<bin>.1` file per command.
+    output_dir: std::path::PathBuf,
+}
+
 fn init_tracing(verbose: u8) {
     let level = match verbose {
         0 => "warn",
@@ -384,7 +405,58 @@ pub fn run() -> i32 {
 /// to the requested subcommand. Returns the exit code without calling
 /// `std::process::exit` so callers can perform cleanup.
 pub async fn run_async() -> i32 {
-    let cli = Cli::parse();
+    // v1.3 Lane G.7: route clap parse failures through the canonical
+    // error envelope. `Cli::parse()` would `exit(2)` with a free-form
+    // clap-rendered message that bypasses the G.7 contract entirely;
+    // we use `try_parse` and translate the error ourselves.
+    let cli = match Cli::try_parse() {
+        Ok(c) => c,
+        Err(e) => {
+            // clap exposes the kind discriminant; "informational" exits
+            // (--help / --version) keep clap's stdout output and exit 0.
+            use clap::error::ErrorKind as ClapKind;
+            let kind = e.kind();
+            if matches!(
+                kind,
+                ClapKind::DisplayHelp
+                    | ClapKind::DisplayVersion
+                    | ClapKind::DisplayHelpOnMissingArgumentOrSubcommand
+            ) {
+                let _ = e.print();
+                return 0;
+            }
+            // Heuristic JSON detection: emit a G.7 envelope when the user
+            // asked for JSON output; otherwise let clap render its
+            // friendly human error. We do NOT call clap's `.exit()`
+            // (which terminates the process) so callers retain control.
+            let argv: Vec<String> = std::env::args().collect();
+            // Accept both split (`--format json`) and combined
+            // (`--format=json`) clap forms. Round-2 reviewer finding:
+            // the previous heuristic only covered the split form.
+            let wants_json = argv.iter().any(|a| {
+                a == "--format=json"
+                    || a == "--output-format=json"
+            }) || argv.windows(2).any(|w| {
+                matches!(w[0].as_str(), "--format" | "--output-format") && w[1] == "json"
+            });
+            if wants_json {
+                let msg = e.to_string();
+                let kind_e = commands::error_envelope::classify_legacy_message(&msg);
+                let _ = commands::error_envelope::emit_err_envelope(
+                    OutputFormat::Json,
+                    "cli.parse",
+                    2,
+                    kind_e,
+                    &msg,
+                    None,
+                    None,
+                );
+            } else {
+                let _ = e.print();
+            }
+            return 2;
+        }
+    };
     init_tracing(cli.verbose);
 
     // v1.3 Lane G.4: each subcommand that owns an Args struct now flattens an
@@ -441,6 +513,21 @@ pub async fn run_async() -> i32 {
             generate_completions(args.shell);
             0
         }
+        Command::Manpages(args) => match generate_manpages(&args.output_dir) {
+            Ok(n) => {
+                // Mirror gen_completions: silent success on the happy path so
+                // the build-script consumer (`scripts/gen_manpages.sh`) has a
+                // clean stdout/stderr signal. A summary line on stderr keeps
+                // the interactive `cargo run -- manpages ./tmp` discoverable
+                // without polluting the script-driven contract.
+                eprintln!("wrote {n} man page(s) to {}", args.output_dir.display());
+                0
+            }
+            Err(e) => {
+                eprintln!("rev-stealth manpages: {e}");
+                3
+            }
+        },
     }
 }
 
@@ -476,11 +563,114 @@ fn generate_completions(shell: CompletionShell) {
     }
 }
 
+/// v1.3 Lane G.8: generate roff(7) man(1) pages for `rev-stealth` and every
+/// public subcommand into `output_dir`. Drives the `scripts/gen_manpages.sh`
+/// build-time generator and the `manpage-drift` CI gate. Reads the clap
+/// `Command` tree directly via `CommandFactory` so the man pages stay in
+/// lockstep with `--help` (long_about + after_help → DESCRIPTION + EXAMPLES /
+/// EXIT CODES / ENV sections, populated by clap_mangen).
+///
+/// Strips internal subcommands (`completions`, `manpages`) from the tree
+/// before walking it — same contract as `generate_completions`.
+///
+/// Output: one file per command using the canonical `<bin>-<sub>-...-<leaf>.1`
+/// naming. Returns the number of files written so the dispatcher can emit a
+/// short progress line.
+fn generate_manpages(output_dir: &std::path::Path) -> std::io::Result<usize> {
+    use clap::CommandFactory;
+    std::fs::create_dir_all(output_dir)?;
+    // Disable clap's auto-injected `help` subcommand tree-wide BEFORE the
+    // walker hands the Command to clap_mangen. Round-1 reviewer (G.8) finding
+    // #2: simply skipping `name == "help"` during DFS still leaves clap's own
+    // SUBCOMMANDS rendering emitting `rev-stealth-help(1)` cross-refs that
+    // point to non-existent `.1` files (`whatis` / `apropos` regression).
+    // `disable_help_subcommand(true)` removes the auto-injected node from
+    // the entire subtree.
+    let root = strip_internal_subcommands(Cli::command()).disable_help_subcommand(true);
+    let mut count = 0usize;
+    write_man_recursive(&root, output_dir, &[], &mut count)?;
+    Ok(count)
+}
+
+/// Walk the clap `Command` tree depth-first. For each node, render one
+/// `<path-joined-by-dashes>.1` file using `clap_mangen::Man::render`. The
+/// `path` slice carries the ancestor command names so nested subcommands
+/// become `rev-stealth-config-set.1` etc. — matching the convention used by
+/// `man(1)` lookup tables.
+///
+/// Note on clap+mangen ownership: `clap_mangen::Man::new` consumes its input
+/// `Command`, so each recursive call clones the child node. The whole walk
+/// runs at build time (~ms), so the clone cost is irrelevant compared to the
+/// resulting determinism — every render starts from a pristine copy of the
+/// subtree.
+fn write_man_recursive(
+    cmd: &clap::Command,
+    output_dir: &std::path::Path,
+    path: &[String],
+    count: &mut usize,
+) -> std::io::Result<()> {
+    // Compose this node's file name. The root command is just `rev-stealth.1`;
+    // children become `rev-stealth-<a>-<b>.1`.
+    let mut segments: Vec<String> = path.to_vec();
+    segments.push(cmd.get_name().to_string());
+    let file_name = format!("{}.1", segments.join("-"));
+    let target = output_dir.join(&file_name);
+
+    // `Man::new` consumes the Command, so clone the subtree. We also force a
+    // stable bin/display name so nested commands render with the
+    // dash-separated invocation users actually type (`rev-stealth config set`,
+    // not just `set`).
+    // `clap::Command::{name,bin_name}` only accept `impl Into<Str>`, and
+    // `Str` does not impl `From<String>`. Leak the per-node strings (one-time,
+    // generator lives ~tens of ms; we don't ship this binary into a long-
+    // running process). Mirrors the same `Box::leak` trick used by
+    // `strip_internal_subcommands` above and by clap's own derive output.
+    //
+    // Round-1 reviewer (G.8) finding #1: `name` must be the FULL dash-joined
+    // page stem (e.g. `rev-stealth-auth-login`), NOT the bare leaf (`login`).
+    // clap_mangen writes the `name` into the `.TH` title heading verbatim
+    // AND uses it when rendering subcommand cross-references in the parent's
+    // `.SH SUBCOMMANDS` block. A bare-leaf name produces `.TH login` and
+    // dangling refs like `config-set(1)` that `man`/`whatis` can't resolve.
+    // The dash-joined stem matches the committed filename and gives `whatis`
+    // the right anchor.
+    let stem_leaked: &'static str = Box::leak(segments.join("-").into_boxed_str());
+    let display_leaked: &'static str = Box::leak(segments.join(" ").into_boxed_str());
+    // `disable_help_subcommand(true)` is applied per-node (not just the root)
+    // because clap auto-injects the `help` subcommand on every node that has
+    // children. Without per-node disable, `rev-stealth-config.1` would still
+    // advertise `config-help(1)` in its SUBCOMMANDS block even though the
+    // walker skips writing the corresponding `.1` file — leaving a dangling
+    // cross-ref. See round-1 reviewer (G.8) finding #2.
+    let owned = cmd
+        .clone()
+        .name(stem_leaked)
+        .bin_name(display_leaked)
+        .disable_help_subcommand(true);
+    let man = clap_mangen::Man::new(owned);
+    let mut buf: Vec<u8> = Vec::with_capacity(4096);
+    man.render(&mut buf)?;
+    std::fs::write(&target, &buf)?;
+    *count += 1;
+
+    // Recurse into children. Filter out clap-injected `help` subcommands
+    // (every clap command auto-generates a `help` subcommand for printing
+    // sub-help; emitting a man page for it would be noise and would drift
+    // every time clap's help text changes).
+    for sub in cmd.get_subcommands() {
+        if sub.get_name() == "help" {
+            continue;
+        }
+        write_man_recursive(sub, output_dir, &segments, count)?;
+    }
+    Ok(())
+}
+
 /// Names of subcommands that exist only for build/CI tooling and must NOT be
 /// surfaced as tab-completion suggestions to end users. Centralised here so
 /// future internal commands (`__dump-schema`, etc.) opt in by adding their
 /// name to one list rather than re-deriving the filter logic.
-const INTERNAL_HIDDEN_SUBCOMMANDS: &[&str] = &["completions"];
+const INTERNAL_HIDDEN_SUBCOMMANDS: &[&str] = &["completions", "manpages"];
 
 /// Rebuild a clap `Command` tree with the names listed in
 /// [`INTERNAL_HIDDEN_SUBCOMMANDS`] removed from the top level. Returns the

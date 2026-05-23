@@ -1,0 +1,28 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-config-show 1  "rev-stealth-config-show " 
+.SH NAME
+rev\-stealth\-config\-show \- Print the merged effective config from all 4 source layers (policy.toml / authorized.toml / sites/* / env). Secret\-looking env values are replaced with `<redacted>`
+.SH SYNOPSIS
+\fBrev\-stealth config show\fR [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Print the merged effective config across the 4 source layers (policy.toml / authorized.toml / sites/* / env). Secret\-looking env values are replaced with `<redacted>`.
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth config show
+  $ rev\-stealth config \-\-output\-format json show
+  $ rev\-stealth config \-\-output\-format yaml show
+
+EXIT CODES:
+  0  Ok               Config emitted.
+  1  UserError        Bad args / parse error.
+  3  PermanentError   Config IO failure.
+
+ENV:
+  REV_SCRAPING_HOME        Override `~/.rev_scraping/` base.
+  REV_SCRAPING_POLICY      Override the policy.toml path.
+  REV_SCRAPING_AUTHORIZED  Override the authorized.toml path.

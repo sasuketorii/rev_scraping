@@ -1,0 +1,25 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-config-profile-list 1  "rev-stealth-config-profile-list " 
+.SH NAME
+rev\-stealth\-config\-profile\-list \- List every profile directory under `<base>/profiles/`
+.SH SYNOPSIS
+\fBrev\-stealth config profile list\fR [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+List every profile directory under <base>/profiles/. Output is the bare set of profile names (no metadata).
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth config profile list
+  $ rev\-stealth config \-\-output\-format json profile list
+
+EXIT CODES:
+  0  Ok               Listing emitted.
+  1  UserError        Bad args.
+  3  PermanentError   directory IO failure.
+
+ENV:
+  REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory.

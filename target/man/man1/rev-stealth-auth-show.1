@@ -1,0 +1,28 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-auth-show 1  "rev-stealth-auth-show " 
+.SH NAME
+rev\-stealth\-auth\-show \- Show a single profile\*(Aqs metadata (redacted)
+.SH SYNOPSIS
+\fBrev\-stealth auth show\fR <\fB\-\-profile\fR> [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Show a single profile\*(Aqs metadata. Cookie values are redacted; only domain / timestamps / source / AAD context are returned.
+.SH OPTIONS
+.TP
+\fB\-\-profile\fR \fI<PROFILE>\fR
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth auth show \-\-profile work
+  $ rev\-stealth \-\-format json auth show \-\-profile work
+
+EXIT CODES:
+  0  Ok               Metadata emitted.
+  1  UserError        Bad args / unknown profile.
+  3  PermanentError   AuthStore unavailable.
+
+ENV:
+  REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.

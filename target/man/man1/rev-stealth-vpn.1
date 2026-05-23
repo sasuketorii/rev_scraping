@@ -1,0 +1,48 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-vpn 1  "rev-stealth-vpn " 
+.SH NAME
+rev\-stealth\-vpn \- VPN IP rotation operations (Surfshark / Gluetun lazy\-rotate\-on\-fail)
+.SH SYNOPSIS
+\fBrev\-stealth vpn\fR [\fB\-\-output\-format\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+VPN exit\-IP control. `rotate` triggers a provider rotation with the chosen strategy (lazy\-on\-fail / every\-n / interval); `status` probes the current public IP and the VPN container state. All actions are audit\-logged.
+.SH OPTIONS
+.TP
+\fB\-\-output\-format\fR \fI<OUTPUT_FORMAT>\fR
+Output format for this subcommand: `human` (default) or `json`. Shadows the global `\-\-format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json\-schemas/cli/<subcommand>.output.json`
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+human
+.IP \(bu 2
+json
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH SUBCOMMANDS
+.TP
+rev\-stealth\-vpn\-rotate(1)
+Trigger a VPN rotation. With `lazy\-on\-fail`, rotation is skipped unless the failure counter has crossed the threshold
+.TP
+rev\-stealth\-vpn\-status(1)
+Show the current public IP and the VPN container state
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth vpn rotate \-\-strategy lazy\-on\-fail \-\-reason scrape\-failure
+  $ rev\-stealth vpn status
+
+EXIT CODES:
+  0  Ok               Action completed.
+  1  UserError        Bad \-\-provider / \-\-strategy.
+  2  TransientError   Provider/container transient failure.
+  3  PermanentError   Provider unsupported in this build.
+  7  Leak             Post\-action leak detected (fail\-closed).
+
+ENV:
+  REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN\-required guard policy\-wide.
+  VPN_INSTANCES             Pool of named VPN instances (config.vpn_instances).

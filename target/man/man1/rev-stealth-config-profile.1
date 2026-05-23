@@ -1,0 +1,41 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-config-profile 1  "rev-stealth-config-profile " 
+.SH NAME
+rev\-stealth\-config\-profile \- P6.5: Manage per\-profile config trees under `<base>/profiles/<name>/`. Profiles share the same internal layout as the top\-level config (`policy.toml`, `authorized.toml`, `sites/`) and are activated by exporting `REV_SCRAPING_HOME=<base>/profiles/<name>`
+.SH SYNOPSIS
+\fBrev\-stealth config profile\fR [\fB\-h\fR|\fB\-\-help\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+Manage per\-profile config trees under <base>/profiles/<name>/. Each profile mirrors the top\-level config layout; activation is by exporting REV_SCRAPING_HOME=<base>/profiles/<name>.
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH SUBCOMMANDS
+.TP
+rev\-stealth\-config\-profile\-list(1)
+List every profile directory under `<base>/profiles/`
+.TP
+rev\-stealth\-config\-profile\-create(1)
+Create a new profile directory and seed `policy.toml`, `authorized.toml`, and `sites/` via ConfigWriter (same skeleton as `config init`). Refuses if the profile already exists
+.TP
+rev\-stealth\-config\-profile\-switch(1)
+Print the shell\-export line needed to activate the profile. We never mutate the operator\*(Aqs environment from inside the process — the operator must eval/source the printed line
+.TP
+rev\-stealth\-config\-profile\-delete(1)
+Best\-effort overwrite\-then\-delete (`shred\-like`) for the profile directory. Refuses if the profile is currently active per `$REV_SCRAPING_HOME` resolution
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth config profile list
+  $ rev\-stealth config profile create work
+  $ rev\-stealth config profile switch work
+  $ rev\-stealth config profile delete work \-\-yes
+
+EXIT CODES:
+  0  Ok               Action completed.
+  1  UserError        Bad name / active profile / missing \-\-yes.
+  3  PermanentError   ConfigWriter IO failure.
+
+ENV:
+  REV_SCRAPING_HOME            Override `~/.rev_scraping/` base.
+  REV_SCRAPING_PROFILES_ROOT   Override the profiles root directory.

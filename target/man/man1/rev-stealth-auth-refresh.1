@@ -1,0 +1,72 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-auth-refresh 1  "rev-stealth-auth-refresh " 
+.SH NAME
+rev\-stealth\-auth\-refresh \- Re\-run interactive login, overwriting an existing profile
+.SH SYNOPSIS
+\fBrev\-stealth auth refresh\fR [\fB\-\-dry\-run\fR] [\fB\-\-explain\fR] [\fB\-\-idempotency\-key\fR] <\fB\-\-profile\fR> <\fB\-\-url\fR> [\fB\-\-domain\fR] [\fB\-\-completion\-pattern\fR] [\fB\-\-obscura\-bin\fR] [\fB\-\-rev\-auth\-bin\fR] [\fB\-\-aad\-context\fR] [\fB\-\-require\-vpn\fR] [\fB\-\-allow\-no\-vpn\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Re\-run the rev\-auth interactive login flow, overwriting an existing profile. Same surface as `auth login` but treats an existing profile as expected.
+.SH OPTIONS
+.TP
+\fB\-\-dry\-run\fR
+v1.3 Lane G.5: side\-effect\-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope
+.TP
+\fB\-\-explain\fR
+v1.3 Lane G.5: include the action plan in the result envelope\*(Aqs `result.plan` field. Can be combined with `\-\-dry\-run`. When passed without `\-\-dry\-run`, the plan is emitted alongside the real action
+.TP
+\fB\-\-idempotency\-key\fR \fI<IDEMPOTENCY_KEY>\fR
+v1.3 Lane G.5 / G.6: opaque caller\-supplied key for at\-most\-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6
+.TP
+\fB\-\-profile\fR \fI<PROFILE>\fR
+
+.TP
+\fB\-\-url\fR \fI<URL>\fR
+
+.TP
+\fB\-\-domain\fR \fI<DOMAIN>\fR
+
+.TP
+\fB\-\-completion\-pattern\fR \fI<COMPLETION_PATTERN>\fR
+
+.TP
+\fB\-\-obscura\-bin\fR \fI<OBSCURA_BIN>\fR
+
+.RS
+May also be specified with the \fBREV_OBSCURA_BIN\fR environment variable. 
+.RE
+.TP
+\fB\-\-rev\-auth\-bin\fR \fI<REV_AUTH_BIN>\fR
+
+.RS
+May also be specified with the \fBREV_AUTH_BIN\fR environment variable. 
+.RE
+.TP
+\fB\-\-aad\-context\fR \fI<AAD_CONTEXT>\fR [default: ]
+
+.TP
+\fB\-\-require\-vpn\fR
+Force the VPN\-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`
+.TP
+\fB\-\-allow\-no\-vpn\fR
+Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth auth refresh \-\-profile work \-\-url https://x.test
+  $ rev\-stealth auth refresh \-\-profile work \-\-url https://x.test \-\-require\-vpn
+
+EXIT CODES:
+  0  Ok               Profile refreshed.
+  1  UserError        Bad args / AUP rejection.
+  3  PermanentError   rev\-auth missing / AuthStore IO failure.
+  4  AuthExpired      Captured profile is empty/unusable after refresh.
+
+ENV:
+  REV_OBSCURA_BIN              Override the obscura binary path.
+  REV_AUTH_BIN                 Override the rev\-auth helper binary.
+  REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.
+  REV_SCRAPING_AUTH_PASSPHRASE Sealed\-store passphrase (else keystore\-derived).
+  REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN\-required guard.

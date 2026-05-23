@@ -1,0 +1,39 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-config-history 1  "rev-stealth-config-history " 
+.SH NAME
+rev\-stealth\-config\-history \- P6.4: List the `.bak.<epoch>` backups for the target config file in newest→oldest order (sorted by mtime, tie\-broken by filename desc to match the epoch\-ms suffix)
+.SH SYNOPSIS
+\fBrev\-stealth config history\fR [\fB\-\-target\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+List the .bak.<epoch> backups for the target config file in newest→oldest order. Sorted by mtime, ties broken by filename desc (matching the epoch\-ms suffix).
+.SH OPTIONS
+.TP
+\fB\-\-target\fR \fI<TARGET>\fR [default: policy]
+Which file\*(Aqs backups to list. Defaults to `policy`
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+policy
+.IP \(bu 2
+authorized
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth config history
+  $ rev\-stealth config history \-\-target authorized
+
+EXIT CODES:
+  0  Ok               Listing emitted.
+  1  UserError        Unknown target.
+  3  PermanentError   directory IO failure.
+
+ENV:
+  REV_SCRAPING_POLICY      Override the policy.toml path.
+  REV_SCRAPING_AUTHORIZED  Override the authorized.toml path.

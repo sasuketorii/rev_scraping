@@ -1,0 +1,73 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-auth-login 1  "rev-stealth-auth-login " 
+.SH NAME
+rev\-stealth\-auth\-login \- Spawn `rev\-auth` for interactive login; AUP\-gated
+.SH SYNOPSIS
+\fBrev\-stealth auth login\fR [\fB\-\-dry\-run\fR] [\fB\-\-explain\fR] [\fB\-\-idempotency\-key\fR] <\fB\-\-profile\fR> <\fB\-\-url\fR> [\fB\-\-domain\fR] [\fB\-\-completion\-pattern\fR] [\fB\-\-obscura\-bin\fR] [\fB\-\-rev\-auth\-bin\fR] [\fB\-\-aad\-context\fR] [\fB\-\-require\-vpn\fR] [\fB\-\-allow\-no\-vpn\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Spawn the rev\-auth helper to perform an interactive login against \-\-url for the given \-\-profile. The captured cookie blob is sealed and written to AuthStore. AUP\-gated; \-\-i\-have\-authorization is required for hosts outside the authorized.toml allowlist.
+.SH OPTIONS
+.TP
+\fB\-\-dry\-run\fR
+v1.3 Lane G.5: side\-effect\-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope
+.TP
+\fB\-\-explain\fR
+v1.3 Lane G.5: include the action plan in the result envelope\*(Aqs `result.plan` field. Can be combined with `\-\-dry\-run`. When passed without `\-\-dry\-run`, the plan is emitted alongside the real action
+.TP
+\fB\-\-idempotency\-key\fR \fI<IDEMPOTENCY_KEY>\fR
+v1.3 Lane G.5 / G.6: opaque caller\-supplied key for at\-most\-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6
+.TP
+\fB\-\-profile\fR \fI<PROFILE>\fR
+
+.TP
+\fB\-\-url\fR \fI<URL>\fR
+
+.TP
+\fB\-\-domain\fR \fI<DOMAIN>\fR
+
+.TP
+\fB\-\-completion\-pattern\fR \fI<COMPLETION_PATTERN>\fR
+
+.TP
+\fB\-\-obscura\-bin\fR \fI<OBSCURA_BIN>\fR
+
+.RS
+May also be specified with the \fBREV_OBSCURA_BIN\fR environment variable. 
+.RE
+.TP
+\fB\-\-rev\-auth\-bin\fR \fI<REV_AUTH_BIN>\fR
+Override the `rev\-auth` helper binary path (defaults to `which rev\-auth`)
+.RS
+May also be specified with the \fBREV_AUTH_BIN\fR environment variable. 
+.RE
+.TP
+\fB\-\-aad\-context\fR \fI<AAD_CONTEXT>\fR [default: ]
+Additional AAD context (e.g. proxy route) bound to the cookie blob
+.TP
+\fB\-\-require\-vpn\fR
+Force the VPN\-required guard ON for this invocation. Wins over `policy.toml`. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`
+.TP
+\fB\-\-allow\-no\-vpn\fR
+Allow this invocation to proceed without a VPN. Loses to env `REV_SCRAPING_REQUIRE_VPN=1`
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth auth login \-\-profile work \-\-url https://x.test
+  $ rev\-stealth auth login \-\-profile work \-\-url https://x.test \-\-domain x.test \-\-require\-vpn
+  $ rev\-stealth auth login \-\-profile demo \-\-url https://x.test \-\-rev\-auth\-bin /usr/local/bin/rev\-auth
+
+EXIT CODES:
+  0  Ok               Profile saved.
+  1  UserError        Bad args / AUP rejection / unknown profile mode.
+  3  PermanentError   rev\-auth missing / AuthStore IO failure.
+  4  AuthExpired      Captured profile is empty/unusable.
+
+ENV:
+  REV_OBSCURA_BIN              Override the obscura binary path.
+  REV_AUTH_BIN                 Override the rev\-auth helper binary.
+  REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.
+  REV_SCRAPING_AUTH_PASSPHRASE Sealed\-store passphrase (else keystore\-derived).
+  REV_SCRAPING_REQUIRE_VPN     When `1`, enforces VPN\-required guard.

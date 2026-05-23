@@ -1,0 +1,49 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-vpn-rotate 1  "rev-stealth-vpn-rotate " 
+.SH NAME
+rev\-stealth\-vpn\-rotate \- Trigger a VPN rotation. With `lazy\-on\-fail`, rotation is skipped unless the failure counter has crossed the threshold
+.SH SYNOPSIS
+\fBrev\-stealth vpn rotate\fR [\fB\-\-provider\fR] [\fB\-\-strategy\fR] [\fB\-\-region\fR] [\fB\-\-reason\fR] [\fB\-\-dry\-run\fR] [\fB\-\-explain\fR] [\fB\-\-idempotency\-key\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Trigger a VPN exit\-IP rotation through the configured provider (Surfshark / Gluetun). Strategy `lazy\-on\-fail` skips when the failure counter is under threshold; `every\-n` / `interval` rotate unconditionally on cadence. The action is recorded to the audit log with the supplied \-\-reason.
+.SH OPTIONS
+.TP
+\fB\-\-provider\fR \fI<PROVIDER>\fR [default: surfshark]
+VPN provider slug (currently only `surfshark`)
+.TP
+\fB\-\-strategy\fR \fI<STRATEGY>\fR [default: lazy\-on\-fail]
+Rotation strategy: `lazy\-on\-fail`, `every\-n`, `interval`
+.TP
+\fB\-\-region\fR \fI<REGION>\fR
+Optional region (`jp`, `us\-west`, `de`, ...). Cycled through when omitted
+.TP
+\fB\-\-reason\fR \fI<REASON>\fR [default: manual]
+Reason hint; recorded in the audit log for forensics
+.TP
+\fB\-\-dry\-run\fR
+v1.3 Lane G.5: side\-effect\-free plan emission. No file writes, no network calls, no keyring operations. Returns exit 0 after emitting the structured plan envelope
+.TP
+\fB\-\-explain\fR
+v1.3 Lane G.5: include the action plan in the result envelope\*(Aqs `result.plan` field. Can be combined with `\-\-dry\-run`. When passed without `\-\-dry\-run`, the plan is emitted alongside the real action
+.TP
+\fB\-\-idempotency\-key\fR \fI<IDEMPOTENCY_KEY>\fR
+v1.3 Lane G.5 / G.6: opaque caller\-supplied key for at\-most\-once commit semantics. Accepted in G.5; surfaced in the envelope; the underlying commit replay semantics land in G.6
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth vpn rotate
+  $ rev\-stealth vpn rotate \-\-strategy every\-n \-\-region jp \-\-reason scheduled
+  $ rev\-stealth vpn rotate \-\-provider surfshark \-\-strategy interval \-\-reason failover
+
+EXIT CODES:
+  0  Ok               Rotation completed (or correctly skipped under lazy\-on\-fail).
+  1  UserError        Unknown \-\-provider / \-\-strategy.
+  2  TransientError   Provider/container transient failure.
+  3  PermanentError   Provider unsupported in this build.
+  7  Leak             Post\-rotation leak check failed (fail\-closed).
+
+ENV:
+  REV_SCRAPING_REQUIRE_VPN  When `1`, enforces VPN\-required guard policy\-wide.

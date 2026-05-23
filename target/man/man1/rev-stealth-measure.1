@@ -1,0 +1,52 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-measure 1  "rev-stealth-measure " 
+.SH NAME
+rev\-stealth\-measure \- v1.1.0 (P15): local fingerprint diagnostics for monitoring. External SaaS calls are opt\-in via `\-\-enable\-external`
+.SH SYNOPSIS
+\fBrev\-stealth measure\fR [\fB\-\-output\-format\fR] <\fB\-\-url\fR> [\fB\-\-enable\-external\fR] [\fB\-\-enable\-egress\-probe\fR] [\fB\-\-user\-agent\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Local fingerprint diagnostics for monitoring (P15). Validates the target \-\-url and emits a deterministic fingerprint snapshot. External SaaS probes (CreepJS / bot.sannysoft) require \-\-enable\-external. The VPS egress probe requires \-\-enable\-egress\-probe AND the `vps\-egress\-probe` Cargo feature.
+.SH OPTIONS
+.TP
+\fB\-\-output\-format\fR \fI<OUTPUT_FORMAT>\fR
+Output format for this subcommand: `human` (default) or `json`. Shadows the global `\-\-format` for this invocation. Same value enum as the global flag; the JSON output is documented under `docs/json\-schemas/cli/<subcommand>.output.json`
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+human
+.IP \(bu 2
+json
+.RE
+.TP
+\fB\-\-url\fR \fI<URL>\fR
+URL to measure against. The page is not actually fetched unless `\-\-enable\-external` is set; we only validate the URL shape here
+.TP
+\fB\-\-enable\-external\fR
+Opt\-in to external fingerprint SaaS calls (CreepJS, bot.sannysoft.com, etc.). Default: disabled
+.TP
+\fB\-\-enable\-egress\-probe\fR
+P10.5: Opt\-in to a VPS egress probe (HEAD request against a minimal endpoint) to measure exit IP / TLS / DNS leak after deploy. Even with this flag set, the probe is only active when the binary was built with the `vps\-egress\-probe` Cargo feature; otherwise a deterministic `disabled` stub is returned. Default: disabled
+.TP
+\fB\-\-user\-agent\fR \fI<USER_AGENT>\fR
+Optional override for the User\-Agent we attribute the measurement to. When omitted we use a neutral rev\-stealth placeholder
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth measure \-\-url https://example.com
+  $ rev\-stealth measure \-\-url https://x.test \-\-enable\-external
+  $ rev\-stealth measure \-\-url https://x.test \-\-enable\-egress\-probe
+
+EXIT CODES:
+  0  Ok               Measurement emitted.
+  1  UserError        Bad args.
+  2  TransientError   External probe transient failure (when \-\-enable\-external).
+  3  PermanentError   Bad \-\-url / measurement path unavailable.
+
+ENV:
+  REV_STEALTH_EGRESS_PROBE_URL  Override the egress probe endpoint.

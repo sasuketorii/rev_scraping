@@ -1,0 +1,29 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rev-stealth-auth-status 1  "rev-stealth-auth-status " 
+.SH NAME
+rev\-stealth\-auth\-status \- Report freshness/expiry status for a profile
+.SH SYNOPSIS
+\fBrev\-stealth auth status\fR <\fB\-\-profile\fR> [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Report freshness / expiry status for the given profile. Returns exit 4 when the stored profile is expired or empty, so callers can distinguish refresh\-needed from hard failures.
+.SH OPTIONS
+.TP
+\fB\-\-profile\fR \fI<PROFILE>\fR
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.SH EXTRA
+EXAMPLES:
+  $ rev\-stealth auth status \-\-profile work
+  $ rev\-stealth \-\-format json auth status \-\-profile work
+
+EXIT CODES:
+  0  Ok               Profile is fresh.
+  1  UserError        Bad args / unknown profile.
+  3  PermanentError   AuthStore unavailable.
+  4  AuthExpired      Profile expired / unusable.
+
+ENV:
+  REV_SCRAPING_AUTH_DIR        Override the AuthStore directory.
