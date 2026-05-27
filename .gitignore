@@ -102,3 +102,6 @@ __pycache__/
 *.pyc
 *.rlib
 librust_out*
+
+# Per-machine MCP server config
+.mcp.json
