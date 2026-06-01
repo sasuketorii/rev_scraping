@@ -142,7 +142,7 @@ assets = [
 #   (also expects `target/release/rev-stealth` pre-built.)
 [package.metadata.generate-rpm]
 name = "rev-stealth"
-license = "MIT"
+license = "AGPL-3.0-only"
 summary = "Stealth web scraping & MCP CLI for AI agent developers"
 # Lean runtime deps; glibc only.
 requires = { glibc = ">= 2.34" }

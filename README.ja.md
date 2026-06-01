@@ -14,7 +14,7 @@
 [![workspace tests](https://img.shields.io/badge/workspace_tests-911%20PASS-success)](#エンジニアリング)
 [![rust](https://img.shields.io/badge/rust-1.83%2B-orange)](https://www.rust-lang.org/)
 [![unsafe](https://img.shields.io/badge/unsafe__code-forbid-success)](#エンジニアリング)
-[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-stdio_JSON--RPC_2.0-purple)](#mcp-サーバ--claude-code-連携)
 
 ---
@@ -434,6 +434,8 @@ proptest · criterion ベンチ · 補完／man ページのドリフトゲー�
 
 ## ライセンス
 
-MIT — [LICENSE](LICENSE) 参照。リポジトリ：<https://github.com/sasuketorii/rev_scraping>。
+**AGPL-3.0-only** — [LICENSE](LICENSE) 参照。唯一の例外は `vendor/obscura/` 配下の内蔵ブラウザ
+エンジンで、これは元の **Apache-2.0** ライセンスのままです。
+リポジトリ：<https://github.com/sasuketorii/rev_scraping>。
 
 > 🇬🇧 English version: [README.md](README.md).

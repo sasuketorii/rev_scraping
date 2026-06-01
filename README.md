@@ -16,7 +16,7 @@
 [![workspace tests](https://img.shields.io/badge/workspace_tests-911%20PASS-success)](#engineering)
 [![rust](https://img.shields.io/badge/rust-1.83%2B-orange)](https://www.rust-lang.org/)
 [![unsafe](https://img.shields.io/badge/unsafe__code-forbid-success)](#engineering)
-[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-stdio_JSON--RPC_2.0-purple)](#mcp-server--claude-code-integration)
 
 ---
@@ -432,6 +432,8 @@ Security reports & responsible disclosure: **`security-alert.reproduce897@passma
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Repository: <https://github.com/sasuketorii/rev_scraping>.
+**AGPL-3.0-only** — see [LICENSE](LICENSE). The one exception is the vendored browser
+engine under `vendor/obscura/`, which remains under its original **Apache-2.0** license.
+Repository: <https://github.com/sasuketorii/rev_scraping>.
 
 > 🇯🇵 A Japanese version of this README lives at [README.ja.md](README.ja.md).
