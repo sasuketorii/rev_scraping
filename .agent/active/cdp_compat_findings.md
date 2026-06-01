@@ -1,7 +1,7 @@
 # CDP Protocol Compatibility — obscura ⇄ chromiumoxide 0.9.1
 
 Investigation date: 2026-05-12.
-obscura: `/Users/sasuketorii/dev/rev_scraping/vendor/obscura` (HEAD).
+obscura: `$REPO_ROOT/vendor/obscura` (HEAD).
 chromiumoxide: `~/.cargo/registry/src/index.crates.io-*/chromiumoxide-0.9.1/`
               + `chromiumoxide_cdp-0.9.1` + `chromiumoxide_types-0.9.1`.
 

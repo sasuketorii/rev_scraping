@@ -101,9 +101,9 @@ Then one paragraph on residual risk (if any) and what is needed to push above 9.
 codex
 staff-code-reviewer skillを使って、提出された修正内容を採点者目線で確認します。まず該当ファイルと検証ルールを読み、ユーザー提示の結果と実際のCI/テスト実装が噛み合っているかを見ます。
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,220p' docs/manual/verification-truth-matrix.md" in $REPO_ROOT

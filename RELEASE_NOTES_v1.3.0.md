@@ -171,7 +171,7 @@ Most are inherited / preserved from v1.2.0. New v1.3.0:
 
 ## Acknowledgments
 
-- Operator: Sasuke Torii (sasuketorii.ai@gmail.com)
+- Operator: Sasuke Torii (security-alert.reproduce897@passmail.com)
 - Coder: Opus 4.7-xhigh (Anthropic Claude)
 - Reviewer: Codex gpt-5.5-xhigh (OpenAI)
 - 4-day intensive build with parallel multi-lane orchestration

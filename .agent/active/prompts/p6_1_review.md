@@ -21,8 +21,8 @@ Runtime parse-smoke locked in `main.rs::cli_tests::config_subcommand_parses_with
 ## Runtime evidence
 `./target/release/rev-stealth config validate` actually dispatches and prints:
 ```
-OK   /Users/sasuketorii/.rev_scraping/policy.toml
-FAIL /Users/sasuketorii/.rev_scraping/authorized.toml: [UnknownField] ...
+OK   $HOME/.rev_scraping/policy.toml
+FAIL $HOME/.rev_scraping/authorized.toml: [UnknownField] ...
 ```
 (no panic; real validation paths exercised end to end.)
 

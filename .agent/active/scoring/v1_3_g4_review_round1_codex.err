@@ -117,22 +117,22 @@ Note: ignore pre-existing clippy errors in `crates/stealth-cli/tests/deprecated_
 codex
 Using `staff-code-reviewer` for this read-only Lane G.4 review. I’ll inspect the changed surface, verify the CLI/schema claims where practical, and report only blocking or release-relevant issues.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 codex
 The runtime skill path listed for `staff-code-reviewer` is missing in one cache location, so I’m falling back to the duplicate local skill under `~/.codex/skills` and continuing the review.
 exec
-/bin/bash -lc "sed -n '1,240p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,240p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
-/bin/bash -lc "rg --files /Users/sasuketorii/.codex /Users/sasuketorii/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
+/bin/bash -lc "rg --files $HOME/.codex $HOME/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
  exited 1 in 0ms:
 exec
-/bin/bash -lc "rg --files /Users/sasuketorii/.codex /Users/sasuketorii/.agents 2>/dev/null | rg '(review-workflow|staff|reviewer)/SKILL\\.md"'$'"'" in $REPO_ROOT
+/bin/bash -lc "rg --files $HOME/.codex $HOME/.agents 2>/dev/null | rg '(review-workflow|staff|reviewer)/SKILL\\.md"'$'"'" in $REPO_ROOT
  exited 1 in 0ms:
 exec
 /bin/bash -lc 'rg --files docs/roles docs/manual crates/stealth-cli/src crates/stealth-cli/tests docs/json-schemas/cli .agent/v1.3 2>/dev/null | sort' in $REPO_ROOT
@@ -4214,21 +4214,21 @@ exec
     "is_dir": false,
     "label": "policy",
     "mode_octal": "600",
-    "path": "/Users/sasuketorii/.rev_scraping/policy.toml"
+    "path": "$HOME/.rev_scraping/policy.toml"
   },
   {
     "exists": true,
     "is_dir": false,
     "label": "authorized",
     "mode_octal": "600",
-    "path": "/Users/sasuketorii/.rev_scraping/authorized.toml"
+    "path": "$HOME/.rev_scraping/authorized.toml"
   },
   {
     "exists": true,
     "is_dir": true,
     "label": "sites_dir",
     "mode_octal": "700",
-    "path": "/Users/sasuketorii/.rev_scraping/sites"
+    "path": "$HOME/.rev_scraping/sites"
   },
   {
     "exists": true,
@@ -4259,7 +4259,7 @@ exec
     {
       "errors": [],
       "ok": true,
-      "path": "/Users/sasuketorii/.rev_scraping/policy.toml"
+      "path": "$HOME/.rev_scraping/policy.toml"
     },
     {
       "errors": [
@@ -4271,7 +4271,7 @@ exec
         }
       ],
       "ok": false,
-      "path": "/Users/sasuketorii/.rev_scraping/authorized.toml"
+      "path": "$HOME/.rev_scraping/authorized.toml"
     }
   ]
 }

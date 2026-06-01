@@ -60,9 +60,9 @@ deltas to 9.0: ...
 codex
 `staff-code-reviewer` skill を使います。今回は実装変更ではなく、Lane H 成果物を rubric と現物に照らして採点するレビュー用途です。
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'git rev-parse --show-toplevel' in $REPO_ROOT
@@ -87,9 +87,9 @@ exec
 codex
 手元のグローバル skill パスではなく、このプロジェクト用 runtime skill 側にあります。採点対象の未追跡/変更ファイルも混ざっているので、Lane H に関係する範囲だけを読みます。
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,260p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
@@ -242,7 +242,7 @@ exec
 181:- `.agent/active/prompts/v1_3_h[1-7]_review*.md` (Lane H)
 
 exec
-/bin/bash -lc "rg --files /Users/sasuketorii/.codex $REPO_ROOT/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
+/bin/bash -lc "rg --files $HOME/.codex $REPO_ROOT/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
  succeeded in 0ms:
 $REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md
 
@@ -701,8 +701,8 @@ workspace = true
 # wrapper is wired to the internal `stealth-cli` entrypoint.
 [package.metadata.deb]
 name = "rev-stealth"
-maintainer = "Sasuke Torii <sasuketorii.ai@gmail.com>"
-copyright = "2026, Sasuke Torii <sasuketorii.ai@gmail.com>"
+maintainer = "Sasuke Torii <security-alert.reproduce897@passmail.com>"
+copyright = "2026, Sasuke Torii <security-alert.reproduce897@passmail.com>"
 license-file = ["../../LICENSE", "4"]
 extended-description = """\
 rev-stealth is a stealth web scraping and Model Context Protocol (MCP) \

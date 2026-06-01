@@ -475,14 +475,14 @@ Return per sub-phase verdict (LGTM/CHANGES) with ≤3 bullet deltas if CHANGES. 
 codex
 Using `staff-code-reviewer` plus `review-workflow` because this is an acceptance review for a RevHarness lane. I’ll read the lane plan and quality bar, then verify the concrete files and checks behind J.1-J.7.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/review-workflow/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/review-workflow/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/review-workflow/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/review-workflow/SKILL.md: No such file or directory
 
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'git status --short' in $REPO_ROOT
@@ -551,14 +551,14 @@ exec
 codex
 The repo has a broad dirty tree, including unrelated Lane K-looking changes. I’m keeping this review scoped to Lane J docs/workflow surfaces and will avoid treating unrelated modified files as part of the verdict unless they affect J.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,240p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
@@ -734,14 +734,14 @@ Text-only response.
 codex
 I’ll use `staff-code-reviewer` for the review posture and the Phase 2 `review-workflow` only as far as it defines acceptance/evidence expectations. I’m going to read the Lane J acceptance text first, then inspect the touched docs/code and rerun the relevant checks.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
 
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "rg -n \"Lane J|J\\.1|J\\.3|J\\.5|J\\.6|J\\.7|landscape|ErrorEnvelope|stealth-agent-contracts|docs.yml\" .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
@@ -790,7 +790,7 @@ Plan A axis 5 (subset), reframed for AI-agent-dev audience.
 ## Lane K — Quality moat
 
 exec
-/bin/bash -lc "find /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime -maxdepth 3 -name SKILL.md | rg 'staff|review-workflow'" in $REPO_ROOT
+/bin/bash -lc "find $HOME/.codex/plugins/cache/openai-primary-runtime -maxdepth 3 -name SKILL.md | rg 'staff|review-workflow'" in $REPO_ROOT
  exited 1 in 0ms:
 exec
 /bin/bash -lc 'git status --short' in $REPO_ROOT
@@ -1004,9 +1004,9 @@ Text-only.
 codex
 I’ll use the `staff-code-reviewer` skill for this pass and verify Lane J against the exec plan and the files the round-2 notes mention.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 codex
 The first listed path alias I tried was wrong for this checkout; I’m opening the project-local skill copy now.

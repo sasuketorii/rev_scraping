@@ -126,9 +126,9 @@ deltas to reach 9.0: <none | bullet list>
 codex
 Using the `staff-code-reviewer` skill for this scoring pass, because this is an acceptance-style review against a repo rubric. I’ll read the rubric and then verify the Lane K artifacts closely enough to ground the scores.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,260p' AGENTS.md" in $REPO_ROOT
@@ -1258,7 +1258,7 @@ REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"146a7bc1-eb45
                body,
 
 exec
-/bin/bash -lc "find /Users/sasuketorii/.codex /Users/sasuketorii/.agents -path '*/staff-code-reviewer/SKILL.md' -print 2>/dev/null" in $REPO_ROOT
+/bin/bash -lc "find $HOME/.codex $HOME/.agents -path '*/staff-code-reviewer/SKILL.md' -print 2>/dev/null" in $REPO_ROOT
  succeeded in 517ms:
 codex
 verdict: LGTM  
@@ -1269,8 +1269,8 @@ REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"554c405e-3793
 
 ### .agent/active/reviews/v1_3_k2_review.out
  succeeded in 0ms:
-/Users/sasuketorii/.cargo/bin/cargo-deny
-/Users/sasuketorii/.cargo/bin/cargo-audit
+$HOME/.cargo/bin/cargo-deny
+$HOME/.cargo/bin/cargo-audit
 
 exec
 /bin/bash -lc "git diff --exit-code 7c700a0b -- .github/workflows/security.yml deny.toml; printf 'diff_exit=%s\\n' "'$?' in $REPO_ROOT
@@ -2231,7 +2231,7 @@ exec
 exec
 /bin/bash -lc 'command -v yamllint || true' in $REPO_ROOT
  succeeded in 0ms:
-/Users/sasuketorii/.local/share/mise/installs/python/3.14.5/bin/yamllint
+$HOME/.local/share/mise/installs/python/3.14.5/bin/yamllint
 
 exec
 /bin/bash -lc 'git diff --check 7c700a0b -- .github/workflows/sbom.yml .github/workflows/release.yml' in $REPO_ROOT
@@ -5085,9 +5085,9 @@ deltas: <none | bullet list, ≤ 5 items>
 codex
 Using `staff-code-reviewer` for the acceptance review. I’ll keep this read-only and check the declared workflow/targets against Lane K.5.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'pwd && git status --short && git rev-parse --short HEAD' in $REPO_ROOT
@@ -5306,9 +5306,9 @@ deltas: <none | bullet list, ≤ 3 items>
 codex
 Using `staff-code-reviewer` for this turn because you asked for a reviewer verdict. I’ll inspect the diff against `7c700a0b` and keep this read-only.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'git diff --stat 7c700a0b -- fuzz/Cargo.toml .github/workflows/fuzz-nightly.yml fuzz/fuzz_targets' in $REPO_ROOT
@@ -5415,9 +5415,9 @@ D  crates/rev-stealth-cli/src/main.rs
 codex
 The first skill path listed in the runtime cache is missing, so I’m falling back to the duplicate local skill entry. The working tree is very dirty, so I’m narrowing the review to the K.5 files and comparing them to `7c700a0b`.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'git diff --name-status 7c700a0b -- crates/stealth-sanitize/fuzz .github/workflows/fuzz-nightly.yml' in $REPO_ROOT
@@ -5564,9 +5564,9 @@ deltas: <none | bullet list, ≤ 3 items>
 codex
 Using `staff-code-reviewer` because this is an explicit reviewer pass. I’ll only read the tree and compare the stated round 3 fixes against baseline `7c700a0b`; no edits.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,220p' $REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
@@ -6163,9 +6163,9 @@ crates/stealth-auth/tests/proptest_envelope.rs
 codex
 The Lane K.4 row is present, and the expected four proptest files exist. I’m going to inspect the test bodies now; the current checkout is `9bed4df7`, not the stated baseline `7c700a0b`, so I’ll treat the baseline as contextual rather than as proof by itself.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,220p' .agents/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
@@ -6384,9 +6384,9 @@ deltas: <none | bullet list, ≤ 3 items>
 codex
 Using `staff-code-reviewer` for this review pass. I’ll keep this read-only and compare the round 2 changes against baseline `7c700a0b` before returning the requested verdict format.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 codex
 The first skill path I tried was not present; I’m switching to the repository-local `staff-code-reviewer` skill listed for this checkout.

@@ -8,14 +8,8 @@
 status: PASS
 api_fallback_allowed: false
 [codex-wrapper] INFO: Command: exec
-2026-05-22T22:34:33.670144Z ERROR codex_core::session: failed to load skill $REPO_ROOT/.agents/skills/cursor-caller/SKILL.md: invalid YAML: mapping values are not allowed in this context at line 2 column 338
-OpenAI Codex v0.132.0
---------
-workdir: $REPO_ROOT
-model: gpt-5.5
-provider: openai
-approval: never
-sandbox: workspace-write [workdir, /tmp, $TMPDIR] (network access enabled)
+REV_HARNESS_DELEGATION_METRIC {"schema_version":1,"delegation_id":"4fcb1483-621c-49ab-92cc-52805e047d96","timestamp":"2026-05-22T22:15:05Z","wrapper_role":"reviewer","specialty":null,"canonical_role":null,"manifest_hash":null,"exit_code":143,"duration_ms":44870846,"tokens_in":null,"tokens_out":null,"total_tokens":null,"dry_run":false,"specialty_status":"none"}
+rk access enabled)
 reasoning effort: xhigh
 reasoning summaries: none
 session id: 019e51d3-7921-76b3-8549-bb94a3b26d4d
@@ -123,9 +117,9 @@ You are operating in **read-only review mode**. Do NOT modify files; only emit t
 codex
 I’ll use the `staff-code-reviewer` workflow for this read-only verdict, then spot-check the schemas against the emitters and run the targeted schema test if it is safe in this checkout.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,220p' docs/manual/verification-truth-matrix.md" in $REPO_ROOT

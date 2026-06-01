@@ -94,9 +94,9 @@ You are operating in **read-only review mode**. Do NOT modify files; only emit t
 codex
 I’ll use the `staff-code-reviewer` workflow and keep this to a read-only inspection of the claimed schema/test alignment.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 codex
 The primary `staff-code-reviewer` skill path is missing in this checkout, so I’m falling back to the normal review stance: verify the claimed contract against the schema, emitters, and tests without editing files.

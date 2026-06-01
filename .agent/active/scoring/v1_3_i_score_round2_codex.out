@@ -154,9 +154,9 @@ Then a one-paragraph commentary on the largest residual risk (if any) and what w
 codex
 I’ll treat this as a review/scoring task and use the staff-code-reviewer workflow. I’m going to inspect the R1 score format, the changed gate scripts/workflow, and run targeted checks where they’re cheap enough to validate the claims.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,220p' $REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT

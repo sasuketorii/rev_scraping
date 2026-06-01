@@ -72,9 +72,9 @@ codex
 exec
 /bin/bash -lc "sed -n '1,260p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
  succeeded in 0ms:
 # v1.3 Quality Bar — Dual 9/10 Convergence Protocol
@@ -456,9 +456,9 @@ without external SaaS, nightly toolchain, or post-merge run dependencies.
 codex
 rubric は重み付きで、Lane K の D は coverage/fuzz/matrix/SBOM を重く見る指定です。R3 の未達理由は K.1 の誤解を誘う表現と K.5 の未 staging なので、次にその 2 点が現物で解消しているか確認します。
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,260p' .agent/active/scoring/v1_3_k_score_round3_codex.out" in $REPO_ROOT
@@ -873,7 +873,7 @@ A  crates/stealth-sanitize/fuzz/fuzz_targets/sanitize_envelope_parse.rs
 exec
 /bin/bash -lc "sed -n '1,220p' .agent/active/scoring/v1_3_k_evidence_notes.md" in $REPO_ROOT
 exec
-/bin/bash -lc "rg --files /Users/sasuketorii/.codex /Users/sasuketorii/.agents | rg 'staff-code-reviewer/SKILL.md"'$'"'" in $REPO_ROOT
+/bin/bash -lc "rg --files $HOME/.codex $HOME/.agents | rg 'staff-code-reviewer/SKILL.md"'$'"'" in $REPO_ROOT
  succeeded in 0ms:
 # Lane K — Evidence rationale notes (durable)
 
@@ -4119,13 +4119,13 @@ exec
 .agent/active/reviews/p13_4_review.out:323:1. `LGTM` は task class profile に応じて有効性を判定する。`standard` では `standard-slice-contract` と required local checks が current evidence で満たされた scoped reviewer signoff として有効であり、release readiness や final closeout を意味しない。`heavy` では `review request target=FINAL` かつ `Final Reviewer Request Gate` 充足時にのみ有効であり、next status は `pending acceptance` とする。`completed` は orchestrator だけが返せる。
 .agent/active/reviews/p13_4_review.out:326:4. `Needs verification` は non-blocking な追加 verification を要求する verdict であり、next status は `pending verification`。required checks failure や provenance 欠落を隠す用途には使えない。`FINAL` request または `ready for final reviewer LGTM` claim から `Needs verification` へ戻った場合、`pending final review` へ再昇格する前に full `Final Reviewer Request Gate` と fresh budget recheck を再充足しなければならない。
 .agent/active/reviews/p13_4_review.out:394:closed universe が無い、または `unknown` sink が 1 件でも残る場合、`remaining issues: N`、`root cause fixed`、`class closed`、final reviewer LGTM request は fail-closed で禁止する。
-.agent/active/reviews/p13_4_review.out:1523:/bin/bash -lc 'rg -n "staff-code-reviewer|コードレビュー|verdict|LGTM" /Users/sasuketorii/.codex/skills /Users/sasuketorii/.agents/skills /Users/sasuketorii/.codex/plugins/cache 2>/dev/null' in $REPO_ROOT
-.agent/active/reviews/p13_4_review.out:1525:/Users/sasuketorii/.codex/skills/cybertomo_overview/SKILL.md:206:The Telegram delivery jobs remain the existing CyberTomo forward scripts. The upstream crawl jobs were swapped from old agent-based LGTM prompts to deterministic no-agent scripts under `~/.hermes/scripts/cybertomo_case_report_*.py`, while preserving downstream report times and staff-facing format.
-.agent/active/reviews/p13_4_review.out:1527:/Users/sasuketorii/.codex/skills/self-growth-proposal-triage/SKILL.md:20:  deterministic checks, evidence, and reviewer LGTM before acceptance.
-.agent/active/reviews/p13_4_review.out:1528:/Users/sasuketorii/.codex/skills/revc-shadcn-frontend-workflow/SKILL.md:23:- Do not claim LGTM for React/Next UI work until the official freshness and
-.agent/active/reviews/p13_4_review.out:1529:/Users/sasuketorii/.codex/skills/revc-shadcn-frontend-workflow/SKILL.md:122:- reviewer LGTM status before production merge
-.agent/active/reviews/p13_4_review.out:1530:/Users/sasuketorii/.codex/skills/rev-ui-prebuild-mockup/SKILL.md:43:10. Require reviewer LGTM before handing the brief and captures to a coder.
-.agent/active/reviews/p13_4_review.out:1531:/Users/sasuketorii/.codex/skills/rev-ui-prebuild-mockup/SKILL.md:70:- explicit reviewer LGTM status
+.agent/active/reviews/p13_4_review.out:1523:/bin/bash -lc 'rg -n "staff-code-reviewer|コードレビュー|verdict|LGTM" $HOME/.codex/skills $HOME/.agents/skills $HOME/.codex/plugins/cache 2>/dev/null' in $REPO_ROOT
+.agent/active/reviews/p13_4_review.out:1525:$HOME/.codex/skills/cybertomo_overview/SKILL.md:206:The Telegram delivery jobs remain the existing CyberTomo forward scripts. The upstream crawl jobs were swapped from old agent-based LGTM prompts to deterministic no-agent scripts under `~/.hermes/scripts/cybertomo_case_report_*.py`, while preserving downstream report times and staff-facing format.
+.agent/active/reviews/p13_4_review.out:1527:$HOME/.codex/skills/self-growth-proposal-triage/SKILL.md:20:  deterministic checks, evidence, and reviewer LGTM before acceptance.
+.agent/active/reviews/p13_4_review.out:1528:$HOME/.codex/skills/revc-shadcn-frontend-workflow/SKILL.md:23:- Do not claim LGTM for React/Next UI work until the official freshness and
+.agent/active/reviews/p13_4_review.out:1529:$HOME/.codex/skills/revc-shadcn-frontend-workflow/SKILL.md:122:- reviewer LGTM status before production merge
+.agent/active/reviews/p13_4_review.out:1530:$HOME/.codex/skills/rev-ui-prebuild-mockup/SKILL.md:43:10. Require reviewer LGTM before handing the brief and captures to a coder.
+.agent/active/reviews/p13_4_review.out:1531:$HOME/.codex/skills/rev-ui-prebuild-mockup/SKILL.md:70:- explicit reviewer LGTM status
 .agent/active/prompts/p13_1_review.md:15:## Gates PASS
 .agent/active/prompts/p13_1_review.md:25:Return: `verdict: LGTM` or `verdict: BLOCK: <reason>`
 .agent/active/reviews/v1_3_k3_review.out:8:status: PASS
@@ -4691,10 +4691,10 @@ index f0578fe7..71a0ee79 100644
              ].join('\n');
 
  exited 101 in 3063ms:
-warning: failed to write cache, path: /Users/sasuketorii/.cargo/registry/index/index.crates.io-1949cf8c6b5b557f/.cache/li/bf/libfuzzer-sys, error: Operation not permitted (os error 1)
+warning: failed to write cache, path: $HOME/.cargo/registry/index/index.crates.io-1949cf8c6b5b557f/.cache/li/bf/libfuzzer-sys, error: Operation not permitted (os error 1)
  Downloading crates ...
   Downloaded autocfg v1.5.1
-error: failed to open `/Users/sasuketorii/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.1.crate`
+error: failed to open `$HOME/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/autocfg-1.5.1.crate`
 
 Caused by:
   Operation not permitted (os error 1)

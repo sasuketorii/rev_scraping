@@ -4,7 +4,7 @@
 
 - Git SHA: 67665dbc01ecfda84fbd2a7d068548653d7d3607
 - Captured: 2026-05-20T10:58:06Z
-- Host: Darwin SANU-M2-96GB.local 25.5.0 Darwin Kernel Version 25.5.0: Mon Apr 27 20:39:09 PDT 2026; root:xnu-12377.121.6~2/RELEASE_ARM64_T6020 arm64
+- Host: Darwin localhost 25.5.0 Darwin Kernel Version 25.5.0: Mon Apr 27 20:39:09 PDT 2026; root:xnu-12377.121.6~2/RELEASE_ARM64_T6020 arm64
 - rustc: rustc 1.95.0 (59807616e 2026-04-14)
 - cargo: cargo 1.95.0 (f2d3ce0bd 2026-03-21)
 

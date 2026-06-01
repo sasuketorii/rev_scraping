@@ -122,9 +122,9 @@ If BLOCK: state the invariant violated.
 codex
 I’ll review this as a blocking code-review pass, using the staff-code-reviewer skill and then checking the actual diff plus the targeted commands.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'git status --short && git diff --stat && git diff -- .github/workflows/ci.yml tests/install_sh_unit.sh' in $REPO_ROOT
@@ -170,9 +170,9 @@ index 196efea7..87eaac1e 100644
 codex
 The initial skill path listed in the session is stale, so I’m falling back to the duplicate local skill path. I also see unrelated worktree changes outside the stated slice; I’ll ignore those for the review unless they affect the two slice files.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,260p' tests/install_sh_unit.sh" in $REPO_ROOT
@@ -926,7 +926,7 @@ exec
 /bin/bash -lc 'git diff -- tests/install_sh_unit.sh' in $REPO_ROOT
  succeeded in 0ms:
 exec
-/bin/bash -lc "find /Users/sasuketorii/.codex /Users/sasuketorii/.agents -path '*staff-code-reviewer/SKILL.md' -print 2>/dev/null | head -20" in $REPO_ROOT
+/bin/bash -lc "find $HOME/.codex $HOME/.agents -path '*staff-code-reviewer/SKILL.md' -print 2>/dev/null | head -20" in $REPO_ROOT
 exec
 /bin/bash -lc 'git diff --name-only' in $REPO_ROOT
  succeeded in 0ms:
@@ -1745,7 +1745,7 @@ rm is /opt/homebrew/bin/rm
 /bin/rm: illegal option -- -
 usage: rm [-f | -i] [-dIPRrvWx] file ...
 SHELL=/bin/bash
-PATH=/Applications/Ghostty.app/Contents/MacOS:/Users/sasuketorii/.local/share/mise/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Ghostty.app/Contents/MacOS:/Users/sasuketorii/.cargo/bin:/Users/sasuketorii/.local/bin:/opt/homebrew/opt/trash/bin:/Users/sasuketorii/.lmstudio/bin:/Users/sasuketorii/.antigravity/antigravity/bin:/Users/sasuketorii/.nvm/versions/node/v20.19.3/bin:/Users/sasuketorii/.nvm/versions/node/v22.17.0/bin:/Users/sasuketorii/.nvm/versions/node/v24.11.1/bin:/Users/sasuketorii/.deno/bin:/Users/sasuketorii/Library/pnpm:/Users/sasuketorii/.pyenv/shims:/Users/sasuketorii/.local/share/mise/installs/go/1.26.3/bin:/Users/sasuketorii/.local/share/mise/installs/node/24.15.0/bin:/Users/sasuketorii/.local/share/mise/installs/python/3.14.5/bin:/Users/sasuketorii/.codex/tmp/arg0/codex-arg0lutVa5:/Users/sasuketorii/.local/share/mise/installs/node/24.15.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/path:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/079c94dc-c80a-445d-8896-cc3ea3d4696b/a4b894f9-6438-4a9b-adc0-842eb0412223/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01Eeb9y5m4iFuY3yRtytYfdc/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01FTLa86dhbVJ3HB1LdHdhN7/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01VTbvGZYaCVU2CNSvhDCnkg/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01XXJmxLXPEhPMmnxmrgntNw/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01SfWJSiw6JtGbsuW75PKvPK/bin:/Users/sasuketorii/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_012ABz1xjgtJYWKrcJkXW6ad/bin:/Users/sasuketorii/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/bin:/Users/sasuketorii/.claude/plugins/cache/claude-plugins-official/security-guidance/unknown/bin
+PATH=/Applications/Ghostty.app/Contents/MacOS:$HOME/.local/share/mise/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/Ghostty.app/Contents/MacOS:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/opt/trash/bin:$HOME/.lmstudio/bin:$HOME/.antigravity/antigravity/bin:$HOME/.nvm/versions/node/v20.19.3/bin:$HOME/.nvm/versions/node/v22.17.0/bin:$HOME/.nvm/versions/node/v24.11.1/bin:$HOME/.deno/bin:$HOME/Library/pnpm:$HOME/.pyenv/shims:$HOME/.local/share/mise/installs/go/1.26.3/bin:$HOME/.local/share/mise/installs/node/24.15.0/bin:$HOME/.local/share/mise/installs/python/3.14.5/bin:$HOME/.codex/tmp/arg0/codex-arg0lutVa5:$HOME/.local/share/mise/installs/node/24.15.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/path:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/079c94dc-c80a-445d-8896-cc3ea3d4696b/a4b894f9-6438-4a9b-adc0-842eb0412223/bin:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01Eeb9y5m4iFuY3yRtytYfdc/bin:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01FTLa86dhbVJ3HB1LdHdhN7/bin:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01VTbvGZYaCVU2CNSvhDCnkg/bin:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01XXJmxLXPEhPMmnxmrgntNw/bin:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_01SfWJSiw6JtGbsuW75PKvPK/bin:$HOME/Library/Application Support/Claude/local-agent-mode-sessions/a4b894f9-6438-4a9b-adc0-842eb0412223/079c94dc-c80a-445d-8896-cc3ea3d4696b/rpm/plugin_012ABz1xjgtJYWKrcJkXW6ad/bin:$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/bin:$HOME/.claude/plugins/cache/claude-plugins-official/security-guidance/unknown/bin
 
  succeeded in 200ms:
 rm2=1
@@ -1756,7 +1756,7 @@ rm2=1
 exec
 /bin/bash -lc 'ls -l /opt/homebrew/bin/rm; file /opt/homebrew/bin/rm; /opt/homebrew/bin/rm --help 2>&1 | head -20; /opt/homebrew/bin/rm -rf /tmp/nonexistent-test-dir; echo rc=$?' in $REPO_ROOT
  succeeded in 0ms:
-lrwxr-xr-x@ 1 sasuketorii  admin  32 Dec 28 20:00 /opt/homebrew/bin/rm -> /Users/sasuketorii/.local/bin/rm
+lrwxr-xr-x@ 1 sasuketorii  admin  32 Dec 28 20:00 /opt/homebrew/bin/rm -> $HOME/.local/bin/rm
 /opt/homebrew/bin/rm: Bourne-Again shell script text executable, ASCII text
 /opt/homebrew/opt/trash/bin/trash: illegal option -- -
 rc=1

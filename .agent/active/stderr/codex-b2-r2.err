@@ -102,7 +102,7 @@ Using `staff-code-reviewer` for this review pass, because this is explicitly a S
 exec
 /bin/bash -lc 'git diff -- tests/install_sh_unit.sh .github/workflows/ci.yml' in $REPO_ROOT
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md 2>/dev/null || sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md 2>/dev/null || sed -n '1,220p' /Users/sasuketorii/.agents/skills/staff-code-reviewer/SKILL.md 2>/dev/null" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md 2>/dev/null || sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md 2>/dev/null || sed -n '1,220p' $HOME/.agents/skills/staff-code-reviewer/SKILL.md 2>/dev/null" in $REPO_ROOT
  exited 1 in 0ms:
  succeeded in 0ms:
 diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
@@ -344,7 +344,7 @@ exec
 codex
 I’ve confirmed the round-2 delta is limited to the PATH pin and non-fatal cleanup changes in the unit script, plus the CI job content already in the branch. I’m checking the full script around the fake PATH/e2e path now so the sign-off isn’t based only on the excerpt.
 exec
-/bin/bash -lc 'ls -l /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer /Users/sasuketorii/.codex/skills/staff-code-reviewer /Users/sasuketorii/.agents/skills/staff-code-reviewer 2>/dev/null' in $REPO_ROOT
+/bin/bash -lc 'ls -l $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer $HOME/.codex/skills/staff-code-reviewer $HOME/.agents/skills/staff-code-reviewer 2>/dev/null' in $REPO_ROOT
  exited 1 in 0ms:
 exec
 /bin/bash -lc "nl -ba tests/install_sh_unit.sh | sed -n '180,380p'" in $REPO_ROOT
@@ -671,7 +671,7 @@ exec
 /bin/bash -lc 'git diff --check -- .github/workflows/ci.yml tests/install_sh_unit.sh' in $REPO_ROOT
  succeeded in 0ms:
 exec
-/bin/bash -lc "rg --files /Users/sasuketorii/.codex /Users/sasuketorii/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
+/bin/bash -lc "rg --files $HOME/.codex $HOME/.agents 2>/dev/null | rg 'staff-code-reviewer/SKILL\\.md"'$'"'" in $REPO_ROOT
  exited 1 in 0ms:
 exec
 /bin/bash -lc 'shellcheck -s sh install.sh tests/install_sh_unit.sh' in $REPO_ROOT

@@ -675,9 +675,9 @@ exec
 codex
 The working tree is dirty and includes the Lane K workflow/evidence files the prompt names, so I’ll treat existing unrelated edits as someone else’s work and inspect only the scoring slice. Next I’m checking the actual K workflows plus the durable evidence note and prior score records.
 exec
-/bin/bash -lc "sed -n '1,240p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,240p' $HOME/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/review-workflow/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "rg -n \"Lane K|K\\.1|K\\.2|K\\.3|K\\.4|K\\.5|K\\.6|K\\.7|K\\.8|Rubric|Axis|overall|weighted|score|branch warning|TRACKED-ONLY|actionlint|fuzz build|bencher|test-release|SBOM|coverage\" -S --hidden .agent .github docs Cargo.toml crates/stealth-sanitize crates/stealth-auth crates/stealth-mcp crates/stealth-sites" in $REPO_ROOT
@@ -3504,7 +3504,7 @@ docs/roles/coder.md:375:  risks, not coverage targets
 .agent/active/reviews/p13_4_review.out:581:crates/stealth-mcp/src/server.rs:403:                // coverage and a `_meta.sanitize` report.
 .agent/active/reviews/p13_4_review.out:796:+    // both for sanitize coverage.
 .agent/active/reviews/p13_4_review.out:1090:+                // coverage and a `_meta.sanitize` report.
-.agent/active/reviews/p13_4_review.out:1532:/Users/sasuketorii/.codex/plugins/cache/openai-curated/cloudflare/36878fcb/skills/cloudflare/references/graphql-api/api.md:88:| `botScore` / `botManagementDecision` | Bot management score (0-99) / verdict |
+.agent/active/reviews/p13_4_review.out:1532:$HOME/.codex/plugins/cache/openai-curated/cloudflare/36878fcb/skills/cloudflare/references/graphql-api/api.md:88:| `botScore` / `botManagementDecision` | Bot management score (0-99) / verdict |
 .agent/active/reviews/p13_4_review.out:1755:    // both for sanitize coverage.
 .agent/active/reviews/p13_4_review.out:2389:                // coverage and a `_meta.sanitize` report.
 .agent/active/reviews/p13_4_review.out:4271:    47	    // both for sanitize coverage.
@@ -4490,7 +4490,7 @@ jobs:
 exec
 /bin/bash -lc "sed -n '1,240p' .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
 exec
-/bin/bash -lc "find /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime -maxdepth 3 -name SKILL.md -path '*review-workflow*' -print" in $REPO_ROOT
+/bin/bash -lc "find $HOME/.codex/plugins/cache/openai-primary-runtime -maxdepth 3 -name SKILL.md -path '*review-workflow*' -print" in $REPO_ROOT
  succeeded in 0ms:
  succeeded in 0ms:
 # v1.3 Uplift ExecPlan — "Black-Belt CLI" Release
@@ -6350,10 +6350,10 @@ help: find a package to install `fuzz` with `cargo search cargo-fuzz`
 exec
 /bin/bash -lc 'cargo check --manifest-path crates/stealth-sanitize/fuzz/Cargo.toml --bins' in $REPO_ROOT
  exited 101 in 2292ms:
-warning: failed to write cache, path: /Users/sasuketorii/.cargo/registry/index/index.crates.io-1949cf8c6b5b557f/.cache/li/bf/libfuzzer-sys, error: Operation not permitted (os error 1)
+warning: failed to write cache, path: $HOME/.cargo/registry/index/index.crates.io-1949cf8c6b5b557f/.cache/li/bf/libfuzzer-sys, error: Operation not permitted (os error 1)
  Downloading crates ...
   Downloaded num-conv v0.2.2
-error: failed to open `/Users/sasuketorii/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/num-conv-0.2.2.crate`
+error: failed to open `$HOME/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/num-conv-0.2.2.crate`
 
 Caused by:
   Operation not permitted (os error 1)

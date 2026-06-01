@@ -92,9 +92,9 @@ the v1.3 scope (do not propose v1.4 work).
 codex
 I’ll score this as a review gate, so I’m loading the staff-code-reviewer skill and then I’ll verify the current diff/evidence rather than relying only on the round summary.
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc 'git status --short' in $REPO_ROOT
@@ -2779,10 +2779,10 @@ exec
 codex
 A stable `cargo check` of the fuzz package is running as a fallback compile signal. It is not equivalent to `cargo +nightly fuzz build`, but it can catch broken target wiring and imports.
  exited 101 in 4236ms:
-warning: failed to write cache, path: /Users/sasuketorii/.cargo/registry/index/index.crates.io-1949cf8c6b5b557f/.cache/li/bf/libfuzzer-sys, error: Operation not permitted (os error 1)
+warning: failed to write cache, path: $HOME/.cargo/registry/index/index.crates.io-1949cf8c6b5b557f/.cache/li/bf/libfuzzer-sys, error: Operation not permitted (os error 1)
  Downloading crates ...
   Downloaded num-conv v0.2.2
-error: failed to open `/Users/sasuketorii/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/num-conv-0.2.2.crate`
+error: failed to open `$HOME/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/num-conv-0.2.2.crate`
 
 Caused by:
   Operation not permitted (os error 1)

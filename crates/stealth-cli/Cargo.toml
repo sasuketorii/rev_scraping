@@ -112,8 +112,8 @@ workspace = true
 #    `cargo deb --no-build` to avoid double-compilation across the matrix.)
 [package.metadata.deb]
 name = "rev-stealth"
-maintainer = "Sasuke Torii <sasuketorii.ai@gmail.com>"
-copyright = "2026, Sasuke Torii <sasuketorii.ai@gmail.com>"
+maintainer = "Sasuke Torii <security-alert.reproduce897@passmail.com>"
+copyright = "2026, Sasuke Torii <security-alert.reproduce897@passmail.com>"
 license-file = ["../../LICENSE", "4"]
 extended-description = """\
 rev-stealth is a stealth web scraping and Model Context Protocol (MCP) \

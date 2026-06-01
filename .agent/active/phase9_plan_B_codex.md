@@ -1,6 +1,6 @@
 # Phase 9 ExecPlan B: Authenticated Session Capture for rev_scraping
 Date: 2026-05-14
-Repository: `/Users/sasuketorii/dev/rev_scraping`
+Repository: `$REPO_ROOT`
 Scope: CLI + MCP server workspace, not a Tauri GUI app.
 This is an independent implementation design for bringing authenticated session capture to `rev_scraping`.
 The goal is a human-in-the-loop login flow that captures post-auth cookies, encrypts them locally, and reuses them for HTTP and CDP scrape paths.
@@ -494,11 +494,11 @@ pub struct SiteRecipe {
 Affected crate paths:
 | Crate | Planned path |
 |---|---|
-| `stealth-cli` | `/Users/sasuketorii/dev/rev_scraping/crates/stealth-cli/src/auth.rs` |
-| `stealth-mcp` | `/Users/sasuketorii/dev/rev_scraping/crates/stealth-mcp/src/auth_tools.rs` |
-| `obscura-bridge` | `/Users/sasuketorii/dev/rev_scraping/crates/obscura-bridge/src/auth.rs` |
-| `stealth-sites` | `/Users/sasuketorii/dev/rev_scraping/crates/stealth-sites/src/auth.rs` |
-| `stealth-auth` | `/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/lib.rs` |
+| `stealth-cli` | `$REPO_ROOT/crates/stealth-cli/src/auth.rs` |
+| `stealth-mcp` | `$REPO_ROOT/crates/stealth-mcp/src/auth_tools.rs` |
+| `obscura-bridge` | `$REPO_ROOT/crates/obscura-bridge/src/auth.rs` |
+| `stealth-sites` | `$REPO_ROOT/crates/stealth-sites/src/auth.rs` |
+| `stealth-auth` | `$REPO_ROOT/crates/stealth-auth/src/lib.rs` |
 ## G. Security threat model
 Cookie values are bearer secrets.
 Treat them like account tokens.
@@ -675,16 +675,16 @@ Recommendation: **enforce credential prohibition in crate docs, review checklist
 Recommendation: **create new workspace crate `stealth-auth`**.
 Files to create:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/Cargo.toml
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/lib.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/jar.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/keystore.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/capture.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/probe.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/redact.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/audit.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/import_export.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/types.rs
+$REPO_ROOT/crates/stealth-auth/Cargo.toml
+$REPO_ROOT/crates/stealth-auth/src/lib.rs
+$REPO_ROOT/crates/stealth-auth/src/jar.rs
+$REPO_ROOT/crates/stealth-auth/src/keystore.rs
+$REPO_ROOT/crates/stealth-auth/src/capture.rs
+$REPO_ROOT/crates/stealth-auth/src/probe.rs
+$REPO_ROOT/crates/stealth-auth/src/redact.rs
+$REPO_ROOT/crates/stealth-auth/src/audit.rs
+$REPO_ROOT/crates/stealth-auth/src/import_export.rs
+$REPO_ROOT/crates/stealth-auth/src/types.rs
 ```
 Public API in `lib.rs`:
 ```rust
@@ -805,11 +805,11 @@ Rollout table:
 | 9g | SNS hardening | UA pinning, proxy stickiness, refusal policy |
 9a files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/Cargo.toml
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/lib.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/jar.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/keystore.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/types.rs
+$REPO_ROOT/crates/stealth-auth/Cargo.toml
+$REPO_ROOT/crates/stealth-auth/src/lib.rs
+$REPO_ROOT/crates/stealth-auth/src/jar.rs
+$REPO_ROOT/crates/stealth-auth/src/keystore.rs
+$REPO_ROOT/crates/stealth-auth/src/types.rs
 ```
 9a exit:
 ```text
@@ -817,8 +817,8 @@ save/load green, wrong AAD fails, 0600 permissions, no secret Debug output
 ```
 9b files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/capture.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-cli/src/auth.rs
+$REPO_ROOT/crates/stealth-auth/src/capture.rs
+$REPO_ROOT/crates/stealth-cli/src/auth.rs
 ```
 9b exit:
 ```text
@@ -826,8 +826,8 @@ auth login opens browser, captures CDP cookies, records UA/language/proxy
 ```
 9c files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/http.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-sites/src/auth.rs
+$REPO_ROOT/crates/stealth-auth/src/http.rs
+$REPO_ROOT/crates/stealth-sites/src/auth.rs
 ```
 9c exit:
 ```text
@@ -835,8 +835,8 @@ recipe auth block exists, HTTP scrape uses profile, proxy mismatch blocks
 ```
 9d files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/cdp_apply.rs
-/Users/sasuketorii/dev/rev_scraping/crates/obscura-bridge/src/auth.rs
+$REPO_ROOT/crates/stealth-auth/src/cdp_apply.rs
+$REPO_ROOT/crates/obscura-bridge/src/auth.rs
 ```
 9d exit:
 ```text
@@ -844,8 +844,8 @@ Network.setCookies works before headless navigation, modern attributes preserved
 ```
 9e files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/probe.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-cli/src/auth.rs
+$REPO_ROOT/crates/stealth-auth/src/probe.rs
+$REPO_ROOT/crates/stealth-cli/src/auth.rs
 ```
 9e exit:
 ```text
@@ -853,7 +853,7 @@ auth status reports fresh/warning/stale and probes through SSRF + Phase 8 route
 ```
 9f files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-mcp/src/auth_tools.rs
+$REPO_ROOT/crates/stealth-mcp/src/auth_tools.rs
 ```
 9f exit:
 ```text
@@ -861,8 +861,8 @@ MCP list/status/start/complete work and never return cookie values
 ```
 9g files:
 ```text
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-auth/src/policy.rs
-/Users/sasuketorii/dev/rev_scraping/crates/stealth-sites/src/auth.rs
+$REPO_ROOT/crates/stealth-auth/src/policy.rs
+$REPO_ROOT/crates/stealth-sites/src/auth.rs
 ```
 9g exit:
 ```text

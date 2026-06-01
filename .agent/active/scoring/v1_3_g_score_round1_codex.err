@@ -60,9 +60,9 @@ deltas to 9.0: ...
 codex
 staff-code-reviewer を使います。今回は実装変更ではなく Lane G の成果物を rubric に照らす採点なので、まず rubric と ExecPlan の該当範囲、差分の事実関係を確認します。
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/skills/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/skills/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '1,260p' .agent/active/v1_3_quality_bar.md" in $REPO_ROOT
@@ -221,9 +221,9 @@ exec
 codex
 rubric は確認できました。ExecPlan 上の Lane G acceptance は 8 sub-phase で、特に G.6 は proptest 50 iter と auth login audit-entry 条件まで書かれているため、そこが実装 evidence とどれだけ噛み合っているかを重点確認します。
 exec
-/bin/bash -lc "sed -n '1,220p' /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
+/bin/bash -lc "sed -n '1,220p' $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md" in $REPO_ROOT
  exited 1 in 0ms:
-sed: /Users/sasuketorii/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
+sed: $HOME/.codex/plugins/cache/openai-primary-runtime/staff-code-reviewer/SKILL.md: No such file or directory
 
 exec
 /bin/bash -lc "sed -n '20,40p' .agent/active/v1_3_uplift_execplan_rev1.md" in $REPO_ROOT
@@ -464,10 +464,10 @@ b2153aa0 (tag: v1.2.0) release: v1.2.0 production hardening (VPS + Hermes + Conf
 5ac7d239 chore: sync RevHarness 0.0.17 §16.8 strict-grading fixes (Opus 93 / Codex 93 LGTM)
 
 exec
-/bin/bash -lc "find /Users/sasuketorii/.codex -path '*staff-code-reviewer/SKILL.md' -print" in $REPO_ROOT
+/bin/bash -lc "find $HOME/.codex -path '*staff-code-reviewer/SKILL.md' -print" in $REPO_ROOT
  succeeded in 402ms:
 exec
-/bin/bash -lc "find /Users/sasuketorii/.codex/skills /Users/sasuketorii/.agents/skills $REPO_ROOT/.agents/skills -path '*staff-code-reviewer*' -maxdepth 5 -print" in $REPO_ROOT
+/bin/bash -lc "find $HOME/.codex/skills $HOME/.agents/skills $REPO_ROOT/.agents/skills -path '*staff-code-reviewer*' -maxdepth 5 -print" in $REPO_ROOT
  succeeded in 0ms:
 $REPO_ROOT/.agents/skills/staff-code-reviewer
 $REPO_ROOT/.agents/skills/staff-code-reviewer/SKILL.md
@@ -1773,8 +1773,8 @@ workspace = true
 #    `cargo deb --no-build` to avoid double-compilation across the matrix.)
 [package.metadata.deb]
 name = "rev-stealth"
-maintainer = "Sasuke Torii <sasuketorii.ai@gmail.com>"
-copyright = "2026, Sasuke Torii <sasuketorii.ai@gmail.com>"
+maintainer = "Sasuke Torii <security-alert.reproduce897@passmail.com>"
+copyright = "2026, Sasuke Torii <security-alert.reproduce897@passmail.com>"
 license-file = ["../../LICENSE", "4"]
 extended-description = """\
 rev-stealth is a stealth web scraping and Model Context Protocol (MCP) \

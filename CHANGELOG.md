@@ -163,7 +163,7 @@ Three reversible hardenings shipped instead of destructive operations:
 
 ### Changed
 - Local git config now uses `128899873+sasuketorii@users.noreply.github.com`
-  instead of the auto-derived `sasuketorii@SANU-M2-96GB.local`. New
+  instead of the auto-derived `maintainer@localhost`. New
   commits will no longer leak the macOS hostname. Historical author
   lines (102/107 commits) are unchanged.
 

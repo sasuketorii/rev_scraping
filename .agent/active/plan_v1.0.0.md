@@ -3,8 +3,8 @@
 **Date:** 2026-05-12
 **Author:** Claude Opus 4.7 (planning role) on behalf of Sasuke Torii / REV-C Inc.
 **Status:** rev3 — Phase 0 complete; all DECISION items resolved.
-**Development location:** `/Users/sasuketorii/dev/rev_scraping/` (new repo).
-  Vendored origin: rev_stealth crates @ 6fc38fd (read-only reference at `/Users/sasuketorii/dev/rev_stealth/`).
+**Development location:** `$REPO_ROOT/` (new repo).
+  Vendored origin: rev_stealth crates @ 6fc38fd (read-only reference at `$HOME/dev/rev_stealth/`).
 **Scope discipline:** Orchestration artifact. Implementation is delegated via the
 `auto_orchestrate.sh` / Task tool per CLAUDE.md §委譲の原則.
 **Positioning (重要):** **Defender-Facing Evaluation Toolkit**.
@@ -102,7 +102,7 @@ ad/tracker をデフォルトでブロックする。
 ### 2.1 Workspace layout (Phase 0 ground truth)
 
 ```
-/Users/sasuketorii/dev/rev_scraping/
+$REPO_ROOT/
 ├── Cargo.toml                    (workspace root, members = 9)
 ├── crates/
 │   ├── stealth-core/             (vendored, MIT, @ 6fc38fd)
@@ -163,7 +163,7 @@ stealth-mcp ─► stealth-cli (lib API) ─► (上記)
 ## 5. 実装フェーズ分割 (並列単位)
 
 ### Phase 0 — Preflight & SOW (✅ COMPLETE @ rev3)
-- ✅ Workspace skeleton at `/Users/sasuketorii/dev/rev_scraping/`.
+- ✅ Workspace skeleton at `$REPO_ROOT/`.
 - ✅ Vendored 5 crates from rev_stealth, vendored obscura source.
 - ✅ 4 NEW stub crates created (obscura-bridge, stealth-cf, stealth-parse, stealth-mcp).
 - ✅ `scripts/check_source_and_spdx.sh`, `scripts/check_bsl_contamination.sh` 雛形.
@@ -270,6 +270,6 @@ stealth-mcp ─► stealth-cli (lib API) ─► (上記)
 |------|---------|--------|------|
 | 2026-05-12 | rev1 | Claude Opus 4.7 / Sasuke Torii | initial; obscura + Scrapling 統合 / 4 crate 新規 |
 | 2026-05-12 | rev2 | Claude Opus 4.7 / Sasuke Torii | 技術 + 安全/法務レビュー 16 項目反映 (chromiumoxide reuse / dyn-safety / TLS dump Phase 0 / Send bounds / version pin / wire-up smoke / measure deliverable / RC exception PR / bridge SSRF S10 / API 改名 / leak_guard 連動 S11 / exit 10 S4 / AUP S12 / DECISION #9–#16 追加 / panic shutdown hook / S7 SPDX lint) |
-| 2026-05-12 | **rev3** | Claude Opus 4.7 / Sasuke Torii | **dev location 変更 + 全 DECISION 確定。** (a) 開発先パスを `/Users/sasuketorii/dev/rev_scraping/` に全面更新 (rev_stealth は vendored origin としてのみ言及)。(b) DECISION #1–#16 を全て確定値で書き換え (✅ 確定 表記)。(c) workspace 構成 (vendored 5 + NEW 4 = 9 members) を §2.1 / §4 に反映。(d) CLI 起動時 disclaimer banner を撤廃し README.md を canonical disclaimer 面とする (#9 #10)。(e) AUP allowlist file 名を `authorized.toml`, env var を `REV_SCRAPING_AUP_ACK` に統一。(f) parse.db 30 日 retention + dir perm 0700 (#13)、measure 外部 SaaS opt-in (#14)、`--strict` opt-in for exit 10 (#16) を Phase 2/4 LGTM 条件に反映。 |
+| 2026-05-12 | **rev3** | Claude Opus 4.7 / Sasuke Torii | **dev location 変更 + 全 DECISION 確定。** (a) 開発先パスを `$REPO_ROOT/` に全面更新 (rev_stealth は vendored origin としてのみ言及)。(b) DECISION #1–#16 を全て確定値で書き換え (✅ 確定 表記)。(c) workspace 構成 (vendored 5 + NEW 4 = 9 members) を §2.1 / §4 に反映。(d) CLI 起動時 disclaimer banner を撤廃し README.md を canonical disclaimer 面とする (#9 #10)。(e) AUP allowlist file 名を `authorized.toml`, env var を `REV_SCRAPING_AUP_ACK` に統一。(f) parse.db 30 日 retention + dir perm 0700 (#13)、measure 外部 SaaS opt-in (#14)、`--strict` opt-in for exit 10 (#16) を Phase 2/4 LGTM 条件に反映。 |
 
 **END OF EXECPLAN (rev3)**
