@@ -5,8 +5,8 @@ model_reasoning_effort = "medium"
 
 web_search = "cached"
 
-[mcp_servers.semantic]
-command = "./scripts/launch-semantic-mcp.sh"
+[mcp_servers.semantic-mcp]
+command = "/Users/sasuketorii/dev/rev_scraping/scripts/launch-semantic-mcp.sh" # rev-harness-path-leak-guard: allow
 # WHY: semantic-mcp operates ONLY on the project-local semantic index (no network,
 # no OAuth, no external side effects). A non-interactive `codex exec` worker has no
 # TTY to answer an approval prompt, so an unapproved sem.* call fails with
@@ -25,22 +25,22 @@ command = "./scripts/launch-semantic-mcp.sh"
 # pattern to any OAuth/network MCP server (supabase, stripe, cloudflare).
 default_tools_approval_mode = "prompt"
 
-[mcp_servers.semantic.tools."sem.preflight"]
+[mcp_servers.semantic-mcp.tools."sem.preflight"]
 approval_mode = "approve"
 
-[mcp_servers.semantic.tools."sem.health"]
+[mcp_servers.semantic-mcp.tools."sem.health"]
 approval_mode = "approve"
 
-[mcp_servers.semantic.tools."sem.context.top_k"]
+[mcp_servers.semantic-mcp.tools."sem.context.top_k"]
 approval_mode = "approve"
 
-[mcp_servers.semantic.tools."sem.capsule"]
+[mcp_servers.semantic-mcp.tools."sem.capsule"]
 approval_mode = "approve"
 
-[mcp_servers.semantic.tools."sem.search"]
+[mcp_servers.semantic-mcp.tools."sem.search"]
 approval_mode = "approve"
 
-[mcp_servers.semantic.tools."sem.registry.query"]
+[mcp_servers.semantic-mcp.tools."sem.registry.query"]
 approval_mode = "approve"
 
 # Chrome DevTools MCP — optional per-project opt-in, not in baseline release.
