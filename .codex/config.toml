@@ -7,6 +7,41 @@ web_search = "cached"
 
 [mcp_servers.semantic]
 command = "./scripts/launch-semantic-mcp.sh"
+# WHY: semantic-mcp operates ONLY on the project-local semantic index (no network,
+# no OAuth, no external side effects). A non-interactive `codex exec` worker has no
+# TTY to answer an approval prompt, so an unapproved sem.* call fails with
+# "user cancelled MCP tool call". We auto-approve a MINIMUM allowlist of 6 tools
+# bounded by a single boundary: NON-DESTRUCTIVE (not "pure read-only").
+#   (a) read-only discovery: health / context.top_k / search / registry.query.
+#   (b) append-only capsule-cache generation: capsule / preflight — these INSERT
+#       into the `capsules` cache table (append-only: no ON CONFLICT/UPDATE/DELETE,
+#       never touches symbols/components/registry rows). Worst case is unbounded
+#       growth of the `capsules` cache, fully reclaimable via sem.admin.gc.
+# Everything that mutates/soft-deletes registry rows or runs GC stays at the
+# default ("prompt"). This INCLUDES registry.upsert: its status normalization
+# admits "deleted", so with ON CONFLICT DO UPDATE it could soft-delete an existing
+# component without a human. So registry.upsert/set_status/delete and admin.gc all
+# stay at "prompt". DO NOT set the default to "approve" and DO NOT copy this
+# pattern to any OAuth/network MCP server (supabase, stripe, cloudflare).
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.semantic.tools."sem.preflight"]
+approval_mode = "approve"
+
+[mcp_servers.semantic.tools."sem.health"]
+approval_mode = "approve"
+
+[mcp_servers.semantic.tools."sem.context.top_k"]
+approval_mode = "approve"
+
+[mcp_servers.semantic.tools."sem.capsule"]
+approval_mode = "approve"
+
+[mcp_servers.semantic.tools."sem.search"]
+approval_mode = "approve"
+
+[mcp_servers.semantic.tools."sem.registry.query"]
+approval_mode = "approve"
 
 # Chrome DevTools MCP — optional per-project opt-in, not in baseline release.
 # [mcp_servers.chrome_devtools]
