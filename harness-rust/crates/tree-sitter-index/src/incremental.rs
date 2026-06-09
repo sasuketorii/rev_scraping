@@ -40,12 +40,21 @@ fn current_unix_ms() -> shared::error::Result<u64> {
 
 /// Index a set of source files, skipping cached and non-parseable files.
 ///
-/// Each entry in `files` is `(file_path, language, file_hash)`.
+/// Each entry in `files` is `(read_path, index_key, language, file_hash)`:
+/// - `read_path` is the ABSOLUTE filesystem path used for stat / read / parse.
+/// - `index_key` is the REPO-RELATIVE string persisted as the DB value for
+///   `symbols`, `file_parse_cache`, and the GC snapshot set (I-1 privacy:
+///   home-absolute host paths must never be stored).
+///
+/// The split is confined to this function: callers supply both paths, and the
+/// downstream upsert / cache / GC sites all key off `index_key` while every
+/// filesystem-IO site uses `read_path`.
+///
 /// Returns an [`IndexResult`] summarising what was processed.
 pub fn index_files(
     conn: &mut Connection,
     project_id: &str,
-    files: &[(PathBuf, String, String)],
+    files: &[(PathBuf, PathBuf, String, String)],
     config: &IndexConfig,
     gc_orphans: bool,
 ) -> shared::error::Result<IndexResult> {
@@ -62,10 +71,13 @@ pub fn index_files(
     let mut parse_failed_files: Vec<String> = Vec::new();
     let mut parsed_files: Vec<ParsedFile> = Vec::new();
 
-    for (path, language, file_hash) in files {
-        let file_path_str = path.to_string_lossy().to_string();
+    for (read_path, index_key, language, file_hash) in files {
+        // `read_path` (absolute) is used for every filesystem-IO site below;
+        // `index_key` (repo-relative) is the DB value for the cache check,
+        // symbols upsert, file_parse_cache write, and GC snapshot set.
+        let file_path_str = index_key.to_string_lossy().to_string();
 
-        // 1. Check cache.
+        // 1. Check cache (keyed by the repo-relative index_key).
         if db::is_file_cached(
             conn,
             project_id,
@@ -78,8 +90,8 @@ pub fn index_files(
             continue;
         }
 
-        // 2. Check file size.
-        let metadata = std::fs::metadata(path).map_err(AgentError::Io);
+        // 2. Check file size (stat the absolute read_path).
+        let metadata = std::fs::metadata(read_path).map_err(AgentError::Io);
         match metadata {
             Ok(meta) => {
                 if meta.len() > config.max_file_size {
@@ -95,8 +107,8 @@ pub fn index_files(
             }
         }
 
-        // 3. Read file content.
-        let content = match std::fs::read(path) {
+        // 3. Read file content (from the absolute read_path).
+        let content = match std::fs::read(read_path) {
             Ok(bytes) => bytes,
             Err(e) => {
                 warn!(file = %file_path_str, error = %e, "cannot read file, skipping");
@@ -233,9 +245,12 @@ pub fn index_files(
         }
 
         if gc_orphans {
+            // GC compares against the repo-relative index_key set (the same
+            // form now stored in symbols/file_parse_cache), so the snapshot set
+            // must also be repo-relative — both sides flip together.
             let snapshot_paths: HashSet<String> = files
                 .iter()
-                .map(|(path, _, _)| path.to_string_lossy().to_string())
+                .map(|(_, index_key, _, _)| index_key.to_string_lossy().to_string())
                 .collect();
             let gc_report = db::gc_symbols_not_in_snapshot_in_tx(
                 &tx,
@@ -251,6 +266,13 @@ pub fn index_files(
                 let _new_version = db::increment_index_version_in_tx(&tx)?;
             }
         }
+
+        // Resolve pending symbol_dependencies.to_symbol_id now that all symbol
+        // rows for this batch are upserted. Previously this was only called in
+        // tests, leaving to_symbol_id NULL and the reverse-dependency BFS in
+        // impact_analysis dead. Runs inside the same transaction (Transaction
+        // derefs to Connection).
+        db::resolve_pending_dependencies(&tx, project_id)?;
 
         tx.commit()
             .map_err(|e| AgentError::Database(format!("failed to commit transaction: {e}")))?;
@@ -526,18 +548,15 @@ mod tests {
         std::fs::write(&file_path, "fn foo() {}").unwrap();
 
         let hash = "cached_hash";
-        db::update_parse_cache(
-            &conn,
-            "proj",
-            &file_path.to_string_lossy(),
-            hash,
-            db::GRAMMAR_VERSION,
-            0,
-            0,
-        )
-        .unwrap();
+        // Cache is keyed by the repo-relative index_key, not the absolute path.
+        db::update_parse_cache(&conn, "proj", "test.rs", hash, db::GRAMMAR_VERSION, 0, 0).unwrap();
 
-        let files = vec![(file_path, "rust".to_string(), hash.to_string())];
+        let files = vec![(
+            file_path,
+            PathBuf::from("test.rs"),
+            "rust".to_string(),
+            hash.to_string(),
+        )];
         let config = IndexConfig::default();
         let result = index_files(&mut conn, "proj", &files, &config, false).unwrap();
         assert_eq!(result.files_skipped, 1);
@@ -554,7 +573,12 @@ mod tests {
         let content = "x".repeat(200_000);
         std::fs::write(&file_path, &content).unwrap();
 
-        let files = vec![(file_path, "rust".to_string(), "somehash".to_string())];
+        let files = vec![(
+            file_path,
+            PathBuf::from("big.rs"),
+            "rust".to_string(),
+            "somehash".to_string(),
+        )];
         let config = IndexConfig::default();
         let result = index_files(&mut conn, "proj", &files, &config, false).unwrap();
         assert_eq!(result.files_skipped, 1);
@@ -571,7 +595,12 @@ mod tests {
         let mut f = std::fs::File::create(&file_path).unwrap();
         f.write_all(b"fn foo() {}\x00binary data").unwrap();
 
-        let files = vec![(file_path, "rust".to_string(), "binhash".to_string())];
+        let files = vec![(
+            file_path,
+            PathBuf::from("binary.rs"),
+            "rust".to_string(),
+            "binhash".to_string(),
+        )];
         let config = IndexConfig::default();
         let result = index_files(&mut conn, "proj", &files, &config, false).unwrap();
         assert_eq!(result.files_skipped, 1);
@@ -586,7 +615,12 @@ mod tests {
 
         std::fs::write(&file_path, "IDENTIFICATION DIVISION.").unwrap();
 
-        let files = vec![(file_path, "cobol".to_string(), "h1".to_string())];
+        let files = vec![(
+            file_path,
+            PathBuf::from("test.cobol"),
+            "cobol".to_string(),
+            "h1".to_string(),
+        )];
         let config = IndexConfig {
             parse_failure_threshold: 1.0, // Allow all failures.
             ..IndexConfig::default()
@@ -603,11 +637,283 @@ mod tests {
         let file_path = dir.path().join("lib.rs");
         std::fs::write(&file_path, "fn hello() {} struct Foo;").unwrap();
 
-        let files = vec![(file_path, "rust".to_string(), "newhash".to_string())];
+        let files = vec![(
+            file_path,
+            PathBuf::from("lib.rs"),
+            "rust".to_string(),
+            "newhash".to_string(),
+        )];
         let config = IndexConfig::default();
         let result = index_files(&mut conn, "proj", &files, &config, false).unwrap();
         assert_eq!(result.files_parsed, 1);
         assert!(result.symbols_extracted >= 2);
+    }
+
+    #[test]
+    fn index_files_stores_repo_relative_index_key() {
+        // The DB value is the repo-relative index_key, NOT the absolute
+        // read_path (I-1 privacy: no home-absolute host path in
+        // symbols/file_parse_cache).
+        let mut conn = setup_db();
+        let dir = tempfile::tempdir().unwrap();
+        let abs = dir.path().join("lib.rs");
+        std::fs::write(&abs, "fn hello() {}").unwrap();
+
+        let files = vec![(
+            abs,
+            PathBuf::from("src/lib.rs"),
+            "rust".to_string(),
+            "h1".to_string(),
+        )];
+        index_files(&mut conn, "proj", &files, &IndexConfig::default(), false).unwrap();
+
+        let stored: String = conn
+            .query_row(
+                "SELECT file_path FROM symbols WHERE project_id = 'proj' LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "src/lib.rs");
+        let cached: String = conn
+            .query_row(
+                "SELECT file_path FROM file_parse_cache WHERE project_id = 'proj' LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cached, "src/lib.rs");
+    }
+
+    #[test]
+    fn index_files_resolves_pending_dependencies_end_to_end() {
+        // Indexing two files where one calls a symbol in the other must leave
+        // symbol_dependencies.to_symbol_id RESOLVED (non-NULL) and make the
+        // caller appear in dependents_of(target). Previously
+        // resolve_pending_dependencies was only invoked in tests, so this BFS
+        // edge was dead.
+        let mut conn = setup_db();
+        let dir = tempfile::tempdir().unwrap();
+        let lib_abs = dir.path().join("lib.rs");
+        let main_abs = dir.path().join("main.rs");
+        std::fs::write(&lib_abs, "pub fn target_fn() {}\n").unwrap();
+        std::fs::write(&main_abs, "fn caller_fn() { target_fn(); }\n").unwrap();
+
+        let files = vec![
+            (
+                lib_abs,
+                PathBuf::from("lib.rs"),
+                "rust".to_string(),
+                "h-lib".to_string(),
+            ),
+            (
+                main_abs,
+                PathBuf::from("main.rs"),
+                "rust".to_string(),
+                "h-main".to_string(),
+            ),
+        ];
+        index_files(&mut conn, "proj", &files, &IndexConfig::default(), false).unwrap();
+
+        // No NULL to_symbol_id for the target_fn edge.
+        let unresolved: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM symbol_dependencies
+                 WHERE project_id = 'proj' AND to_name = 'target_fn' AND to_symbol_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(unresolved, 0, "target_fn dependency must be resolved");
+
+        // dependents_of(target_fn) returns the caller.
+        let target_id: i64 = conn
+            .query_row(
+                "SELECT id FROM symbols WHERE project_id = 'proj' AND name = 'target_fn'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let dependents = db::dependents_of(&conn, target_id).unwrap();
+        assert!(
+            dependents.iter().any(|s| s.name == "caller_fn"),
+            "caller_fn must be a dependent of target_fn"
+        );
+
+        // And the reverse-dependency BFS now reaches the caller from lib.rs.
+        let report = impact_analysis(&conn, "proj", &["lib.rs"], 3, 100).unwrap();
+        assert!(report.populated);
+        assert!(
+            report
+                .affected_symbols
+                .iter()
+                .any(|s| s.name == "caller_fn"),
+            "impact_analysis must surface caller_fn as affected by lib.rs change"
+        );
+    }
+
+    #[test]
+    fn single_file_reindex_preserves_inbound_dependency_edges() {
+        // Regression for commit-diff reindex: reindexing only the target file
+        // must not drop reverse-impact edges from unchanged callers.
+        let mut conn = setup_db();
+        let dir = tempfile::tempdir().unwrap();
+        let lib_abs = dir.path().join("lib.rs");
+        let main_abs = dir.path().join("main.rs");
+        std::fs::write(&lib_abs, "pub fn target_fn() {}\n").unwrap();
+        std::fs::write(&main_abs, "fn caller_fn() { target_fn(); }\n").unwrap();
+
+        let seed = vec![
+            (
+                lib_abs.clone(),
+                PathBuf::from("lib.rs"),
+                "rust".to_string(),
+                "h-lib-1".to_string(),
+            ),
+            (
+                main_abs,
+                PathBuf::from("main.rs"),
+                "rust".to_string(),
+                "h-main-1".to_string(),
+            ),
+        ];
+        index_files(&mut conn, "proj", &seed, &IndexConfig::default(), false).unwrap();
+
+        let report_before = impact_analysis(&conn, "proj", &["lib.rs"], 3, 100).unwrap();
+        assert!(
+            report_before
+                .affected_symbols
+                .iter()
+                .any(|s| s.name == "caller_fn"),
+            "seed must establish caller_fn as a reverse dependent"
+        );
+
+        std::fs::write(&lib_abs, "pub fn target_fn() {}\npub fn sibling_fn() {}\n").unwrap();
+        let commit_delta = vec![(
+            lib_abs,
+            PathBuf::from("lib.rs"),
+            "rust".to_string(),
+            "h-lib-2".to_string(),
+        )];
+        index_files(
+            &mut conn,
+            "proj",
+            &commit_delta,
+            &IndexConfig::default(),
+            false,
+        )
+        .unwrap();
+
+        let report_after = impact_analysis(&conn, "proj", &["lib.rs"], 3, 100).unwrap();
+        assert!(
+            report_after
+                .affected_symbols
+                .iter()
+                .any(|s| s.name == "caller_fn"),
+            "single-file reindex must preserve main.rs -> lib.rs::target_fn impact edge"
+        );
+
+        let unresolved: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM symbol_dependencies
+                 WHERE project_id = 'proj' AND to_name = 'target_fn' AND to_symbol_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(unresolved, 0, "preserved inbound edge must relink");
+    }
+
+    #[test]
+    fn single_file_reindex_does_not_relink_removed_target_to_same_name_in_other_file() {
+        // Preserved inbound edges remember the file they originally targeted.
+        // If the target symbol disappears from that file, the old edge must not
+        // be globally relinked to an unrelated same-name symbol elsewhere.
+        let mut conn = setup_db();
+        let dir = tempfile::tempdir().unwrap();
+        let lib_abs = dir.path().join("lib.rs");
+        let main_abs = dir.path().join("main.rs");
+        let other_abs = dir.path().join("other.rs");
+        std::fs::write(&lib_abs, "pub fn target_fn() {}\n").unwrap();
+        std::fs::write(&main_abs, "fn caller_fn() { target_fn(); }\n").unwrap();
+
+        let seed = vec![
+            (
+                lib_abs.clone(),
+                PathBuf::from("lib.rs"),
+                "rust".to_string(),
+                "h-lib-1".to_string(),
+            ),
+            (
+                main_abs.clone(),
+                PathBuf::from("main.rs"),
+                "rust".to_string(),
+                "h-main-1".to_string(),
+            ),
+        ];
+        index_files(&mut conn, "proj", &seed, &IndexConfig::default(), false).unwrap();
+
+        std::fs::write(&other_abs, "pub fn target_fn() {}\n").unwrap();
+        let other = vec![(
+            other_abs.clone(),
+            PathBuf::from("other.rs"),
+            "rust".to_string(),
+            "h-other-1".to_string(),
+        )];
+        index_files(&mut conn, "proj", &other, &IndexConfig::default(), false).unwrap();
+
+        let lib_report = impact_analysis(&conn, "proj", &["lib.rs"], 3, 100).unwrap();
+        assert!(
+            lib_report
+                .affected_symbols
+                .iter()
+                .any(|s| s.name == "caller_fn"),
+            "precondition: caller_fn must still target lib.rs before lib.rs changes"
+        );
+
+        std::fs::write(&lib_abs, "pub fn renamed_target() {}\n").unwrap();
+        let lib_reindex = vec![(
+            lib_abs,
+            PathBuf::from("lib.rs"),
+            "rust".to_string(),
+            "h-lib-2".to_string(),
+        )];
+        index_files(
+            &mut conn,
+            "proj",
+            &lib_reindex,
+            &IndexConfig::default(),
+            false,
+        )
+        .unwrap();
+
+        let false_relinks: i64 = conn
+            .query_row(
+                "SELECT COUNT(*)
+                   FROM symbol_dependencies d
+                   JOIN symbols from_s ON from_s.id = d.from_symbol_id
+                   JOIN symbols to_s ON to_s.id = d.to_symbol_id
+                  WHERE d.project_id = 'proj'
+                    AND d.to_name = 'target_fn'
+                    AND from_s.file_path = 'main.rs'
+                    AND to_s.file_path = 'other.rs'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            false_relinks, 0,
+            "main.rs dependency must not relink from removed lib.rs::target_fn to other.rs::target_fn"
+        );
+
+        let other_report = impact_analysis(&conn, "proj", &["other.rs"], 3, 100).unwrap();
+        assert!(
+            !other_report
+                .affected_symbols
+                .iter()
+                .any(|s| s.name == "caller_fn"),
+            "other.rs::target_fn must not gain caller_fn through a stale preserved edge"
+        );
     }
 
     #[test]

@@ -21,6 +21,12 @@ pub fn semantic_mcp_data_root() -> Result<PathBuf> {
         return Ok(PathBuf::from(path));
     }
 
+    if !is_test_mode() {
+        if let Ok(path) = std::env::var("REV_HARNESS_RUST_DB_HOME") {
+            return Ok(PathBuf::from(path));
+        }
+    }
+
     platform_data_root().map(|root| root.join("Revharness").join("semantic-mcp"))
 }
 
@@ -128,5 +134,23 @@ mod tests {
     fn rejects_path_like_project_ids() {
         assert!(semantic_mcp_db_path("../x").is_err());
         assert!(semantic_mcp_db_path("x/y").is_err());
+    }
+
+    #[test]
+    fn honors_rust_db_home_override_outside_test_mode() {
+        // Hold the crate-wide env lock for the whole test so this env mutation
+        // can never race a concurrent `semantic_gc` test (which would otherwise
+        // resolve a real platform path, panic, and poison its mutex). The guard
+        // also snapshots and restores all managed vars on drop.
+        let _guard = crate::test_env::EnvGuard::acquire();
+
+        std::env::set_var("REV_HARNESS_RUST_DB_HOME", "/tmp/revharness-rust-db-home");
+        std::env::remove_var("REVHARNESS_TEST_HARNESS");
+        std::env::remove_var("SEMANTIC_MCP_HOME");
+
+        assert_eq!(
+            semantic_mcp_data_root().unwrap(),
+            PathBuf::from("/tmp/revharness-rust-db-home")
+        );
     }
 }

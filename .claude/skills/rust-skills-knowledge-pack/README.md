@@ -190,7 +190,7 @@ Masterが親、他ファイルが派生です。意思決定やcrate versionを�
 Claude Codeではプロジェクトスキルとして次のように配置できます。
 
 ```text
-.claude/skills/rust-skills-architecture/SKILL.md
+.claude/skills/rust-skills-knowledge-pack/SKILL.md
 ```
 
 CodexではAgent Skillsとして `SKILL.md` を含むskill directoryに置くか、repository guidanceとして `AGENTS.md` を併用します。`AGENTS.md` を作る場合は、この `SKILL.md` のGlobal Contractと禁止パターンだけを短く移植してください。

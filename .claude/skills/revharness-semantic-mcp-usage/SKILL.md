@@ -1,13 +1,13 @@
 ---
 name: revharness-semantic-mcp-usage
-description: RevHarness の semantic-mcp (Rust) を呼ぶ canonical reference. sem.context.top_k → sem.capsule の 2-step フロー、context_token、INDEX_VERSION / FILE_SHA_ROLLUP、FTS5 BM25 search、sem.admin.gc、placement v2 (Revharness/semantic-mcp/v1)、application_id RSEM marker、REVHARNESS_TEST_HARNESS test isolation を 1 か所に集約する。
+description: Opt-in RevHarness semantic-mcp (Rust) reference. Covers sem.context.top_k -> sem.capsule, context_token, freshness hashes, FTS5 BM25 search, sem.admin.gc, placement v2, RSEM marker, and test isolation. Use raw-read when semantic state is absent or STALE.
 ---
 
 # RevHarness Semantic MCP Usage
 
 ## Overview
 
-RevHarness の frontier-push 後の semantic-mcp contract は、Rust semantic-mcp を authoritative surface とし、`sem.context.top_k` が server-side Top-K と `context_token` を発行し、30 分以内に `sem.capsule` がその `context_token` だけを受け取って capsule を生成する 2-step flow である。caller が `top_k_symbols` を直接送る旧 flow は fail-closed で拒否され、freshness は `INDEX_VERSION` / `FILE_SHA_ROLLUP` / `CAPSULE_SHA256` と shared Rust code によって bind される。
+semantic-mcp は opt-in の補助 surface である。必須 context は raw-read を優先し、FRESH な index / context_token がある場合だけ Rust semantic-mcp の `sem.context.top_k` -> `sem.capsule` 2-step flow を使ってよい。caller が `top_k_symbols` を直接送る旧 flow は fail-closed で拒否され、freshness は `INDEX_VERSION` / `FILE_SHA_ROLLUP` / `CAPSULE_SHA256` と shared Rust code によって bind される。STALE / absent / cache miss / token expiry の場合は raw-read に戻り、STALE capsule body を根拠にしない。
 
 ## When to use
 
@@ -28,9 +28,9 @@ Use this skill when a task touches or asks about any of these semantic-mcp surfa
 
 Do not use this skill as a reason to call MCP by itself. This is a reference skill; the routing registry keeps `mcp_servers: []` because agents read the contract here and then use the appropriate runtime surface separately.
 
-## Canonical workflow (must follow)
+## Optional workflow
 
-Always generate a semantic capsule through `sem.context.top_k` followed by `sem.capsule`.
+When semantic output is useful and the index is FRESH, generate a capsule through `sem.context.top_k` followed by `sem.capsule`. This workflow is not a session-start prerequisite.
 
 1. Call `sem.context.top_k`.
 
@@ -105,11 +105,33 @@ Always generate a semantic capsule through `sem.context.top_k` followed by `sem.
    - `file_parse_cache changed since context_token was issued`.
    - `cache freshness violation` appears in the error.
 
-   Do not bypass these failures by reconstructing Top-K in the caller. A stale token means the capsule must be rebuilt from a fresh `sem.context.top_k` response.
+   Do not bypass these failures by reconstructing Top-K in the caller. A stale token means no capsule body is valid; raw-read the affected files, then optionally reissue `sem.context.top_k` after freshness is restored.
 
 6. Keep the capsule bounded.
 
    The canonical semantic capsule budget is 220 tokens total: 200 body tokens plus 20 metadata/framing tokens. If the response exceeds the bounded budget, semantic-mcp must fail closed instead of emitting an oversized capsule.
+
+## Index coverage (source-first bootstrap)
+
+Indexing is **edit-driven**: only files touched by the Edit/Write hook are indexed. Stable, unedited source — usually the very code you want semantic to find — is therefore **not covered** until something touches it. Symptoms: `sem.context.top_k` returns a `file_parse_cache miss` for a changed file you have not edited, and `sem.symbols.search` returns 0 rows for a symbol that demonstrably exists.
+
+When `sem.context.top_k` returns:
+
+```
+sem.context.top_k failed: file_parse_cache miss for <path>. This file is not yet indexed ... Run the source-first full reindex once: `agent-core context index-all --apply` ...
+```
+
+run the **source-first full index** once from the repo root:
+
+```
+agent-core context index-all --apply
+# or, during adopter setup / sync:
+scripts/semantic-bootstrap.sh --index-all
+```
+
+`context index-all` indexes the WHOLE repo's source now (`changed_only=false`, `gc_orphans=true`, idempotent by `file_hash + grammar_version`). It excludes top-level harness paths (`.agent/`, `.claude/`, `docs/`, top-level `scripts/`, …) but **includes nested product paths** such as `contact_sender_v2/.../scripts/sender-opt`. `gc_orphans=true` purges stale legacy rows. Dry-run is the default (`agent-core context index-all` with no `--apply` reports candidate counts without writing).
+
+This is **not** lazy in-request indexing: the MCP read-server never indexes on a `top_k` call (avoids write-contention / latency / freshness races). The miss error is actionable — run `index-all`, then retry; newly edited files are still picked up automatically on the next iteration.
 
 ## Capsule body anatomy
 
@@ -151,6 +173,15 @@ Prefix wildcard is not provided in this release.
 - Sending raw FTS5 syntax through `query` is not a supported escape hatch.
 - If raw FTS5 prefix query mode is needed, add it in a separate plan with a separate contract.
 - FTS5 syntax errors and SQLite errors must fail closed through `rusqlite::Error`; callers must not silently fall back to a broader unbounded search.
+
+### Search idiom & expectations
+
+各ツールの探索範囲は固定されており、混同すると 0 件で迷子になる。意図を取り違えないこと。
+
+- `sem.search` = **symbol-NAME lookup** over the ~129-row manually-curated `components` registry (plus a filesystem file-scan). FTS5 index covers only `name` / `semantic_id` / `module` / `kind` / `file_path` — **no description/docstring**. つまり自然言語クエリ（"the thing that validates tokens" のような文）は **0 hits** になる。クエリにはシンボル名トークン（識別子・モジュール名・パス断片）を渡すこと。`sem.search` は 31,514-row の tree-sitter `symbols` テーブルは一切引かない。
+- `sem.context.top_k` = **impact discovery** over the 31,514 tree-sitter symbols。`changed_files` 入力を要求する fan-in / impact ランキングであって、free-form な検索インターフェースではない。「変更ファイルから影響範囲を出す」用途専用。
+- `sem.registry.query` = filter the same ~129-row registry（`name_partial` / `kind` などで絞り込む）。これも自然言語検索ではない。
+- **Free-form / natural-language discovery（"X に関係するシンボルを探したい"）には現状 semantic path が無い。** sanctioned fallback は `rg` / `grep`。フルの 31k symbol index を引く専用ツール `sem.symbols.search` は **planned**（別スライスで追跡）であり、まだ存在しないものとして扱うこと。利用可能であるかのように案内しない。
 
 ## sem.admin.gc usage
 

@@ -138,7 +138,7 @@ test_planner_missing_fails_closed() {
   trap 'rm -rf "$tmpdir"' RETURN
 
   make_repo "$tmpdir/repo"
-  rm -f "$tmpdir/repo/scripts/harness-check-planner.sh"
+  /bin/rm -f "$tmpdir/repo/scripts/harness-check-planner.sh"
   cat > "$tmpdir/repo/scripts/runtime_target.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -232,7 +232,7 @@ test_planner_allows_diff_metadata_for_tracked_deletion() {
   printf 'delete me\n' > "$tmpdir/repo/docs/delete_me.md"
   git -C "$tmpdir/repo" add docs/delete_me.md
   git -C "$tmpdir/repo" commit -qm "add deletable doc"
-  rm -f "$tmpdir/repo/docs/delete_me.md"
+  /bin/rm -f "$tmpdir/repo/docs/delete_me.md"
 
   local result=""
   result="$(run_shadow_verify "$tmpdir/repo")" || fail "shadow verify should pass diff metadata checks for tracked deletion"
@@ -272,7 +272,7 @@ test_planner_rejects_missing_shell_runtime_command() {
   trap 'rm -rf "$tmpdir"' RETURN
 
   make_repo "$tmpdir/repo"
-  rm -f "$tmpdir/repo/scripts/runtime_target.sh"
+  /bin/rm -f "$tmpdir/repo/scripts/runtime_target.sh"
   local command="bash -n -- scripts/runtime_target.sh"
   write_planner "$tmpdir/repo" "$command"
 
@@ -294,7 +294,7 @@ test_planner_rejects_missing_json_runtime_command() {
   printf '{}\n' > "$tmpdir/repo/config/runtime.json"
   git -C "$tmpdir/repo" add config/runtime.json
   git -C "$tmpdir/repo" commit -qm "add runtime json"
-  rm -f "$tmpdir/repo/config/runtime.json"
+  /bin/rm -f "$tmpdir/repo/config/runtime.json"
   local command="jq empty -- config/runtime.json"
   write_planner "$tmpdir/repo" "$command"
 
@@ -372,7 +372,7 @@ touch "$tmpdir/planner-executed"
 printf '%s\n' 'bash -n -- scripts/runtime_target.sh'
 EOF
   chmod +x "$tmpdir/evil-planner.sh"
-  rm -f "$tmpdir/repo/scripts/harness-check-planner.sh"
+  /bin/rm -f "$tmpdir/repo/scripts/harness-check-planner.sh"
   ln -s "$tmpdir/evil-planner.sh" "$tmpdir/repo/scripts/harness-check-planner.sh"
 
   local result=""
@@ -404,7 +404,7 @@ touch "$tmpdir/router-executed"
 printf '%s\n' '{"block_type":"code-block","route_owner":"attacker"}'
 EOF
   chmod +x "$tmpdir/evil-router.sh"
-  rm -f "$tmpdir/repo/scripts/harness-block-router.sh"
+  /bin/rm -f "$tmpdir/repo/scripts/harness-block-router.sh"
   ln -s "$tmpdir/evil-router.sh" "$tmpdir/repo/scripts/harness-block-router.sh"
 
   local result=""

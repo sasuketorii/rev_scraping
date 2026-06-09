@@ -1,6 +1,6 @@
 ---
 name: cursor-caller
-description: Call Cursor CLI (binary `agent`) through the canonical RevHarness wrapper. Use when the task is light/medium and Codex-grade reasoning is overkill, or when the user explicitly asks for Cursor. Triggers include "cursor で" / "cursor agent で" / "ask モードで調べて" / "yolo で全自動". Three roles align to Cursor official mode terminology: `ask` (true read-only via --mode ask), `agent` (default write-capable agent mode), `yolo` (agent + --force command auto-approval). Cross-family delegation invariant: always invoke through `scripts/cursor-wrapper.sh`; never call `agent` directly. Safety note: per Cursor official docs, `agent -p` (default mode) has write/shell access; only `--mode ask` is a guaranteed read-only path.
+description: 'Call Cursor CLI (binary `agent`) through the canonical RevHarness wrapper. Use when the task is light/medium and Codex-grade reasoning is overkill, or when the user explicitly asks for Cursor. Triggers include "cursor で" / "cursor agent で" / "ask モードで調べて" / "yolo で全自動". Three roles align to Cursor official mode terminology: `ask` (true read-only via --mode ask), `agent` (default write-capable agent mode), `yolo` (agent + --force command auto-approval). Cross-family delegation invariant: always invoke through `scripts/cursor-wrapper.sh`; never call `agent` directly. Safety note: per Cursor official docs, `agent -p` (default mode) has write/shell access; only `--mode ask` is a guaranteed read-only path.'
 ---
 
 # Cursor Caller

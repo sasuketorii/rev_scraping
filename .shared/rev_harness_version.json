@@ -1,0 +1,7 @@
+{
+  "schema_version": "rev-harness-version/v1",
+  "harness_name": "rev_harness",
+  "harness_tag": "0.1.0",
+  "manifest_schema": "rev-harness-distribution-manifest/v1",
+  "note": "Upgraded to RevHarness 0.1.0 (Rust-only; Node semantic tree removed). Self-contained relative launcher wiring (.codex/config.toml + .claude/settings.json) restored, replacing the prior Option-X absolute shared-launcher path; harness-rust synced from 0.1.0 source (target/ excluded). harness_commit + synced_at are stamped per-adopter at sync time."
+}

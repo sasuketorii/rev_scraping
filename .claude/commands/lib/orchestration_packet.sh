@@ -5,6 +5,27 @@
 # It owns orchestration packet extraction, path validation, baseline snapshot
 # preflight, and policy bundle validation for coder-launch packets.
 
+_orchestration_packet_model_io_guard_path() {
+  local repo_root="${REPO_ROOT:-}"
+  if [[ -z "$repo_root" ]]; then
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+  fi
+  printf '%s\n' "${REV_HARNESS_MODEL_IO_GUARD:-${repo_root}/scripts/rev-harness-model-io-guard.sh}"
+}
+
+_orchestration_packet_guard_prompt_file() {
+  local prompt_file="$1"
+  local label="$2"
+  local guard_path=""
+
+  guard_path="$(_orchestration_packet_model_io_guard_path)"
+  if [[ -x "$guard_path" ]]; then
+    bash "$guard_path" prompt-budget --file "$prompt_file" --label "$label" \
+      --max-bytes "${REV_HARNESS_MODEL_IO_PROMPT_MAX_BYTES:-262144}" \
+      --warn-bytes "${REV_HARNESS_MODEL_IO_PROMPT_WARN_BYTES:-196608}" || return 1
+  fi
+}
+
 _baseline_freeze_script_is_available() {
   local canonical_baseline_lib=""
 
@@ -341,6 +362,15 @@ _prepare_orchestration_packet_for_coder_launch() {
   if ! evidence_destination_abs="$(_orchestration_packet_repo_abs_path "$evidence_destination_rel")"; then
     _orchestration_packet_block "$phase" \
       "Orchestration packet preflight failed closed: invalid evidence destination path in plan packet tuple."
+  fi
+
+  if ! _orchestration_packet_guard_prompt_file "$coder_prompt_abs" "orchestration_packet:coder_prompt"; then
+    _orchestration_packet_block "$phase" \
+      "Orchestration packet preflight failed closed: coder prompt exceeds model I/O guard budget."
+  fi
+  if ! _orchestration_packet_guard_prompt_file "$reviewer_prompt_abs" "orchestration_packet:reviewer_prompt"; then
+    _orchestration_packet_block "$phase" \
+      "Orchestration packet preflight failed closed: reviewer prompt exceeds model I/O guard budget."
   fi
 
   ledger_abs="$REPO_ROOT/.agent/active/sow/task-lineage-ledger.md"

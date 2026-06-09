@@ -980,12 +980,6 @@ exec_rust_semantic_server() {
     "$@"
 }
 
-node_semantic_entrypoint() {
-  local root="${1:-}"
-  [[ -n "$root" ]] || die "repo root is required"
-  printf '%s\n' "$root/scripts/semantic-mcp-server/dist/index.js"
-}
-
 assert_semantic_exec_env_overrides() {
   if [[ -n "${SEMANTIC_MCP_ENTRYPOINT:-}" ]]; then
     die "SEMANTIC_MCP_ENTRYPOINT override is forbidden; canonical repo-local entrypoint is required"
@@ -1001,13 +995,52 @@ exec_semantic_server() {
 
   assert_semantic_exec_env_overrides
 
-  local project_id
-  project_id="$(read_project_id)"
+  local project_id=""
+  local adopter_pwd_root=""
+  local adopter_pwd_id=""
+  # `identity_repo_root` is the worktree-resolved identity root that OWNS the
+  # project_id we are about to serve. It is the SAME identity root that
+  # project-id.sh uses to place the project_id artifact, and it MUST be passed
+  # to the server as --repo-root so the server records the correct
+  # projects.root_path (orphan-GC anchor) instead of falling back to a process
+  # CWD that could later vanish and make the live DB look like an orphan
+  # (BLOCKER #3a).
+  local identity_repo_root=""
+  if [[ -n "${PWD:-}" ]] \
+    && adopter_pwd_root="$(canonicalize_dir "$PWD" 2>/dev/null)" \
+    && [[ "$adopter_pwd_root" != "$root" && -f "$adopter_pwd_root/.shared/project_id" ]]; then
+    if adopter_pwd_id="$(
+      PROJECT_ID_REPO_ROOT="$adopter_pwd_root" \
+        read_project_id_from_path "$adopter_pwd_root/.shared/project_id" 2>/dev/null
+    )"; then
+      if [[ -n "$adopter_pwd_id" && "$adopter_pwd_id" != "$(read_project_id)" ]]; then
+        project_id="$adopter_pwd_id"
+        # Identity root for the adopter project (worktree-resolved).
+        identity_repo_root="$(
+          PROJECT_ID_REPO_ROOT="$adopter_pwd_root" project_identity_root 2>/dev/null || true
+        )"
+      fi
+    fi
+  fi
+  if [[ -z "$project_id" ]]; then
+    project_id="$(read_project_id)"
+    # Identity root for the canonical helper's own project.
+    identity_repo_root="$(project_identity_root 2>/dev/null || true)"
+  fi
+
+  # Only pass --repo-root when we resolved a trustworthy absolute existing dir.
+  # A blank/relative/missing identity root is deliberately NOT passed: the
+  # server then leaves projects.root_path blank (safe age-TTL fallback) rather
+  # than recording a wrong root. Blank is safe; wrong is catastrophic.
+  local repo_root_args=()
+  if [[ -n "$identity_repo_root" && "$identity_repo_root" == /* && -d "$identity_repo_root" ]]; then
+    repo_root_args=(--repo-root "$identity_repo_root")
+  fi
 
   local workspace_root=""
   if workspace_root="$(resolve_rust_workspace_root_if_present_via_helper "$root")"; then
     if can_exec_rust_semantic_server "$root"; then
-      exec_rust_semantic_server "$workspace_root" "$project_id" "$@"
+      exec_rust_semantic_server "$workspace_root" "$project_id" "${repo_root_args[@]}" "$@"
     else
       local rust_server_status=$?
       case "$rust_server_status" in
@@ -1032,16 +1065,16 @@ exec_semantic_server() {
     esac
   fi
 
-  local server_entrypoint
-  server_entrypoint="$(node_semantic_entrypoint "$root")"
-  if [[ ! -f "$server_entrypoint" ]]; then
-    die "semantic MCP entrypoint not found: $server_entrypoint"
+  # The Node semantic backend has been removed (de-overkill S3-B3). Rust is the
+  # only supported backend. If we reached here the Rust workspace was not
+  # resolvable; fail closed with a clear, actionable message. The legacy escape
+  # env REV_HARNESS_ALLOW_NODE_SEMANTIC is now a no-op (the Node tree is gone)
+  # and is called out explicitly so anyone still setting it understands why it
+  # no longer takes effect.
+  if [[ "${REV_HARNESS_ALLOW_NODE_SEMANTIC:-}" == "1" ]]; then
+    die "Node backend removed; Rust required. REV_HARNESS_ALLOW_NODE_SEMANTIC is now a no-op (the Node tree was deleted in S3). Build the Rust backend with \`cargo build -p semantic-mcp\`."
   fi
-  if ! is_repo_local_real_path "$root" "$server_entrypoint"; then
-    die "semantic MCP entrypoint must be a repo-local real file: $server_entrypoint"
-  fi
-
-  exec_with_trusted_runtime node --repo-root "$root" "$server_entrypoint" --project-id "$project_id" "$@"
+  die "Rust semantic backend required; build with \`cargo build -p semantic-mcp\`. The Rust workspace (harness-rust/) could not be resolved."
 }
 
 usage() {

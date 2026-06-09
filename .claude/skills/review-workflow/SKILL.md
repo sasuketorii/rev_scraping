@@ -1,6 +1,6 @@
 ---
 name: review-workflow
-description: Own the reusable review and fix loop for Phase 2.
+description: Own the Phase 2 review/fix loop. Use for code review loop, reviewer LGTM, PR review workflow, fix-and-rereview cycles.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 
@@ -19,6 +19,7 @@ Phase 2 の review/fix loop はこの skill が所有する。`auto-orchestrator
 - 自動運用では常に新規セッションで回す。`--resume` は手動 TTY 専用。
 - レビュー出力形式は `docs/roles/reviewer.md` の `Code Review Report` テンプレートに統一する。
 - 指摘ゼロでもテンプレートは省略しない。`## Findings` は `- None.` とし、`## Verdict` は Acceptance Gate と Verdict Rules に従って決める。
+- Rereview round-cap: 低リスク slice（docs-only / test-fix / local-rename）の rereview ROUND は既定 `review_round_policy.default_max_passes = 2`（R1 + Conditional 解消の rereview 1 回）。risk-EXEMPT classes `{design, acceptance-gate, security, wrapper, semantic-change, broad-refactor}` は cap を超えてよい。canonical 定義は `.agent/registry/model_policy.json` の `review_round_policy`、authority prose は `docs/manual/verification-truth-matrix.md` の `Review Round Cap`。この cap は rereview round のみを抑えるもので、I-12 dual-LGTM（phase advance に二系統 family を要求）を緩めない。
 
 ## Claude / Opus Review Auth Guard
 

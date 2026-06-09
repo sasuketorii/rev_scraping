@@ -1,0 +1,1476 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-01T17:38:20Z",
+  "generator": "scripts/build-cross-harness-registry.sh",
+  "skills": [
+    {
+      "skill_name": "auto-orchestrator",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/auto-orchestrator/SKILL.md",
+      "source_sha256": "a81e6763eb65689fb706625d593097ccba55d28d904e62cc4b9c0a1962d420a2",
+      "frontmatter_stripped_sha256": "a26eca8b8f63727c65b781f24e75c2490da61f56594d56386db60b7580ed00de",
+      "projected_sha256": "a81e6763eb65689fb706625d593097ccba55d28d904e62cc4b9c0a1962d420a2",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 516,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "baseline-protection",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/baseline-protection/SKILL.md",
+      "source_sha256": "57d0b509458adaf004f95cb162cbe3ebdb842210dece2595717630d88825655f",
+      "frontmatter_stripped_sha256": "dc0589f6f934f3f2a1a9f5c301d6210c82f9c29426d69b324c20540be0e324d7",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 202,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "channel-industry-context",
+      "source_harness": "rev_textsocialharness",
+      "source_relpath": ".claude/skills/channel-industry-context/SKILL.md",
+      "source_sha256": "ee67272c90a2ccfcde0e933b541dc9f2a1d46f8576dac5b76d426ad554532fff",
+      "frontmatter_stripped_sha256": "f906f08701364ae0281cef6bd05ae406e299200b7b455a23921f3a2baeb42294",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "social",
+      "managed": true,
+      "description_chars": 636,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "channel-line-policy",
+      "source_harness": "rev_textsocialharness",
+      "source_relpath": ".claude/skills/channel-line-policy/SKILL.md",
+      "source_sha256": "4cd85937a00b3be72d164d805eddd9bc95fdbb543fa3e2e4b8f68717026b7332",
+      "frontmatter_stripped_sha256": "839e01215d8a33a21f8009b50dd071eee0d14a630e98dbaaa9fb27541254b14a",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "social",
+      "managed": true,
+      "description_chars": 761,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "channel-meta-policy",
+      "source_harness": "rev_textsocialharness",
+      "source_relpath": ".claude/skills/channel-meta-policy/SKILL.md",
+      "source_sha256": "622e715c975a40cb2a713e3c55bafdcf8c2ebe7515354542fe29e0fa38fa08a3",
+      "frontmatter_stripped_sha256": "e0474f1cdfb2b648f068182444e3ae523693b989dd146b6a3c60d54b3c2ba1d0",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "social",
+      "managed": true,
+      "description_chars": 768,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "channel-youtube-shorts-policy",
+      "source_harness": "rev_textsocialharness",
+      "source_relpath": ".claude/skills/channel-youtube-shorts-policy/SKILL.md",
+      "source_sha256": "aee1e607410f1e2c2390253f7dfb2d2935457f0498cbc7b67c667a3e9481615c",
+      "frontmatter_stripped_sha256": "9fec752fad1740ad9901a6bc39f09ba646a5fed8ffede2feb1f3b9fb12149740",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "social",
+      "managed": true,
+      "description_chars": 655,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "client-distribution-readiness",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/client-distribution-readiness/SKILL.md",
+      "source_sha256": "337036218241f473740ce74860e1d87f92552004ce0f51257c5c536ece631e7f",
+      "frontmatter_stripped_sha256": "823c76f21ef1d6076277d57d36a4d94c218aeb6afc4b0fb546251c6524698577",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 377,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "clone-to-asset-shelf",
+      "source_harness": "unknown",
+      "source_relpath": null,
+      "source_sha256": null,
+      "frontmatter_stripped_sha256": null,
+      "projected_sha256": "3ed55bb1cd25a26ac34e1513675d89fe9dd4bba41eb884862d0f6e803b891b44",
+      "projection_kind": "manual/unknown",
+      "domain": "other",
+      "managed": false,
+      "description_chars": 0,
+      "present_in": [],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "cloudflare-deploy-guard",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/cloudflare-deploy-guard/SKILL.md",
+      "source_sha256": "64f02e11280ce2ae01d80d34662d1ef9b43c2654bcac88d93aeb5368c5c8d661",
+      "frontmatter_stripped_sha256": "351b489cacfa4b81f632769e8652bced9e3b3d3b5fb0836d3848770d1fb38f72",
+      "projected_sha256": "64f02e11280ce2ae01d80d34662d1ef9b43c2654bcac88d93aeb5368c5c8d661",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 167,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "codex-app-server-guard",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/codex-app-server-guard/SKILL.md",
+      "source_sha256": "c3f95d681af459349ab76e883a0640b140b29de9f106549dedb49bf823986a71",
+      "frontmatter_stripped_sha256": "43ae4d488ba1fae1dd68c36434aaa2656c47159f7d8d5f99e2498db41cec15ab",
+      "projected_sha256": "c3f95d681af459349ab76e883a0640b140b29de9f106549dedb49bf823986a71",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 330,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "codex-app-server-product-integration",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/codex-app-server-product-integration/SKILL.md",
+      "source_sha256": "da6ae53b486a9a53c230f707e3507d5f25f7dc3e32bb0cf674f35ee5151499a3",
+      "frontmatter_stripped_sha256": "8c9289be50098c49024a44de4c3ed5714706df8de72693ad173768a7c4569f79",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 308,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "codex-caller",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/codex-caller/SKILL.md",
+      "source_sha256": "aba23275e60157f550c008e1691df2ed91e683ec3750758acfe68755b569e169",
+      "frontmatter_stripped_sha256": "47f5b98b8aea499888ba7dde27d85e376e21907347d238aa7026f80e6b9b7fef",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 418,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "context-compactor",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/context-compactor/SKILL.md",
+      "source_sha256": "e26900c3c0cf115d29d09f72e00ad67158e88f33bc90c6e3e801d8f8dce22a79",
+      "frontmatter_stripped_sha256": "66f6afc222fa7a672451e5f60bf2f07926cee66995761d255acc7982d08f4557",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 101,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-blog-post",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-blog-post/SKILL.md",
+      "source_sha256": "d58f19ee9462888ca2b8231272b64b5e9092867b82d3f86a6eca1f1cce49efd5",
+      "frontmatter_stripped_sha256": "ac163e1c8c410837bd32daf84402e7c8ff25e67d34e6b16b69f6973cb8286090",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-brand-voice-check",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-brand-voice-check/SKILL.md",
+      "source_sha256": "9decdb089f2f3f1c0a49967261e70a35ff0be3112f65808f8bcf297a5e4e08ae",
+      "frontmatter_stripped_sha256": "0d21278c4313486567c841354d511af769c55ba74ff5e0036b46e09da5314f73",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 529,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-case-study",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-case-study/SKILL.md",
+      "source_sha256": "8295362b2d0d6d63d7236919bc7f670321c3de9862f2168e3f6113716a2ca271",
+      "frontmatter_stripped_sha256": "e867cace3ea1a7dbc0bd087754e4de2f5805c24bfe997068b55453adb6067510",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-cta-design",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-cta-design/SKILL.md",
+      "source_sha256": "6977e373353b1c3a649f68856c8cda0e4ba31dbaed34f6577d6d609a22821849",
+      "frontmatter_stripped_sha256": "5df072400de5f68b6cd48f82abbac1f6348dc6b544d87ec43ebcdb0471ada6af",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 455,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-email-sequence",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-email-sequence/SKILL.md",
+      "source_sha256": "832ee72da54d2d47910fbbc5347b912b6102ebcd8d132b6f239db9351ec845d7",
+      "frontmatter_stripped_sha256": "e79de7901b2d8f630bc00f75fd5f0e33d2bb95fd6dbcb42703c2360886bd130d",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 457,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-headline-pack",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-headline-pack/SKILL.md",
+      "source_sha256": "1524e25502dfef13dccb7a313d8a61f3a8ec6499cd02f006c88d7dad95ceab7a",
+      "frontmatter_stripped_sha256": "7a3378dea498077ba66ec03fe3a76b5d9f4426c53e0526350fb0979f2c968fc2",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 453,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-line-thread",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-line-thread/SKILL.md",
+      "source_sha256": "61cb1ac6bc2168bfa897f77df2a3c96ef3010986eb82f437b3c29ade6feff767",
+      "frontmatter_stripped_sha256": "3fa4476c66c2067386bdab2ffa035af169900004f3da3570389f7401d532dde3",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-short-video-script",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-short-video-script/SKILL.md",
+      "source_sha256": "e183201c66f47bc694834264575b8b80c7292e7708c9c551e01b13cf57d0e39d",
+      "frontmatter_stripped_sha256": "dde487a69ff0e4ddecd288bf3ff5add4b6bd63a20b76c830db42f596d9842351",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "copy-structure-optimizer",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/copy-structure-optimizer/SKILL.md",
+      "source_sha256": "e16d40905808b9a0c0fee6e24f6dc7249ba38a4154fef8057d8f01cc583f1161",
+      "frontmatter_stripped_sha256": "c453c42c7ad8ed9632f0a4d88ad8d73d451610d96d90f51503d4bbd7b88fe66b",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 535,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "courseops-mcp-usage",
+      "source_harness": "unknown",
+      "source_relpath": null,
+      "source_sha256": null,
+      "frontmatter_stripped_sha256": null,
+      "projected_sha256": "059996ecc8cfe91e805e277b3779c4b56b7ac0ea0fb59e9e69e733a90d4c45c5",
+      "projection_kind": "manual/unknown",
+      "domain": "other",
+      "managed": false,
+      "description_chars": 0,
+      "present_in": [],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "cursor-caller",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/cursor-caller/SKILL.md",
+      "source_sha256": "03052e05f0861cddba0654849b4ecd49a1b176482ab238e9d2ed745d1950b5d2",
+      "frontmatter_stripped_sha256": "5872e11c8e27edce808059a2c58745312fa249417e07d2b1c3e2186e769a30bf",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 710,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "design-principles",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/design-principles/SKILL.md",
+      "source_sha256": "57fa00a86a879ceee59ee9949fa222872b8288258a9243cfb471f45346fe7716",
+      "frontmatter_stripped_sha256": "b7884ba3c16b79037890855bb424fa16e0ed841ec3fba7fbcd75541b47bff418",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 246,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "development-junk-cleanup",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/development-junk-cleanup/SKILL.md",
+      "source_sha256": "552a3aa0bef8f950a368df4ce9f2874c9b3744cec8ab837d4dced094569bc966",
+      "frontmatter_stripped_sha256": "f0bc3b2b608428d3488363467cc810c0896240a1917a4658745fc5a385595af0",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 300,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "go-skills-knowledge-pack",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/go-skills-knowledge-pack/SKILL.md",
+      "source_sha256": "67583305c0b0da0735008eee9d7408455f5efd081a3aa5b21377b115677db7b5",
+      "frontmatter_stripped_sha256": "a17a519c6f6e02e9650133f715c2920f5eeb161d364bad0951ea14522be82949",
+      "projected_sha256": "4e9405d5993950b56324315c7654255172ab4c8818111a5b298224eb8da929a1",
+      "projection_kind": "manual/unknown",
+      "domain": "dev",
+      "managed": false,
+      "description_chars": 353,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "harness-official-docs-update",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/harness-official-docs-update/SKILL.md",
+      "source_sha256": "87dbd66d69372e8d647cedfdcd868ebcefbf834fbe0fef1e4a9b2642f20a66a9",
+      "frontmatter_stripped_sha256": "9259fbc7ad569669536f4aa77dc64c4916be3c08706fb48aa8e5b0fabe4be5ce",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 172,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-3days",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-3days/SKILL.md",
+      "source_sha256": "d758efff3b57c149e60640e1423bae1cdb6a8b086247a20c66acdd21dca82e22",
+      "frontmatter_stripped_sha256": "6c604296d1038eb7d4e0c86c6255891734589ad767bf37f52b725baf41c9db40",
+      "projected_sha256": "6fe598986853e1a31fc80c2b0f461d86a1fc53aad67f36e1d2dd560949257624",
+      "projection_kind": "partial-capped",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 243,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "launch-ad-creative",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-ad-creative/SKILL.md",
+      "source_sha256": "3aecddf61cf8285cb994d99d3357524c38e8e43084703300833c3c0ab0418a7f",
+      "frontmatter_stripped_sha256": "93fe8e15c696a25bd499e9686128950a4581a4570d611f5386b4721eeef53eca",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-bonus-design",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-bonus-design/SKILL.md",
+      "source_sha256": "ec067820fff787a89f937435bffff91664498bedb0d84cea2a06465cf833df0a",
+      "frontmatter_stripped_sha256": "6726fb8f943ecfb85f8aa7faa47c2ce014aa3ea36577665df917e0f186ff294c",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-funnel-test",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-funnel-test/SKILL.md",
+      "source_sha256": "2286994626f09aa2cdea58e33128370eda6af7c0296ea8a2b10afe3b4d903953",
+      "frontmatter_stripped_sha256": "98c363078cae33f02fb42f6b09774c97ae71f66be6a188aa4d7f8863020b3ee6",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-go-live-checklist",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-go-live-checklist/SKILL.md",
+      "source_sha256": "c050bdd494bdd9a1142e1b9aa3ff4963de197c572d3e2e8b1143cdd344100822",
+      "frontmatter_stripped_sha256": "63bebdfc90ff057d8e89e99675cad5b9386ce28c5777441a189b97fb87c6d884",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-lp-build",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-lp-build/SKILL.md",
+      "source_sha256": "4873937939352c8d946979eacf01968b77c542cfd9e1e7d0bb5799216c78512a",
+      "frontmatter_stripped_sha256": "964ba8fe7cbd3ed20d3e8f13c406657c3da5215f1e5ab032be08427cc3305d90",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-minicourse-factory",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-minicourse-factory/SKILL.md",
+      "source_sha256": "badb563ca7597b0c2122ddeaa946597e9155557370c58f8bf933ca99962965ff",
+      "frontmatter_stripped_sha256": "2f9d161362f0ddece6bb1b59ea63f290c3811c5b92edfe85d19a8e94434aaeb9",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-offer-review",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-offer-review/SKILL.md",
+      "source_sha256": "086fb19a93a892cb191622048c9972b25ddcbed6ac45470e0288c920a6cce9c2",
+      "frontmatter_stripped_sha256": "98757a89931faad3578eebd5d7f97b95f2cdf6a0e223335ba056442ccd64c667",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-step-sequence",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-step-sequence/SKILL.md",
+      "source_sha256": "402ea5fe282d0bdab153307f6a876d9aee46736ecec81e2b3ccc1656d2d62218",
+      "frontmatter_stripped_sha256": "d2375c00d1aa4bda05e9a7ecce11102a16f3ab58c3bc69f903512dddd5109e55",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-strategy-design",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-strategy-design/SKILL.md",
+      "source_sha256": "3d1ae2f6504a96728676cf9c68a06a04aa2bdc0550b5f07cba9ddfe5d914b452",
+      "frontmatter_stripped_sha256": "20e003e2ba0bf7b24a54f77c9f6a9f12e635c57ed5ac97aec5c87fd831e505d3",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-training-program",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-training-program/SKILL.md",
+      "source_sha256": "101586b06ca3e14b0c430c3e5d7fd90fecc586fbba0be8fbc421bc4200da5adf",
+      "frontmatter_stripped_sha256": "65ef64c85c50aad1466eae95ab7de816d3ae7fa5010439b9d301d8fc137ae061",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 730,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "launch-vsl-script",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/launch-vsl-script/SKILL.md",
+      "source_sha256": "8dbe7bdcdd818a9f5b1279119684f0d3fb3175d349fee29c1e358647d2e61293",
+      "frontmatter_stripped_sha256": "83d5dacd1040a9471481e49d802800d4d8aebb6290ce49477737c4632f036377",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 1,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "naming-normalization-guard",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/naming-normalization-guard/SKILL.md",
+      "source_sha256": "b881723831bea4fc0de6cc4de79ecf0e9e1b0d510adda7c4e8f7b007ceae0d2e",
+      "frontmatter_stripped_sha256": "753a6fb71a3d00b62a6fd5206decf6cf9a9e6eec0f21b5a7b5b5bbc3886e0cfd",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 254,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-ab-test-planner",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-ab-test-planner/SKILL.md",
+      "source_sha256": "2e4c3e924418794c30bc30eb80c0ccda25e7e22943d91bd77ef13d6170cf9e95",
+      "frontmatter_stripped_sha256": "f4389e775e7b14a512ab01527108c4c088034a2dd231bf390dd421bd3b6da4cf",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 705,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-deprecation-curator",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-deprecation-curator/SKILL.md",
+      "source_sha256": "17f27f7b301a0624991bc46f807594486bb73b71d19b671e458d3f47bd8df88c",
+      "frontmatter_stripped_sha256": "39fc98a22ecda0836d17f0ff1c2bb0404a4d66b46e58cc820bb5e637c6e4084f",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 517,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-design-generation",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-design-generation/SKILL.md",
+      "source_sha256": "8f3f5305c4b5fc4ed06a140f7dd8243ae387bb3d6b65172bb28f9ab309833a80",
+      "frontmatter_stripped_sha256": "ac7ed13ad8c31ec482d62718cc240f4770cfe0a82c9c9499f93d2f9460171dd7",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 516,
+      "present_in": [
+        "rev_marketing_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-eval-runner",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-eval-runner/SKILL.md",
+      "source_sha256": "3c6649f65c2619fe8e84b222bf0bfd7f126d81d6d1a65817c6fd9d2df6505586",
+      "frontmatter_stripped_sha256": "85d1e708c7e157f406182b3caa32c598d96d31b11dbb4a38a5521319d5b63a51",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 782,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-evidence-validator",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-evidence-validator/SKILL.md",
+      "source_sha256": "24092de7737fc10d4d891a88ce146463df2f018b2d90914004cb0ae8c0cba4fb",
+      "frontmatter_stripped_sha256": "737dacc52b149ce1fb82584669fce0f62202b86c13991ea4cf5d373a669749c2",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 693,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-input-quality-auditor",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-input-quality-auditor/SKILL.md",
+      "source_sha256": "aa5f0e8ec6f5892184e5c92866e7a5909aaa4d4456a5107cd2cb377de7703cd3",
+      "frontmatter_stripped_sha256": "b099849e1255a3194b9b6da50a394c9c653ff41d567db546e9d268ec2f463512",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 744,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-knowledge-curator",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-knowledge-curator/SKILL.md",
+      "source_sha256": "704373e5baa9d3d029163df8ea5d9adbb532268f29780a5963b9b7b9b73dc10e",
+      "frontmatter_stripped_sha256": "72723da0b51ffa7a950723de08d04748e6db3021af4f78619ed507f3d1f4d13d",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 586,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-legal-risk-gate",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-legal-risk-gate/SKILL.md",
+      "source_sha256": "a27f48d3107b1e12cba366a3888e78b02aec1aa62b411d4c27b36e04f12c84b0",
+      "frontmatter_stripped_sha256": "e71a277d0fef65c032482d601d6018108c5eceae5c28ec3d9948c5562f3eb54d",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 713,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-orchestrator",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-orchestrator/SKILL.md",
+      "source_sha256": "4d6d7aa16977750e958f8d2a4aefa155e442ac905795ede516d3b4158fe8bd66",
+      "frontmatter_stripped_sha256": "3ebb462276a9f6cfe9dda3cfff7e7c71cc161a362afb0a84802511d3f000180c",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 743,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-pii-scrubber",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-pii-scrubber/SKILL.md",
+      "source_sha256": "e9b013c7e3a73d55b74be43fa6feceafec0a8f23cae1acc071aac22b28f6abb0",
+      "frontmatter_stripped_sha256": "c6fb85e011594721f8a75e5e2e430436ff9ad9a74c85471b69fdedf0b4e44425",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 710,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-result-ingestor",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-result-ingestor/SKILL.md",
+      "source_sha256": "7c1f63b0b656cf4b94eeec644aa52155bba07d494a45e80ac3caabe81e10b6ae",
+      "frontmatter_stripped_sha256": "9352f89c4c1f0ef6fba1f7fc4b7dac712cc15d345e48669612df9e1328641996",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 732,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-reviewer",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-reviewer/SKILL.md",
+      "source_sha256": "b79ff097db1e76e5118f065c12ae7fc0656f0fc95c6c2d634650d8f087bc2970",
+      "frontmatter_stripped_sha256": "ac35b8fcc29c3022adea1a8f55380b3916d83f7484955bf4650d1642ed5f98e7",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 691,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-semantic-bootstrap",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-semantic-bootstrap/SKILL.md",
+      "source_sha256": "f33f125ac2a3a5b287fa5ab7f37dced3ae401870242df1c1d20d1fcf53b95277",
+      "frontmatter_stripped_sha256": "babb6ce62f0b8dd64b6d1aeb71ee8cf3d494658882cc340cba22ec2555682f9c",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 633,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "ops-skill-discovery-hook",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/ops-skill-discovery-hook/SKILL.md",
+      "source_sha256": "be9b0e20f388dfa0c89101a22e7b1760788b2e87370a63acdf27fda604765eb0",
+      "frontmatter_stripped_sha256": "7a902bc48bbfe4c4cf2f95a78f965c4bc8dd83b234f6a0cb26ba6b6e81dc6bfc",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 756,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "orchestrator-bootstrap",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/orchestrator-bootstrap/SKILL.md",
+      "source_sha256": "3c5d29c1327d411f7505439e1c9d62108e736c45ca54810ab038d901416a143b",
+      "frontmatter_stripped_sha256": "547246a44b9e2eae0ed976448df1000696cafc265e7189a35d0ec9f820e9acbe",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 159,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "payload-cms-deploy-guard",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/payload-cms-deploy-guard/SKILL.md",
+      "source_sha256": "a7f40afef23eb304447905781dc9061d60dc7567b9db05d9c4e7dc1b21083657",
+      "frontmatter_stripped_sha256": "e8dda8ec6590aa3d3e1d919b29288e4d836f713ac2f6d46c33b9207e5a8c1289",
+      "projected_sha256": "a7f40afef23eb304447905781dc9061d60dc7567b9db05d9c4e7dc1b21083657",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 527,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "production-function-implementer",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/production-function-implementer/SKILL.md",
+      "source_sha256": "11ffcf7560abd9e182f23569e358d31ca299957caa1c77beac9d758fc2750b98",
+      "frontmatter_stripped_sha256": "beff3e0529db495231d10d81e3e9dde4c5128fb4698b9662e287d745d747b6b8",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 92,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-attention-audit",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-attention-audit/SKILL.md",
+      "source_sha256": "9655763a14978c88611ee497f4c3a818efd0c2b341c18576f7acc0946d2e6c7a",
+      "frontmatter_stripped_sha256": "1aa9756b29401aa3d0ad6992ad1a0ec38acaebf875192af4c50c3946b89a1e4e",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 704,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-decision-pack",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-decision-pack/SKILL.md",
+      "source_sha256": "5908715ef5bde0543043588c29cda6002ae8c778a30a06a5a02c55bd11c3ac5c",
+      "frontmatter_stripped_sha256": "de8cc6bc7c65f2f39c6b2d29beec1417f13285ebf6708a5a9c4e4b7b1be42817",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 575,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-motivation-architect",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-motivation-architect/SKILL.md",
+      "source_sha256": "b72a7218188e5ded29f7959c3e2ef1aa49d27bdf67ea35eb3d60efd387486da4",
+      "frontmatter_stripped_sha256": "8b80845fb24a2c331a303f4a7b952af04222a7bcdc86d96941a80c71ca3faeb6",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 669,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-neuro-myth-debunker",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-neuro-myth-debunker/SKILL.md",
+      "source_sha256": "fef2cdf2b5fc06380dd36b34132e8fa5ac590aac77cf8ea3d63d87a9f51c4650",
+      "frontmatter_stripped_sha256": "1d89dc8c2fc04b6e2f9c1669886ad5c7fda5eb210e48395601b6fbe14b27e33c",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 575,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-objection-handler",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-objection-handler/SKILL.md",
+      "source_sha256": "b016bd466138fe5ff63be6269f5ef92e8851c148fdc25e621819ba28df5373a8",
+      "frontmatter_stripped_sha256": "23e1f7339bcea6ca08ef909e32619f8f7e220178a47071e24de1ab0f1162bc4e",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 547,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-opening-talk",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-opening-talk/SKILL.md",
+      "source_sha256": "22ee863976ec0e48229cb5d80a442a37cae22c08a9e2fc707a9ee596219a962c",
+      "frontmatter_stripped_sha256": "0cf8c1aa755c3ff47c0c7a45844995f718a37ecbe56cf174d3dd2062ecb7eeb5",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 646,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-persuasion-stack",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-persuasion-stack/SKILL.md",
+      "source_sha256": "9df855a2ec53c92e564ded9404e048b1de5e05448db4495a7685eda3485b63c8",
+      "frontmatter_stripped_sha256": "b2046704bfc0c938fd0df2abc4393510a395aeaecbc8659c07b31db975194233",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 767,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-questioning-coach",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-questioning-coach/SKILL.md",
+      "source_sha256": "7136111e040acd655b90b0bbbd43a4dc93cf7d7392c459caa57f33549d9b281c",
+      "frontmatter_stripped_sha256": "a8734b90bdb777e73d7661273c3d5461aac7fc6a1da7bbd0bf80e6b2cbfc90ef",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 624,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-read-signal",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-read-signal/SKILL.md",
+      "source_sha256": "b0b689b245723fa75da5fdbab52523ff5e54c809fe5e2dc3e6329f69c5d127e7",
+      "frontmatter_stripped_sha256": "c17f55bd0bbc252c77dc2942a0f6e26baf83856421887cb97965adf8a07fc198",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 601,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "psychology-temporal-orchestrator",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/psychology-temporal-orchestrator/SKILL.md",
+      "source_sha256": "c353edb6999ef76d65692abae8f049394aea997167cefb542e9d5724e082c632",
+      "frontmatter_stripped_sha256": "b8b2ea88f6b06611b68777b949a8deee5f853efc142d640554d6dc9bcb66a618",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 544,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "research-handoff",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/research-handoff/SKILL.md",
+      "source_sha256": "ffc53bfccc4c55171cd8447dc05b3be2f8d9ed2ea6ce0d5a508a66e593cbbb40",
+      "frontmatter_stripped_sha256": "5d081b5dd94fed974e76c745f18cf5d3330e82852933004891b0604fd7d2d022",
+      "projected_sha256": "ffc53bfccc4c55171cd8447dc05b3be2f8d9ed2ea6ce0d5a508a66e593cbbb40",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 159,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "rev-harness-lifecycle",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/rev-harness-lifecycle/SKILL.md",
+      "source_sha256": "4abe38e1ef9b4c76d3a8a1dff32ac439dc7f5e388b02fe55f060b2551621fff2",
+      "frontmatter_stripped_sha256": "3970fb3cf7e65ab47899327c72675c766a3bd3e42afffd22f0741f4624821481",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 170,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "rev-ui-prebuild-mockup",
+      "source_harness": "unknown",
+      "source_relpath": null,
+      "source_sha256": null,
+      "frontmatter_stripped_sha256": null,
+      "projected_sha256": "bd8c254b5d595efacf0e9fa6166ca769ef913c84ac559e82f09ed23846daf001",
+      "projection_kind": "manual/unknown",
+      "domain": "other",
+      "managed": false,
+      "description_chars": 0,
+      "present_in": [],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "revc-corporate-build",
+      "source_harness": "unknown",
+      "source_relpath": null,
+      "source_sha256": null,
+      "frontmatter_stripped_sha256": null,
+      "projected_sha256": "1a090f1b8f995cfaf2d0ace3f620344ddddde07a3469d74308a7d60b9ce20218",
+      "projection_kind": "manual/unknown",
+      "domain": "other",
+      "managed": false,
+      "description_chars": 0,
+      "present_in": [],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "revc-shadcn-frontend-workflow",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/revc-shadcn-frontend-workflow/SKILL.md",
+      "source_sha256": "3b5d2394755770f47b759629520e088972390e784d4784e4b702d7b0f57d5eb7",
+      "frontmatter_stripped_sha256": "6f361075a35005e9b726406905f929c8c79573758132718547c0e323a9964380",
+      "projected_sha256": "7e11414a61b7a4c387a6af35dedc6b808b8d95d82a80e70a37505d4a218ed3e7",
+      "projection_kind": "manual/unknown",
+      "domain": "dev",
+      "managed": false,
+      "description_chars": 277,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "revharness-semantic-mcp-usage",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/revharness-semantic-mcp-usage/SKILL.md",
+      "source_sha256": "b730abf0e5e0e99b851c311d94f964f2aed4127852950c65d7591a499b6ff9ed",
+      "frontmatter_stripped_sha256": "4484a853a390f57b853c556ef932128b2018682b790a0638d23368b27a5dbd74",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 299,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "review-workflow",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/review-workflow/SKILL.md",
+      "source_sha256": "7bbadcf887afbd9b83eaaf73266d4515b96ddaeb195115c4b1d03017ba2c0bab",
+      "frontmatter_stripped_sha256": "2926cd8550ba12cb2a3bce0104a2db14f57c88c096d7e34a13c53130d5ebf2fb",
+      "projected_sha256": "7bbadcf887afbd9b83eaaf73266d4515b96ddaeb195115c4b1d03017ba2c0bab",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 118,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "rust-skills-knowledge-pack",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/rust-skills-knowledge-pack/SKILL.md",
+      "source_sha256": "a24620ac88f513b48c6f2ac84090ed25ff1ae796caf4bc92df392b2cdeaba6bc",
+      "frontmatter_stripped_sha256": "2032b02caafc7a9d8a42371df1158de0e7587c37b0bc80b3fa37fd5a8ce95220",
+      "projected_sha256": "a24620ac88f513b48c6f2ac84090ed25ff1ae796caf4bc92df392b2cdeaba6bc",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 332,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "rustskills-architecture-legacy",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/rustskills-architecture-legacy/SKILL.md",
+      "source_sha256": "fe793be0fc9f98ee6ff31835c2d8e4df485bd973c649d4413ad08d54b7763e2e",
+      "frontmatter_stripped_sha256": "10d9f9705ec9fa54d4cb1c0abe39cd0c055f6c7426bd3488034bc5e8353133b1",
+      "projected_sha256": "fe793be0fc9f98ee6ff31835c2d8e4df485bd973c649d4413ad08d54b7763e2e",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 235,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "satori-kobun",
+      "source_harness": "rev_marketing_harness",
+      "source_relpath": ".claude/skills/satori-kobun/SKILL.md",
+      "source_sha256": "e255ff23d1fd2fd33a8005fc1d38b7d161716b8bd82749f27be0969ea300d3f5",
+      "frontmatter_stripped_sha256": "fa56e586c549ac5a949f5841561dde4f08da69e1f61bd8d9c47d4dad7603bb0a",
+      "projected_sha256": "a345559b1ce840fe537d64763c88bfb7ebae4804bbb829487881083a8abc69e1",
+      "projection_kind": "partial-capped",
+      "domain": "marketing",
+      "managed": true,
+      "description_chars": 183,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "scope-guard",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/scope-guard/SKILL.md",
+      "source_sha256": "53771e08657e687c8b7ed9f6d5f8a7b4360349e70a2943afa1f5750fc2c5ab90",
+      "frontmatter_stripped_sha256": "6b40f5992277bb96eafe727a8bf316dd1223f67dc0b856d9ac8a79d32b0b0cf8",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 83,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "self-growth-proposal-triage",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/self-growth-proposal-triage/SKILL.md",
+      "source_sha256": "d24fcbaa374ffe477fc79d3ea10959d8214d620982ed26320f52404fedfe3f50",
+      "frontmatter_stripped_sha256": "91a380b37ae48bf2fd85f1eb3d226084e1e9dd72aaf8cac6cc6d416f2bdbabd8",
+      "projected_sha256": "165ad0a67dd52d6ac884855596571f2ee57efddc0de8c4a91bb58426e9b92c63",
+      "projection_kind": "manual/unknown",
+      "domain": "dev",
+      "managed": false,
+      "description_chars": 219,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "semantic-bootstrap",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/semantic-bootstrap/SKILL.md",
+      "source_sha256": "aee0d1d0183f2065384ee5b9941b733e9dc0dc92ad6e60ef2072220bc57aa4fc",
+      "frontmatter_stripped_sha256": "23da260bdc95b6b384324d2ac9a0903162e24c03d103b0453efa1c6f38a49472",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 375,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "shadcn",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/shadcn/SKILL.md",
+      "source_sha256": "acdb8064078e57108fe564a6daf6a32fd0e00a4388f6c635d5a443eaec668ce6",
+      "frontmatter_stripped_sha256": "eadfe8483d8872ddda7677f5c6ba3118e67bad610900e51d694d4d8878d5f420",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 175,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "slice-designer",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/slice-designer/SKILL.md",
+      "source_sha256": "3f1030a01a314267962d375c0a4ad1886c18b17518c5bef6d7e9a836d284cc71",
+      "frontmatter_stripped_sha256": "d3d11e23851e9d16138365bf1e78f915e89bc25e267fe6552fc5e9901cf59101",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 150,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "staff-code-reviewer",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/staff-code-reviewer/SKILL.md",
+      "source_sha256": "b2549e6f19a8576958cb76755def71a816fce929ad3b7acc85004522614b4fde",
+      "frontmatter_stripped_sha256": "9042a8679e1847c93e694e7580890454cfbeb048f33296ccc6a563f0eb7b9ac1",
+      "projected_sha256": "b2549e6f19a8576958cb76755def71a816fce929ad3b7acc85004522614b4fde",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 208,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "structured-mentor",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/structured-mentor/SKILL.md",
+      "source_sha256": "beecc3615eb969c0b9270147611073b6ee86b3669a4f56dd92e5adba45c490fa",
+      "frontmatter_stripped_sha256": "d286b9f01a240dcbcd6e820deb819e50c1dcc59bc300d23e1add333bdffbdd7c",
+      "projected_sha256": null,
+      "projection_kind": "byte-for-byte",
+      "domain": "other",
+      "managed": true,
+      "description_chars": 96,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": false
+    },
+    {
+      "skill_name": "supabase-deploy-guard",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/supabase-deploy-guard/SKILL.md",
+      "source_sha256": "c68e285d6d290efde50e1b55eb1f721c0915a4a1c5f81ae57e0e2eb0ca613b4e",
+      "frontmatter_stripped_sha256": "60a637811695381efc92e16ae29fccf8af88977d9886f8a8a8bf39e86c423869",
+      "projected_sha256": "c68e285d6d290efde50e1b55eb1f721c0915a4a1c5f81ae57e0e2eb0ca613b4e",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 168,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "system-planner",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/system-planner/SKILL.md",
+      "source_sha256": "064d8314e2cf1524a2e5a7cc1bc1ac4777e30ef26b0d6e6902d53ba4f83611ca",
+      "frontmatter_stripped_sha256": "4028b6e4890156bf3e059729c960a3ea687a4f2b0427decda1c417c9001560ed",
+      "projected_sha256": "064d8314e2cf1524a2e5a7cc1bc1ac4777e30ef26b0d6e6902d53ba4f83611ca",
+      "projection_kind": "byte-for-byte",
+      "domain": "dev",
+      "managed": true,
+      "description_chars": 130,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "threads-kobun",
+      "source_harness": "rev_textsocialharness",
+      "source_relpath": ".claude/skills/threads-kobun/SKILL.md",
+      "source_sha256": "e434cd1bf109c8440fa4c4145304e2f1c36ba866ff8c985068eee99bf23f3643",
+      "frontmatter_stripped_sha256": "0d60425dcdf7640de98b84762c0524b43bdc31017d63e0e5015071d0160f4c6d",
+      "projected_sha256": "2ed4a07cc794d71d4c672b93119d11b6d652275338c176db398086e5309301e7",
+      "projection_kind": "partial-capped",
+      "domain": "social",
+      "managed": true,
+      "description_chars": 269,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "typescript-skills-knowledge-pack",
+      "source_harness": "rev_harness",
+      "source_relpath": ".claude/skills/typescript-skills-knowledge-pack/SKILL.md",
+      "source_sha256": "7e17cf020014e153e5a79c68146024b03d1e3aa909e8b95fbbfdb70e3e72015b",
+      "frontmatter_stripped_sha256": "8f3aded39bd019bbb7364af0f968f31b7af03fd1abbb44963b21976e17ed0aab",
+      "projected_sha256": "4dbc349cc6b19a94f720280c1d16b8bd73ace43f07b0b4b53bb62f96bcf12196",
+      "projection_kind": "manual/unknown",
+      "domain": "dev",
+      "managed": false,
+      "description_chars": 330,
+      "present_in": [
+        "rev_harness"
+      ],
+      "on_user_shelf": true
+    },
+    {
+      "skill_name": "x-kobun",
+      "source_harness": "rev_textsocialharness",
+      "source_relpath": ".claude/skills/x-kobun/SKILL.md",
+      "source_sha256": "a2bb0c389f09abc4d49805ec9678576454a7462153114ee5ade5ae7c1346308d",
+      "frontmatter_stripped_sha256": "95afb49b366f4cda79dbef89bee69ec94f6aa5da67852ab7897de66b711162af",
+      "projected_sha256": "728933b56fcdfcd35b307bb560f8996376ef30c5681efc96fe55986cd47f1e9a",
+      "projection_kind": "partial-capped",
+      "domain": "social",
+      "managed": true,
+      "description_chars": 523,
+      "present_in": [
+        "rev_marketing_harness",
+        "rev_textsocialharness"
+      ],
+      "on_user_shelf": true
+    }
+  ]
+}

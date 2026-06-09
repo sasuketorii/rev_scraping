@@ -47,9 +47,9 @@ The gate currently executes these commands. `benchmark_surface_contract` is cont
 | skill routing | `bash test/integration/rev_harness_skill_routing_test.sh` | class-to-skill matrix, self-growth routing, provenance, and light-path non-escalation invariants |
 | self-growth proposal cycle | `bash test/integration/self_growth_proposal_cycle_test.sh` | proposal-driven self-growth promotion cycle, untrusted evidence boundary, no autonomous mutation, and bounded cost contract |
 | static asset check | `bash test/integration/rev_harness_static_asset_check_test.sh` | dependency-free static app smoke validation for disposable workspace HTML/CSS/JS/JSON artifacts |
-| semantic build | `bash scripts/run-semantic-node-tool.sh npm --prefix scripts/semantic-mcp-server ci && bash scripts/run-semantic-node-tool.sh npm --prefix scripts/semantic-mcp-server run build` | trusted-node semantic runtime dependency bootstrap and buildability |
-| semantic test | `bash scripts/run-semantic-node-tool.sh npm --prefix scripts/semantic-mcp-server test` | trusted-node DB/queue/project-id regression suite |
-| semantic CLI contract parity | `bash test/integration/semantic_cli_contract_parity_test.sh` | direct Node/Rust CLI parity for `project-id validate` and `unknown command` |
+| semantic rust build | `bash -c 'cd harness-rust && cargo check -p semantic-mcp -p tree-sitter-index'` | Rust semantic backend buildability (the Node backend was removed in de-overkill S3-B3) |
+| semantic CLI contract | `bash test/integration/semantic_cli_contract_parity_test.sh` | Rust-only CLI contract for `project-id validate` and `unknown command` |
+| semantic MCP contract tests | `bash -c 'cd harness-rust && cargo test -p semantic-mcp'` | Rust semantic-mcp tool/registry/search/preflight/capsule contract regression suite |
 | native reviewer smoke | `bash test/integration/native_reviewer_surface_smoke.sh` | reviewer packet / prompt rendering / review-report contract, fenced transport-payload rejection, invalid reviewer relay suppression |
 | codex MCP zombie cleanup contract | `bash test/integration/codex_mcp_zombie_cleanup_contract_test.sh` | stale Playwright / Computer Use MCP helper detection, semantic-safe dry-run contract, and default age guard |
 | codex MCP zombie cleanup live | `bash test/integration/codex_mcp_zombie_cleanup_live_test.sh` | explicit PID-confirmed stale-helper termination and fail-closed live cleanup contract |
@@ -68,7 +68,6 @@ The gate currently executes these commands. `benchmark_surface_contract` is cont
 | janitor inspect | `bash scripts/rev-harness-janitor.sh inspect --json | jq -e '.schema_version == "rev-harness-janitor/v1" and .janitor_command == "inspect" and .delete_enabled == false and .archive_enabled == false and .apply_enabled == false' >/dev/null` | self-cleaning visibility stays wired into release-gate without deleting or moving evidence |
 | semantic coordination | `bash test/integration/semantic_coordination_test.sh` | coordinator fail-closed, direct entrypoints, shadow loop, invalid queue contracts |
 | registry export | `bash test/integration/semantic_registry_export_contract_test.sh` | DB authority, stale export rejection, fail-closed merge gate |
-| queue runtime | `bash test/integration/semantic_review_queue_runtime_test.sh` | queue lease lifecycle, non-LGTM requeue, lease-loss block |
 | capsule help | `bash .claude/commands/lib/context_capsule.sh --help` | direct CLI entrypoint availability |
 | shadow help | `bash .claude/commands/lib/shadow_verify.sh --help` | direct CLI entrypoint availability |
 | benchmark surface contract | `bash test/integration/harness_benchmark_contract_test.sh` | benchmark CLI/artifact contract only; not full benchmark execution |
@@ -95,8 +94,7 @@ Existing tests already cover the required `ALLOW/WARN/BLOCK` contracts.
 | direct entrypoint regression for capsule/shadow | `semantic_coordination_test.sh` `M10` | `BLOCK` if bootstrap sourcing or routing regresses |
 | stale registry export / foreign meta / legacy `project_id` | `semantic_registry_export_contract_test.sh` `R1*`, `R5*`, `R7` | `BLOCK` |
 | MCP mutator fallback | `semantic_registry_export_contract_test.sh` `R3`, `R6*` | `BLOCK` |
-| queue non-LGTM verdict | `semantic_review_queue_runtime_test.sh` request-changes case | `WARN` then explicit requeue |
-| queue lease loss after review success | `semantic_review_queue_runtime_test.sh` partial lease-loss case | `BLOCK` |
+| queue lease / complete / requeue lifecycle (Rust backend) | `cargo test -p semantic-mcp` (`review_queue` module) | `BLOCK` on lease/finalize regression |
 | wrapper role escape or caller-controlled wrapper override | `cross_agent_wrapper_matrix_test.sh` `X1`, `X3`, `X8`, `X10` | `BLOCK` |
 
 ## 4. Static Comparison Rules

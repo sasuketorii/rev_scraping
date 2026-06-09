@@ -16,7 +16,7 @@ cleanup_global() {
 }
 trap cleanup_global EXIT
 
-ALL_TEST_IDS=(X1 X2 X3 X4 X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X14b X15a X15b X15c X15d X15e X15f X15g X15h)
+ALL_TEST_IDS=(X1 X2 X3 X4 X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X14b X15a X15b X15c X15d X15e X15f X15g X15h X16a X16b X16c)
 
 require_cmd() {
   local cmd="$1"
@@ -66,6 +66,9 @@ test_description() {
     X15f) echo "codex-job wait --timeout 0 returns 0 when completed and 124 when still running" ;;
     X15g) echo "codex-job gc --ttl rejects non-numeric, negative, and out-of-range values with exit 64" ;;
     X15h) echo "codex-job status/wait/result reject path-traversal job ids with exit 64" ;;
+    X16a) echo "codex wrapper runtime model-policy die is not retried and keeps exit 1" ;;
+    X16b) echo "codex wrapper network/transport failures retry then exit 75 when exhausted" ;;
+    X16c) echo "codex wrapper exit 144 is non-transient and is not retried" ;;
     *) return 1 ;;
   esac
 }
@@ -1109,9 +1112,9 @@ test_x14_vendored_wrappers_refused() {
     set -e
 
     [[ "$claude_status" -eq 70 ]] || failed=1
-    contains_text "VENDOR GUARD" "$(cat "$claude_stderr")" || failed=1
+    contains_text "identity-check (strict)" "$(cat "$claude_stderr")" || failed=1
     [[ "$codex_status" -eq 70 ]] || failed=1
-    contains_text "VENDOR GUARD" "$(cat "$codex_stderr")" || failed=1
+    contains_text "identity-check (strict)" "$(cat "$codex_stderr")" || failed=1
 
     /bin/rm -rf "$tmpdir"
     [[ "$failed" -eq 0 ]]
@@ -1152,8 +1155,8 @@ test_x14b_vendor_guard_warn_soft_mode() {
     # guard で exit 70 されていないこと (= soft mode で通過していること)
     [[ "$claude_status" -ne 70 ]] || failed=1
     [[ "$codex_status" -ne 70 ]] || failed=1
-    contains_text "soft-mode active" "$(cat "$claude_stderr")" || failed=1
-    contains_text "soft-mode active" "$(cat "$codex_stderr")" || failed=1
+    contains_text "identity-check (advisory)" "$(cat "$claude_stderr")" || failed=1
+    contains_text "identity-check (advisory)" "$(cat "$codex_stderr")" || failed=1
 
     /bin/rm -rf "$tmpdir"
     [[ "$failed" -eq 0 ]]
@@ -1607,6 +1610,127 @@ test_x15h_codex_job_path_traversal_rejected() {
   )
 }
 
+test_x16a_codex_wrapper_policy_die_not_retried() {
+  (
+    set -u -o pipefail
+    local tmpdir repo mockbin status line_count failed=0
+
+    tmpdir="$(mktemp -d)"
+    repo="$tmpdir/repo"
+    mockbin="$tmpdir/mockbin"
+    mkdir -p "$repo/scripts" "$repo/.agent/registry" "$repo/.agent/generated" "$repo/.shared" "$mockbin"
+    /bin/cp "$PROJECT_ROOT/scripts/codex-wrapper.sh" "$repo/scripts/codex-wrapper.sh"
+    /bin/cp "$PROJECT_ROOT/scripts/_canonical-guard.sh" "$repo/scripts/_canonical-guard.sh"
+    /bin/cp "$PROJECT_ROOT/scripts/_outbound-deny.sh" "$repo/scripts/_outbound-deny.sh"
+    /bin/cp "$PROJECT_ROOT/scripts/subscription-auth-guard.sh" "$repo/scripts/subscription-auth-guard.sh"
+    /bin/cp "$PROJECT_ROOT/.agent/registry/model_policy.json" "$repo/.agent/registry/model_policy.json"
+    jq '.runtime_fallback_below_minimum = "allowed"' \
+      "$PROJECT_ROOT/.agent/generated/codex_model_policy.runtime.json" \
+      > "$repo/.agent/generated/codex_model_policy.runtime.json"
+    printf 'managed-adopter-test\n' > "$repo/.shared/project_id"
+
+    write_lines "$mockbin/codex" \
+      '#!/usr/bin/env bash' \
+      'printf '"'"'argv=%s\n'"'"' "$*" >> "${MOCK_CODEX_LOG:?}"' \
+      'exit 0'
+    chmod +x "$mockbin/codex"
+    : > "$tmpdir/codex.log"
+
+    set +e
+    MOCK_CODEX_LOG="$tmpdir/codex.log" \
+      PATH="$mockbin:$PATH" \
+      bash "$repo/scripts/codex-wrapper.sh" --role coder --stdin \
+        > "$tmpdir/stdout.txt" 2> "$tmpdir/stderr.txt" <<< "x16a policy"
+    status=$?
+    set -e
+
+    line_count="$(wc -l < "$tmpdir/codex.log" | tr -d '[:space:]')"
+    [[ "$status" -eq 1 ]] || failed=1
+    [[ "$line_count" -eq 0 ]] || failed=1
+    contains_text "runtime fallback below minimum must be forbidden" "$(cat "$tmpdir/stderr.txt")" || failed=1
+    ! contains_text "retrying attempt" "$(cat "$tmpdir/stderr.txt")" || failed=1
+
+    /bin/rm -rf "$tmpdir"
+    [[ "$failed" -eq 0 ]]
+  )
+}
+
+test_x16b_codex_wrapper_transient_retry_exhausted() {
+  (
+    set -u -o pipefail
+    local tmpdir mockbin status line_count failed=0
+
+    tmpdir="$(mktemp -d)"
+    setup_mocks "$tmpdir"
+    mockbin="$tmpdir/mockbin"
+    write_lines "$mockbin/codex" \
+      '#!/usr/bin/env bash' \
+      'printf '"'"'argv=%s\n'"'"' "$*" >> "${MOCK_CODEX_LOG:?}"' \
+      'cat >/dev/null || true' \
+      'printf '"'"'network connection reset by peer\n'"'"' >&2' \
+      'exit 1'
+    chmod +x "$mockbin/codex"
+    : > "$tmpdir/codex.log"
+    : > "$tmpdir/claude.log"
+
+    set +e
+    MOCK_CODEX_LOG="$tmpdir/codex.log" \
+      MOCK_CLAUDE_LOG="$tmpdir/claude.log" \
+      PATH="$mockbin:$PATH" \
+      bash "$PROJECT_ROOT/scripts/codex-wrapper.sh" --role coder --stdin \
+        > "$tmpdir/stdout.txt" 2> "$tmpdir/stderr.txt" <<< "x16b transient"
+    status=$?
+    set -e
+
+    line_count="$(wc -l < "$tmpdir/codex.log" | tr -d '[:space:]')"
+    [[ "$status" -eq 75 ]] || failed=1
+    [[ "$line_count" -eq 2 ]] || failed=1
+    contains_text "retrying attempt 2/2" "$(cat "$tmpdir/stderr.txt")" || failed=1
+    contains_text "transient codex retries exhausted" "$(cat "$tmpdir/stderr.txt")" || failed=1
+
+    /bin/rm -rf "$tmpdir"
+    [[ "$failed" -eq 0 ]]
+  )
+}
+
+test_x16c_codex_wrapper_exit_144_not_transient() {
+  (
+    set -u -o pipefail
+    local tmpdir mockbin status line_count failed=0
+
+    tmpdir="$(mktemp -d)"
+    setup_mocks "$tmpdir"
+    mockbin="$tmpdir/mockbin"
+    write_lines "$mockbin/codex" \
+      '#!/usr/bin/env bash' \
+      'printf '"'"'argv=%s\n'"'"' "$*" >> "${MOCK_CODEX_LOG:?}"' \
+      'cat >/dev/null || true' \
+      'printf '"'"'exit 144 fixture\n'"'"' >&2' \
+      'exit 144'
+    chmod +x "$mockbin/codex"
+    : > "$tmpdir/codex.log"
+    : > "$tmpdir/claude.log"
+
+    set +e
+    MOCK_CODEX_LOG="$tmpdir/codex.log" \
+      MOCK_CLAUDE_LOG="$tmpdir/claude.log" \
+      PATH="$mockbin:$PATH" \
+      bash "$PROJECT_ROOT/scripts/codex-wrapper.sh" --role coder --stdin \
+        > "$tmpdir/stdout.txt" 2> "$tmpdir/stderr.txt" <<< "x16c 144"
+    status=$?
+    set -e
+
+    line_count="$(wc -l < "$tmpdir/codex.log" | tr -d '[:space:]')"
+    [[ "$status" -eq 144 ]] || failed=1
+    [[ "$line_count" -eq 1 ]] || failed=1
+    ! contains_text "retrying attempt" "$(cat "$tmpdir/stderr.txt")" || failed=1
+    ! contains_text "transient codex retries exhausted" "$(cat "$tmpdir/stderr.txt")" || failed=1
+
+    /bin/rm -rf "$tmpdir"
+    [[ "$failed" -eq 0 ]]
+  )
+}
+
 dispatch_test() {
   local id="$1"
   case "$id" in
@@ -1633,6 +1757,9 @@ dispatch_test() {
     X15f) test_x15f_codex_job_wait_timeout_zero ;;
     X15g) test_x15g_codex_job_gc_ttl_validation ;;
     X15h) test_x15h_codex_job_path_traversal_rejected ;;
+    X16a) test_x16a_codex_wrapper_policy_die_not_retried ;;
+    X16b) test_x16b_codex_wrapper_transient_retry_exhausted ;;
+    X16c) test_x16c_codex_wrapper_exit_144_not_transient ;;
     *) return 2 ;;
   esac
 }

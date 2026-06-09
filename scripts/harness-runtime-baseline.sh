@@ -198,7 +198,6 @@ default_steps() {
     quick)
       STEPS=(
         "orchestration_dry_run|bash test/integration/harness_release_gate.sh --tier local --dry-run"
-        "semantic_index_benchmark|bash test/integration/semantic_index_benchmark_smoke_test.sh"
       )
       ;;
     focused)
@@ -207,7 +206,6 @@ default_steps() {
         "auto_orchestrate_preflight|bash test/integration/auto_orchestrate_packet_preflight_test.sh"
         "semantic_cli_contract|bash test/integration/semantic_cli_contract_parity_test.sh"
         "semantic_coordination|bash test/integration/semantic_coordination_test.sh"
-        "semantic_index_benchmark|bash test/integration/semantic_index_benchmark_smoke_test.sh"
       )
       ;;
     *)

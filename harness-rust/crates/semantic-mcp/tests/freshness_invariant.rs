@@ -19,7 +19,12 @@ fn capsule_fails_closed_when_file_parse_cache_changes_after_token_issue() {
     tree_sitter_index::incremental::index_files(
         &mut conn,
         "proj",
-        &[(file_path.clone(), "rust".to_string(), "hash-1".to_string())],
+        &[(
+            file_path.clone(),
+            std::path::PathBuf::from("src/lib.rs"),
+            "rust".to_string(),
+            "hash-1".to_string(),
+        )],
         &IndexConfig::default(),
         false,
     )
@@ -46,7 +51,12 @@ fn capsule_fails_closed_when_file_parse_cache_changes_after_token_issue() {
     tree_sitter_index::incremental::index_files(
         &mut second_conn,
         "proj",
-        &[(file_path, "rust".to_string(), "hash-2".to_string())],
+        &[(
+            file_path,
+            std::path::PathBuf::from("src/lib.rs"),
+            "rust".to_string(),
+            "hash-2".to_string(),
+        )],
         &IndexConfig::default(),
         false,
     )
@@ -64,4 +74,13 @@ fn capsule_fails_closed_when_file_parse_cache_changes_after_token_issue() {
     .unwrap_err();
     assert!(error.contains("file_parse_cache changed since context_token was issued"));
     assert!(error.contains("cache freshness violation"));
+
+    let persisted_capsules: i64 = ctx
+        .conn
+        .query_row("SELECT COUNT(*) FROM capsules", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(
+        persisted_capsules, 0,
+        "STALE context_token must not emit or persist a capsule body"
+    );
 }

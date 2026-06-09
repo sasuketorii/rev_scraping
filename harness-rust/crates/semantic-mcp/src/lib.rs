@@ -13,8 +13,12 @@ pub mod protocol;
 pub mod registry;
 pub mod review_queue;
 pub mod search;
+pub mod symbols_search;
 pub mod tools;
 pub mod util;
+
+#[cfg(test)]
+pub(crate) mod test_env;
 
 pub use clock::{Clock, SystemClock};
 pub use context::ServerContext;

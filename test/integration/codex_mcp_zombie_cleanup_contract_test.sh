@@ -41,7 +41,7 @@ printf '%s\n' \
   '100 1 82000 01:20:00 npm exec @playwright/mcp@latest' \
   '101 100 91000 01:20:00 node /home/example/.npm/_npx/abcd/node_modules/.bin/playwright-mcp' \
   '102 1 19000 01:20:00 ./Codex Computer Use.app/Contents/MacOS/SkyComputerUseClient mcp' \
-  '103 1 9000 01:20:00 /home/example/dev/agent_base/harness-rust/target/debug/semantic-mcp --project-id agent_base-e911f375a31a' \
+  '103 1 9000 01:20:00 ~/dev/agent_base/harness-rust/target/debug/semantic-mcp --project-id agent_base-e911f375a31a' \
   '104 1 6000 00:01:00 /Applications/Codex.app/Contents/MacOS/Codex' \
   '105 1 21000 00:01:00 node /home/example/.npm/_npx/recent/node_modules/.bin/playwright-mcp' \
   '106 1 31000 01:20:00 npm exec @chrome-devtools/mcp@latest' \

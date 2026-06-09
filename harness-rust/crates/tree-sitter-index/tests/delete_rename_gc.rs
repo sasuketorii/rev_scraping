@@ -42,16 +42,31 @@ fn gc_removes_symbols_dependencies_and_cache_for_paths_missing_from_snapshot() {
     std::fs::write(&b_path, "pub fn b() {}\n").unwrap();
     std::fs::write(&c_path, "pub fn c() { a(); }\n").unwrap();
 
+    // (read_path = absolute tempdir path, index_key = repo-relative DB value).
+    let a_file = "a.rs".to_string();
+    let b_file = "b.rs".to_string();
+    let c_file = "c.rs".to_string();
     let all_files = vec![
-        (a_path.clone(), "rust".to_string(), "hash-a".to_string()),
-        (b_path.clone(), "rust".to_string(), "hash-b".to_string()),
-        (c_path.clone(), "rust".to_string(), "hash-c".to_string()),
+        (
+            a_path.clone(),
+            std::path::PathBuf::from(&a_file),
+            "rust".to_string(),
+            "hash-a".to_string(),
+        ),
+        (
+            b_path.clone(),
+            std::path::PathBuf::from(&b_file),
+            "rust".to_string(),
+            "hash-b".to_string(),
+        ),
+        (
+            c_path.clone(),
+            std::path::PathBuf::from(&c_file),
+            "rust".to_string(),
+            "hash-c".to_string(),
+        ),
     ];
     incremental::index_files(&mut conn, "proj", &all_files, &IndexConfig::default(), true).unwrap();
-
-    let a_file = a_path.to_string_lossy().to_string();
-    let b_file = b_path.to_string_lossy().to_string();
-    let c_file = c_path.to_string_lossy().to_string();
     assert!(count_by_file(&conn, "symbols", "proj", &c_file) > 0);
     assert!(dependency_count_from_file(&conn, "proj", &c_file) > 0);
     assert_eq!(count_by_file(&conn, "file_parse_cache", "proj", &c_file), 1);
@@ -62,8 +77,18 @@ fn gc_removes_symbols_dependencies_and_cache_for_paths_missing_from_snapshot() {
     .unwrap();
 
     let snapshot_files = vec![
-        (a_path, "rust".to_string(), "hash-a".to_string()),
-        (b_path, "rust".to_string(), "hash-b".to_string()),
+        (
+            a_path,
+            std::path::PathBuf::from(&a_file),
+            "rust".to_string(),
+            "hash-a".to_string(),
+        ),
+        (
+            b_path,
+            std::path::PathBuf::from(&b_file),
+            "rust".to_string(),
+            "hash-b".to_string(),
+        ),
     ];
     incremental::index_files(
         &mut conn,
@@ -92,8 +117,13 @@ fn gc_generation_guard_preserves_rows_newer_than_transaction_start() {
     let dir = tempfile::tempdir().unwrap();
     let c_path = dir.path().join("c.rs");
     std::fs::write(&c_path, "pub fn c() {}\n").unwrap();
-    let c_file = c_path.to_string_lossy().to_string();
-    let files = vec![(c_path, "rust".to_string(), "hash-c".to_string())];
+    let c_file = "c.rs".to_string();
+    let files = vec![(
+        c_path,
+        std::path::PathBuf::from(&c_file),
+        "rust".to_string(),
+        "hash-c".to_string(),
+    )];
     incremental::index_files(&mut conn, "proj", &files, &IndexConfig::default(), true).unwrap();
 
     let tx = conn

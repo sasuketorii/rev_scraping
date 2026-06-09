@@ -79,4 +79,4 @@ Codex Goal、Claude Code subagents、OpenAI prompt guidance のような upstrea
 - `git diff --check -- <files...>`
 - `bash test/integration/harness_release_gate.sh`
 - `bash test/integration/common_task_contract_smoke.sh`
-- `npm --prefix scripts/semantic-mcp-server test`
+- `( cd harness-rust && cargo test -p semantic-mcp )`

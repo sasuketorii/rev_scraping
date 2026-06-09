@@ -40,8 +40,8 @@ run_resolver() {
 
 test_settings_launch_path() {
   local command=""
-  command="$(jq -r '.mcpServers.semantic.command' "$SETTINGS_FILE")"
-  [[ "$command" == "./scripts/launch-semantic-mcp.sh" ]] || fail "semantic MCP command mismatch: $command"
+  command="$(jq -r '.mcpServers["semantic-mcp"].command' "$SETTINGS_FILE")"
+  [[ "$command" == "./scripts/launch-semantic-mcp.sh" ]] || fail "semantic-mcp command mismatch: $command"
 }
 
 test_resolver_success_and_failure() {

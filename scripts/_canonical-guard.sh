@@ -28,6 +28,7 @@
 #
 # 公開関数:
 #   rev_harness_assert_canonical_root <wrapper_basename>
+#   resolve_target_root [target_arg]
 #
 # 環境変数:
 #   REV_HARNESS_CANONICAL_ROOT  source-checkout path override (default: $HOME/dev/rev_harness)
@@ -41,6 +42,36 @@ if [[ -n "${_REV_HARNESS_CANONICAL_GUARD_LOADED:-}" ]]; then
   return 0 2>/dev/null || exit 0
 fi
 readonly _REV_HARNESS_CANONICAL_GUARD_LOADED=1
+
+resolve_target_root() {
+  local target_arg="${1:-}"
+  local target_root
+
+  if [[ -n "$target_arg" ]]; then
+    target_root="$(cd "$target_arg" 2>/dev/null && pwd -P)" || {
+      echo "ERROR: --target path not accessible: $target_arg" >&2
+      return 2
+    }
+  elif [[ -n "${REV_HARNESS_ADOPTER_ROOT:-}" ]]; then
+    target_root="$(cd "$REV_HARNESS_ADOPTER_ROOT" 2>/dev/null && pwd -P)" || {
+      echo "ERROR: REV_HARNESS_ADOPTER_ROOT not accessible: $REV_HARNESS_ADOPTER_ROOT" >&2
+      return 2
+    }
+  else
+    target_root="$(pwd -P)"
+  fi
+
+  local harness_root
+  harness_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+  if [[ "$target_root" == "$harness_root" ]]; then
+    echo "ERROR: refusing self-install (TARGET_ROOT == HARNESS_ROOT == $target_root)" >&2
+    echo "       Use --target <adopter-path> or cd into an adopter project first." >&2
+    return 72
+  fi
+
+  printf '%s\n' "$target_root"
+  return 0
+}
 
 _rev_harness_read_project_id() {
   local repo_root="$1"

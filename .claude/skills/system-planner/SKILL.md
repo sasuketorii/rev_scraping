@@ -1,6 +1,6 @@
 ---
 name: system-planner
-description: Own the reusable planning workflow for Phase 2.
+description: Own the reusable planning workflow for Phase 2. Use for planning workflow, ExecPlan drafting, slice planning, scope decomposition.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 

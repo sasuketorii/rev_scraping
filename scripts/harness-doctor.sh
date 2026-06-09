@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 
 MODE=""
 JSON_ONLY="false"
@@ -309,6 +309,61 @@ collect_active_hold_summary() {
      | .clean_archive_allowed = true')"
 }
 
+collect_semantic_paths_summary() {
+  local paths_rel=".rev-harness-state/paths.json"
+  local paths_path="$PROJECT_ROOT/$paths_rel"
+  local schema_ok="false" semantic_db="" rust_db="" legacy_node_db="" semantic_db_present="false" rust_db_present="false" legacy_node_db_present="false"
+  local digest=""
+
+  if [[ ! -f "$paths_path" ]]; then
+    add_finding unknown "semantic paths manifest is missing: $paths_rel; semantic is optional, so raw-read required files until bootstrap/reindex restores a FRESH index"
+    SEMANTIC_PATHS_JSON="$(jq -nc '{present: false}')"
+    return 0
+  fi
+
+  digest="$(sha256_file "$paths_path")"
+  if jq -e '.schema == "rev-harness-paths/v1"' "$paths_path" >/dev/null 2>&1; then
+    schema_ok="true"
+  else
+    add_finding warning "semantic paths manifest schema is invalid: $paths_rel; do not rely on semantic capsule output, raw-read required files"
+  fi
+
+  if jq empty "$paths_path" >/dev/null 2>&1; then
+    semantic_db="$(jq -r '.semantic_db // .rust_db // .node_db // empty' "$paths_path")"
+    rust_db="$(jq -r '.rust_db // .semantic_db // empty' "$paths_path")"
+    legacy_node_db="$(jq -r '.node_db // empty' "$paths_path")"
+  else
+    add_finding warning "semantic paths manifest is invalid JSON: $paths_rel; do not rely on semantic capsule output, raw-read required files"
+  fi
+
+  [[ -n "$semantic_db" && -f "$semantic_db" ]] && semantic_db_present="true"
+  [[ -n "$rust_db" && -f "$rust_db" ]] && rust_db_present="true"
+  [[ -n "$legacy_node_db" && -f "$legacy_node_db" ]] && legacy_node_db_present="true"
+
+  SEMANTIC_PATHS_JSON="$(jq -nc \
+    --argjson present true \
+    --argjson schema_ok "$schema_ok" \
+    --arg sha256 "$digest" \
+    --arg semantic_db "$semantic_db" \
+    --arg rust_db "$rust_db" \
+    --arg legacy_node_db "$legacy_node_db" \
+    --argjson semantic_db_present "$semantic_db_present" \
+    --argjson rust_db_present "$rust_db_present" \
+    --argjson legacy_node_db_present "$legacy_node_db_present" \
+    '{
+      present: $present,
+      schema_ok: $schema_ok,
+      sha256: $sha256,
+      backend: "rust",
+      semantic_db: $semantic_db,
+      rust_db: $rust_db,
+      legacy_node_db: $legacy_node_db,
+      semantic_db_present: $semantic_db_present,
+      rust_db_present: $rust_db_present,
+      legacy_node_db_present: $legacy_node_db_present
+    }')"
+}
+
 derive_status() {
   if [[ -n "$BLOCKS" ]]; then
     printf 'BLOCK\n'
@@ -335,6 +390,7 @@ render_json() {
     --argjson release_gate "$LATEST_RELEASE_GATE_JSON" \
     --argjson model_policy "$MODEL_POLICY_JSON" \
     --argjson active_summary "$ACTIVE_SUMMARY_JSON" \
+    --argjson semantic_paths "$SEMANTIC_PATHS_JSON" \
     '{
       schema_version: "harness-doctor/v1",
       mode: "quick",
@@ -358,7 +414,8 @@ render_json() {
         git_status: $git_status,
         release_gate: $release_gate,
         model_policy: $model_policy,
-        active_task: $active_summary
+        active_task: $active_summary,
+        semantic_paths: $semantic_paths
       },
       pointers: {
         latest_release_gate_pointer: ".claude/tmp/harness-release-gate/latest.json",
@@ -544,12 +601,14 @@ GIT_STATUS_JSON="{}"
 LATEST_RELEASE_GATE_JSON="{}"
 MODEL_POLICY_JSON="{}"
 ACTIVE_SUMMARY_JSON="{}"
+SEMANTIC_PATHS_JSON="{}"
 
 STARTED_MS="$(now_ms)"
 run_step "git_status_summary" "OK" collect_git_status_summary
 run_step "release_gate_latest_pointer" "OK" collect_release_gate_pointer
 run_step "model_policy_freshness" "OK" collect_model_policy_summary
 run_step "active_task_summary" "OK" collect_active_hold_summary
+run_step "semantic_paths" "OK" collect_semantic_paths_summary
 ENDED_MS="$(now_ms)"
 ELAPSED_MS=$((ENDED_MS - STARTED_MS))
 [[ "$ELAPSED_MS" -ge 0 ]] || ELAPSED_MS=0

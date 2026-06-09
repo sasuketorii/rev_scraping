@@ -808,7 +808,7 @@ cmd_stale_refs() {
     [[ -f "$file" ]] || continue
     rel="${file#"$scan_root"/}"
     case "$rel" in
-      .git/*|scripts/semantic-mcp-server/node_modules/*|scripts/semantic-mcp-server/dist/*|.claude/tmp/harness-release-gate/*)
+      .git/*|.claude/tmp/harness-release-gate/*)
         continue
         ;;
     esac

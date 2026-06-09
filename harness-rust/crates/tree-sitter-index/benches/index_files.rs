@@ -14,7 +14,7 @@ const LOC_PER_FILE: usize = 1_000;
 
 struct IndexFixture {
     _repo: TempDir,
-    files: Vec<(PathBuf, String, String)>,
+    files: Vec<(PathBuf, PathBuf, String, String)>,
     config: IndexConfig,
 }
 
@@ -34,7 +34,8 @@ impl IndexFixture {
         for index in 0..FILES {
             let path = src.join(format!("fixture_{index:04}.rs"));
             std::fs::write(&path, rust_file(index)).expect("write rust fixture");
-            files.push((path, "rust".to_string(), format!("hash-{index:04}")));
+            let index_key = PathBuf::from(format!("src/fixture_{index:04}.rs"));
+            files.push((path, index_key, "rust".to_string(), format!("hash-{index:04}")));
         }
         Self {
             _repo: repo,

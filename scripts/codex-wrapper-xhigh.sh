@@ -26,4 +26,6 @@ if [[ ! -x "${CANONICAL_WRAPPER}" ]]; then
   fail "Canonical wrapper is not executable: ${CANONICAL_WRAPPER}"
 fi
 
+# Wave HSDI Phase C / T-C-2 — export shim role hint for parse_wrapper_args merge-on-equal
+export CODEX_WRAPPER_SHIM_ROLE="${SHIM_ROLE}"
 CODEX_WRAPPER_LOG_PREFIX="${SHIM_PREFIX}" exec "${CANONICAL_WRAPPER}" --role "${SHIM_ROLE}" "$@"

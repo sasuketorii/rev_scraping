@@ -20,6 +20,35 @@ REVIEWER_VULN_PATTERN_MAX_FILES="${REVIEWER_VULN_PATTERN_MAX_FILES:-12}"
 REVIEWER_ARCH_CAPSULE_MIN_TOKENS="${REVIEWER_ARCH_CAPSULE_MIN_TOKENS:-30}"
 REVIEWER_ARCH_CAPSULE_MAX_TOKENS="${REVIEWER_ARCH_CAPSULE_MAX_TOKENS:-50}"
 REVIEWER_LAST_OUTPUT_STATUS=""
+_REVIEWER_LIB_DIR="${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+_REVIEWER_REPO_ROOT="${REPO_ROOT:-$(cd "$_REVIEWER_LIB_DIR/../../.." && pwd)}"
+_REVIEWER_MODEL_IO_GUARD="${REV_HARNESS_MODEL_IO_GUARD:-${_REVIEWER_REPO_ROOT}/scripts/rev-harness-model-io-guard.sh}"
+
+_reviewer_model_io_quarantine_dir() {
+  local repo_root=""
+  repo_root="$(cd "$_REVIEWER_REPO_ROOT" && pwd -P 2>/dev/null)" || repo_root="$_REVIEWER_REPO_ROOT"
+  printf '%s\n' "${repo_root}/.claude/tmp/call-invoke-guard/quarantine"
+}
+
+_reviewer_guard_prompt_file() {
+  local prompt_file="$1"
+  local label="$2"
+
+  if [[ -x "$_REVIEWER_MODEL_IO_GUARD" ]]; then
+    bash "$_REVIEWER_MODEL_IO_GUARD" prompt-budget --file "$prompt_file" --label "$label" \
+      --max-bytes "${REV_HARNESS_MODEL_IO_PROMPT_MAX_BYTES:-262144}" \
+      --warn-bytes "${REV_HARNESS_MODEL_IO_PROMPT_WARN_BYTES:-196608}" || return 1
+  fi
+}
+
+_reviewer_scan_output_file() {
+  local output_file="$1"
+  local label="$2"
+
+  if [[ -x "$_REVIEWER_MODEL_IO_GUARD" ]]; then
+    bash "$_REVIEWER_MODEL_IO_GUARD" scan-output --file "$output_file" --label "$label" --quarantine-dir "$(_reviewer_model_io_quarantine_dir)" || return 1
+  fi
+}
 
 # =====================================================
 # 動的レビュワー選択
@@ -346,16 +375,12 @@ _reviewer_resolve_stderr_dir() {
 _reviewer_write_sanitized_stub() {
   local output_file="$1"
   local reason="${2:-reviewer output quarantined}"
-  local quarantine_file="${3:-}"
   local compact_reason=""
 
   compact_reason=$(printf '%s' "$reason" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')
   {
-    printf '[ERROR] %s' "$compact_reason"
-    if [[ -n "$quarantine_file" ]]; then
-      printf ' See %s.' "$quarantine_file"
-    fi
-    printf '\n'
+    printf '[ERROR] %s\n' "$compact_reason"
+    printf 'See sanitized guard metadata under .claude/tmp/call-invoke-guard/ when model I/O guard quarantine applies.\n'
   } > "$output_file"
 }
 
@@ -363,17 +388,15 @@ _reviewer_quarantine_raw_stdout() {
   local raw_output="$1"
   local output_file="$2"
   local reason="$3"
-  local quarantine_file=""
 
   if [[ -f "$raw_output" && -s "$raw_output" ]]; then
-    quarantine_file="${output_file}.quarantine.raw"
-    mv "$raw_output" "$quarantine_file"
-    log_warn "Reviewer stdout quarantined: $quarantine_file"
+    /bin/rm -f "$raw_output" 2>/dev/null || true
+    log_warn "Reviewer stdout replaced with sanitized stub"
   else
     /bin/rm -f "$raw_output" 2>/dev/null || true
   fi
 
-  _reviewer_write_sanitized_stub "$output_file" "$reason" "$quarantine_file"
+  _reviewer_write_sanitized_stub "$output_file" "$reason"
 }
 
 _reviewer_promote_validated_stdout() {
@@ -387,6 +410,12 @@ _reviewer_promote_validated_stdout() {
   if [[ ! -s "$raw_output" ]]; then
     REVIEWER_LAST_OUTPUT_STATUS="empty_output"
     _reviewer_quarantine_raw_stdout "$raw_output" "$output_file" "$log_label produced empty reviewer output"
+    return 1
+  fi
+
+  if ! _reviewer_scan_output_file "$raw_output" "$log_label"; then
+    REVIEWER_LAST_OUTPUT_STATUS="model_io_guard_block"
+    _reviewer_quarantine_raw_stdout "$raw_output" "$output_file" "$log_label produced unsafe model I/O markers"
     return 1
   fi
 
@@ -1386,6 +1415,11 @@ reviewer_run_single() {
   local combined_input
   combined_input=$(create_temp_file "review_input_${reviewer_name}")
   echo "$combined_content" > "$combined_input"
+  if ! _reviewer_guard_prompt_file "$combined_input" "reviewer:$reviewer_name"; then
+    /bin/rm -f "$combined_input" 2>/dev/null || true
+    log_error "Reviewer prompt budget guard blocked launch: $reviewer_name"
+    return 1
+  fi
   stderr_capture=$(create_temp_file "review_stderr_${reviewer_name}")
   stdout_capture=$(create_temp_file "review_stdout_${reviewer_name}")
   stderr_sidecar="${output_file}.stderr.log"
@@ -2366,6 +2400,10 @@ _run_batch_review_reviewer() {
 
   stderr_capture=$(create_temp_file "batch_review_stderr")
   stdout_capture=$(create_temp_file "batch_review_stdout")
+  if ! _reviewer_guard_prompt_file "$review_prompt_file" "reviewer:batch"; then
+    printf '%s\n' "[ERROR] model I/O guard blocked batch review prompt" > "$review_output"
+    return 1
+  fi
   if timeout_run "$CODEX_TIMEOUT" "$CODEX_WRAPPER_CANONICAL" --role reviewer --stdin < "$review_prompt_file" > "$stdout_capture" 2> "$stderr_capture"; then
     _reviewer_finalize_stderr_sidecar "$stderr_capture" "$stderr_sidecar" "Batch review"
     /bin/rm -f "$stderr_capture"

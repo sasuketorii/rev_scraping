@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 shared = { path = "../shared" }
-tree-sitter-index = { path = "../tree-sitter-index", default-features = false, features = ["lang-rust", "lang-typescript", "lang-python"] }
+tree-sitter-index = { path = "../tree-sitter-index", default-features = false, features = ["lang-rust", "lang-typescript", "lang-python", "lang-go", "lang-shell", "lang-markdown"] }
 rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

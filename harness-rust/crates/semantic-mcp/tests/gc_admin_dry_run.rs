@@ -35,6 +35,7 @@ fn gc_dry_run_reports_candidates_without_deleting() {
         older_than_days: 30,
         dry_run: true,
         force: false,
+        ..Default::default()
     })
     .unwrap();
 

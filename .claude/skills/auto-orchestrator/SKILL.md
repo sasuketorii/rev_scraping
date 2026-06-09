@@ -65,7 +65,7 @@ Auto-trigger via SKILL description matching is a discovery hint only. Specialty 
 | Supabase migration / Edge Functions / Auth / Storage / Realtime / MCP/API 変更を deploy する | `supabase-deploy-guard` | RLS・secret・billing・rollback gate。Supabase 公式 skill と併用 |
 | Payload CMS production deploy / schema / access-control / upload / Jobs Queue / migration を行う | `payload-cms-deploy-guard` | data exposure・privilege・upload・queue・rollback gate。Payload 公式 skill と併用 |
 | Go system design / review / implementation / dependency governance | `go-skills-architecture` | `go-skills-knowledge-pack` 由来の REV-C Go architecture skill |
-| Rust system design / implementation / benchmarking / dependency governance | `rust-skills-architecture` | `rust-skills-knowledge-pack` 由来の REV-C Rust architecture skill |
+| Rust system design / implementation / benchmarking / dependency governance | `rust-skills-knowledge-pack` | REV-C Rust architecture skill (previously routed as `rust-skills-architecture` / `rustskills-architecture`; both legacy names are now retired) |
 | TypeScript / Node / Bun / Deno / React / Next / edge runtime system design / review / implementation | `typescript-skills-architecture` | `typescript-skills-knowledge-pack` 由来の REV-C TypeScript architecture skill |
 | REV-C frontend UI/UX with shadcn/ui, shadcn CLI/MCP, React, or Next.js | `revc-shadcn-frontend-workflow` | shadcn-first workflow。公式 shadcn skill / CLI / MCP と React/Next 最新 security/update docs freshness gate を要求 |
 | Skill / knowledge pack addition, import, rename, or reorganization | `naming-normalization-guard` | Skill package naming, required entrypoint filenames, internal references, and stale-path hygiene |

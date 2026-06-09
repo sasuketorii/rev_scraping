@@ -5,6 +5,8 @@
 
 #[cfg(feature = "lang-go")]
 pub mod go;
+#[cfg(feature = "lang-markdown")]
+pub mod markdown;
 #[cfg(feature = "lang-python")]
 pub mod python;
 #[cfg(feature = "lang-rust")]
@@ -64,6 +66,8 @@ pub fn get_extractor(language: &str) -> Option<Box<dyn SymbolExtractor>> {
         "go" => Some(Box::new(go::GoExtractor)),
         #[cfg(feature = "lang-shell")]
         "shell" | "bash" => Some(Box::new(shell::ShellExtractor)),
+        #[cfg(feature = "lang-markdown")]
+        "markdown" => Some(Box::new(markdown::MarkdownExtractor)),
         _ => None,
     }
 }

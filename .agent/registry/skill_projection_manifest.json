@@ -109,7 +109,7 @@
     },
     {
       "package": "rust-skills-knowledge-pack",
-      "skill_name": "rust-skills-architecture",
+      "skill_name": "rust-skills-knowledge-pack",
       "source_path": ".claude/skills/rust-skills-knowledge-pack",
       "projections": [
         {
@@ -200,45 +200,45 @@
   ],
   "skills": [
     {
-      "name": "rustskills-architecture",
+      "name": "rustskills-architecture-legacy",
       "canonical_source": {
-        "path": ".agent/skills/rustskills-architecture",
+        "path": ".agent/skills/rustskills-architecture-legacy",
         "role": "canonical-source"
       },
       "projections": [
         {
           "provider": "claude",
-          "path": ".claude/skills/rustskills-architecture",
+          "path": ".claude/skills/rustskills-architecture-legacy",
           "projection_kind": "byte-for-byte",
           "excluded_generated_metadata": [],
           "activation": {
             "status": "project-local-active",
             "auto_discoverable": true,
-            "install_target": ".claude/skills/rustskills-architecture",
+            "install_target": ".claude/skills/rustskills-architecture-legacy",
             "note": "Claude Code project-local skill projection."
           }
         },
         {
           "provider": "codex-generated",
-          "path": ".agent/generated/skills/codex/rustskills-architecture",
+          "path": ".agent/generated/skills/codex/rustskills-architecture-legacy",
           "projection_kind": "byte-for-byte",
           "excluded_generated_metadata": [],
           "activation": {
             "status": "install-required",
             "auto_discoverable": false,
-            "install_target": "$CODEX_HOME/skills/rustskills-architecture",
+            "install_target": "$CODEX_HOME/skills/rustskills-architecture-legacy",
             "note": "Generated Codex projection only; install into the Codex skills root before treating it as active."
           }
         },
         {
           "provider": "codex-installed",
-          "path": "$CODEX_HOME/skills/rustskills-architecture",
+          "path": "$CODEX_HOME/skills/rustskills-architecture-legacy",
           "projection_kind": "byte-for-byte",
           "excluded_generated_metadata": [],
           "activation": {
             "status": "installed-active",
             "auto_discoverable": true,
-            "install_target": "$CODEX_HOME/skills/rustskills-architecture",
+            "install_target": "$CODEX_HOME/skills/rustskills-architecture-legacy",
             "note": "Actual Codex skill home projection discoverable by future Codex sessions."
           }
         }

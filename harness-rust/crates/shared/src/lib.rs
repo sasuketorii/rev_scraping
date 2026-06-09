@@ -14,8 +14,12 @@ pub mod paths;
 pub mod ranker;
 pub mod semantic_gc;
 pub mod semantic_lock;
+pub mod semantic_pointer;
 pub mod types;
 pub mod validation;
+
+#[cfg(test)]
+pub(crate) mod test_env;
 
 // Re-export the most commonly used items at the crate root.
 pub use error::{AgentError, Result};

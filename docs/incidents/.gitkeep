@@ -1,0 +1,5 @@
+# Incidents
+
+このディレクトリには、閾値超過時のRCA（Root Cause Analysis）記録が保存されます。
+
+ファイル形式: `YYYYMMDD_<incident-summary>.md`

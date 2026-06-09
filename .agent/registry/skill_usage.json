@@ -1,0 +1,172 @@
+{
+  "auto-orchestrator": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "baseline-protection": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "client-distribution-readiness": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "cloudflare-deploy-guard": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "codex-app-server-guard": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "codex-app-server-product-integration": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "codex-caller": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "context-compactor": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "cursor-caller": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "design-principles": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "development-junk-cleanup": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "go-skills-knowledge-pack": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "harness-official-docs-update": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "naming-normalization-guard": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "orchestrator-bootstrap": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "payload-cms-deploy-guard": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "production-function-implementer": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "research-handoff": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "rev-harness-lifecycle": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "revc-shadcn-frontend-workflow": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "revharness-semantic-mcp-usage": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "review-workflow": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "rust-skills-knowledge-pack": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "rustskills-architecture-legacy": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "scope-guard": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "self-growth-proposal-triage": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "semantic-bootstrap": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "shadcn": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "slice-designer": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "staff-code-reviewer": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "structured-mentor": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "supabase-deploy-guard": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "system-planner": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  },
+  "typescript-skills-knowledge-pack": {
+    "first_seen_at": "2026-06-01T16:30:24.551746+00:00",
+    "last_used_at": null,
+    "use_count": 0
+  }
+}

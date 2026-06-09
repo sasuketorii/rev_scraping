@@ -121,6 +121,7 @@ Reviewerは、Coderの成果物を多角的に評価し、品質を担保する�
 - LGTM の成立条件、valid な `worker outcome`、completion language との関係は `docs/manual/verification-truth-matrix.md` の `Reviewer LGTM Validity` / `Worker Outcome Contract` / `Completion / Archive Language Semantics` を正本とする
 - reviewer は task class profile に応じた review scope・required checks・artifact integrity・class closure state を自分で追跡できない限り LGTM を出してはならない。lineage provenance と adversarial pre-closure pass は `heavy`、または defect / root-cause / same-class fix の `standard` で必須
 - reviewer は adversarial pre-closure pass の section が存在するだけで十分とみなさず、current slice / owned sink universe に対する substantive coverage を確認できない限り LGTM を出してはならない
+- Skip `wip:` commits during LGTM evaluation (graceful checkpoint commits are not part of the dual-LGTM artifact set; evaluate only non-`wip:` commits constituting the slice's reviewable diff)
 - acceptance の読み順は `user scope → reviewer role definition → verification truth matrix → runtime entrypoint` とする
 
 ### 8.5 Remaining-Issues Count Claims
@@ -129,6 +130,15 @@ Reviewerは、Coderの成果物を多角的に評価し、品質を担保する�
 - 上記を満たさない場合の fallback は、必ず `remaining issues count unknown`
 - reviewer comment の件数を、closed-universe の残件数として言い換えてはならない
 - stale な旧 count を、新しい scope や reset 後の count として再利用してはならない
+
+### 8.6 Completion Contract
+- review verdict は必ず `.agent/active/<task>/review-{opus,codex}-r<N>.md` に file write し、memory-only verdict を禁止する
+- `Falsifiable` evidence として各 finding に `file:line` と引用 literal proof を含める
+- verdict markdown を file write することは MUST であり、memory-only / text-only return verdict は禁止する。Phase E dual-LGTM transition guard で reject される
+- file 名は `review-{opus,codex,gemini,...}-r<round>.md` の形式 (reviewer family + round 番号) とし、`.agent/active/<plan-or-task-id>/` 配下に書く
+- 推奨として verdict file の sha256 を report 末尾または review log に記録する。Phase E `dual-lgtm-validate.sh` が sha256 を check する
+- file 本文に `**Verdict**: ✅ LGTM (unconditional)` のような verdict literal を含め、harness が grep で status を取れるようにする
+- 既存の `Skip wip:` rule は保持され、本 section と独立に作用する
 
 ### 実行ルール
 - caller-facing / manual / external な `codex exec` を直接呼ばず、必ず `scripts/codex-wrapper.sh --role reviewer` を使う

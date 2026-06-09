@@ -1,7 +1,26 @@
 # Verification / Truth Matrix
 
-vocabulary-rev: 39ab54db69ded2c81d79789b9b616be86cce54aeeac8df11245cf88158b3f9b4
+vocabulary-rev: 3c15038c28c5cd63186d987b71aa9a92da0f94b7d767241a3686d9a09efdb2ad
 Machine-readable vocabulary mirror and consumer policy: docs/manual/matrix-vocabulary.json (`_policy.vocabulary_consumer_contract`).
+
+## Invariant Acceptance Gates
+
+| invariant | deterministic_check | mandatory | blocking |
+|-----------|---------------------|-----------|----------|
+| I-1 Privacy hard gate | `bash scripts/rev-harness-path-leak-guard.sh` exit 0 | yes | blocks commit |
+| I-2 Tier 1 capsule byte-stable | `bash scripts/ci/tier1-scope-guard.sh` exit 0 | yes | blocks release |
+| I-2b Shipped binary privacy stable | `strings target/release/semantic-mcp \| grep -E '/Users/\|/home/\|contact_dev'` = 0 (`bash scripts/ci/release-binary-privacy-scan.sh`) | yes | blocks release tag |
+| I-3 Dual LGTM on-disk evidence | `bash scripts/dual-lgtm-validate.sh --strict` exit 0 | yes | blocks phase_advance |
+| I-4 Graceful-shutdown fail-open | `bash .claude/hooks/agent-graceful-shutdown.sh --self-test` exit 0 | yes | runtime safety |
+| I-5 Wrapper help / behavior parity | `bash scripts/ci/check-wrapper-help-parity.sh` exit 0 | yes | blocks tag |
+| I-6 file_owner_token exclusivity | `bash scripts/ci/check-execplan-topology.sh --strict` exit 0 | yes | blocks dispatch |
+| I-7 PARALLEL_QUIESCE sweep gate | `bash test/unit/test-hook-quiesce-gate.sh && bash test/unit/test-janitor-quiesce.sh` exit 0 | yes | runtime safety |
+| I-8 Pre/Post SHA256 snapshot | `bash test/unit/test-safe-dispatch.sh` exit 0 | yes | runtime safety |
+| I-9 Dispatch-topology lint | `bash scripts/ci/check-execplan-topology.sh` exit 0 | yes | blocks dispatch |
+| I-10 Call out, never absorb | `bash test/integration/test-rev-harness-cli.sh` exit 0 | yes | governance |
+| I-11 Destructive opt-in | `bash test/unit/test-janitor-build-cleanup.sh` exit 0 | yes | runtime safety |
+| I-12 Smoke-gated dual-LGTM | `bash scripts/ci/phase-done-smoke.sh` exit 0 AND smoke_evidence_sha256 sourced from JSONL row | yes | blocks phase_advance state transition |
+| I-13 Semantic MCP wire contract | `bash scripts/ci/mcp-wire-contract-check.sh --strict` exits 0 | yes | blocks release |
 
 ## Must Read
 
@@ -232,6 +251,15 @@ late same-class finding の責務分界:
 11. `standard` / `heavy` の default budget は `stall<=30m; wall<=240m` とし、auto-loop での最大 ceiling は `stall<=60m; wall<=480m` とする。これを超える soft budget は invalid で `BLOCK`。
 12. late same-class finding または scope delta が 1 件でも発生したら、既存の residual count、ready for final reviewer LGTM claim、`review request target=FINAL` は即時失効する。
 
+### Review Round Cap (rereview rounds only)
+
+低リスク slice の rereview ROUND 数には既定の上限を設ける。これは fix-and-rereview loop の回数だけを抑えるものであり、I-12 smoke-gated dual-LGTM（phase advance に二系統 family を要求する不変条件）を一切緩めない。cap は rereview round に対するものであって、cross-family review 要件に対するものではない。
+
+1. 既定 `review_round_policy.default_max_passes = 2`（R1 + Conditional 解消のための rereview 1 回）。`docs-only` / `test-fix` / `local-rename` のような低リスク変更に適用する。
+2. risk-EXEMPT classes `{design, acceptance-gate, security, wrapper, semantic-change, broad-refactor}` は default cap を超えてよい。これらの surface では multi-round review が load-bearing であり、cap は advisory（強制停止ではない）として扱う。
+3. canonical な機械可読定義は `.agent/registry/model_policy.json` の `review_round_policy` ブロックとする（`default_max_passes` / `risk_exempt_classes`）。本 matrix prose と `model-policy.sh validate` がそれを参照し、`docs/manual/matrix-vocabulary.json` の `review_round_policy` がその語彙を mirror する。
+4. この cap は I-12 / I-3（dual-LGTM on-disk evidence）の二系統要件、`fix-review loops used` の既存 per-slice 上限、`Loop / Stall Rules` の他 counter を上書きしない。最も厳しい制約が優先する。
+
 ### User-Approved Reviewer Ceiling Extension
 
 この例外は、ユーザーが特定 task lineage の継続と LGTM 取得を明示承認した場合に限り、`cumulative reviewer requests for task` の non-blocking ceiling だけを最小限に引き上げる。これは抜け道ではなく、実際の reviewer request 数を reset せずに記録し続けるための governance 表現である。
@@ -266,7 +294,7 @@ late same-class finding の責務分界:
 | prompt / context / plan など運用文書でコマンド、パス、gate、review 条件、運用例を追加・変更する | `.agent/PROJECT_CONTEXT.md`、handoff prompt、plan、SOW | `git diff --check -- <files>`、追加・変更した参照先ごとの `test -e <path>`、コマンドや script 契約に触れる場合は非破壊の help / syntax / existence probe |
 | `.github/workflows/*.yml` / `.github/workflows/*.yaml` | GitHub Actions workflow | `git diff --check -- <files>`、YAML parse、`actionlint`、変更した workflow が属する relevant gate |
 | wrapper / session / orchestrator shell | `scripts/*wrapper*.sh`、`.claude/commands/*.sh`、`.claude/commands/lib/*.sh` | `git diff --check -- <files>`、変更ファイルごとの `bash -n <file>`、`bash test/integration/cross_agent_wrapper_matrix_test.sh`、必要に応じて related smoke / coordination checks（例: phase / native-surface / semantic coordination 系の smoke） |
-| durable authority / queue backend / release-gate surface | repo-local semantic-mcp backend（`scripts/semantic-mcp-server/**`、`harness-rust/crates/semantic-mcp/**`）、public shell ingress / adapter（`scripts/semantic-review-queue.sh`）、`test/integration/harness_release_gate.sh` | `git diff --check -- <files>`、変更 surface の relevant subset checks、semantic preflight / registry mutation hardening では `bash test/integration/semantic_registry_mutation_flow_test.sh`、`bash test/integration/semantic_coordination_test.sh`、`bash test/integration/semantic_project_id_contract_test.sh` を含める。acceptance boundary が release / closeout をまたぐ場合は `bash test/integration/harness_release_gate.sh` |
+| durable authority / queue backend / release-gate surface | repo-local semantic-mcp backend（`harness-rust/crates/semantic-mcp/**`）、public shell ingress / adapter（`scripts/semantic-review-queue.sh`）、`test/integration/harness_release_gate.sh` | `git diff --check -- <files>`、変更 surface の relevant subset checks、semantic preflight / registry mutation hardening では `bash test/integration/semantic_registry_mutation_flow_test.sh`、`bash test/integration/semantic_coordination_test.sh`、`bash test/integration/semantic_project_id_contract_test.sh` を含める。acceptance boundary が release / closeout をまたぐ場合は `bash test/integration/harness_release_gate.sh` |
 | reviewer policy / acceptance matrix / truth matrix | acceptance policy、review 判定基準、truth placement の正本 | 該当する上記 row の checks を満たしたうえで、Reviewer は実行済み checks の証跡を確認する。reasoning-only では代替できない |
 | build / test / CI / quality gate 設定（workflow 以外） | `Makefile`、quality gate script、test harness 設定 | `git diff --check -- <files>` と、その surface が所有する deterministic validation |
 | 実装コード / テスト | `src/**`、`test/**`、アプリ実装 | `git diff --check -- <files>` と、変更 surface に対応する lint / typecheck / unit / integration などの deterministic checks |
@@ -313,12 +341,9 @@ benchmark JSON artifact.
 | V24 | `cd harness-rust && cargo deny check sources licenses` | `lru` / `fs2` / `scopeguard` licenses compatible; `criterion` dev-deps allowed | `.claude/tmp/frontier-push/v24_fixed.log` |
 | V25 | `cd harness-rust && cargo test -p semantic-mcp --test foreign_db_rejected` | `application_id = 0xDEADBEEF` DB is rejected fail-closed | `.claude/tmp/frontier-push/v25.log` |
 
-Node TS parity coverage for `sem.capsule` caller-supplied `top_k_symbols` is
-quarantined in `test/integration/semantic_backend_contract_parity_test.sh`
-with the sentinel `QUARANTINED: see plan_20260516_ts-wire-and-freshness §3`.
-The quarantine is limited to the old Node parity top-k input cases; Rust
-semantic-mcp treats `top_k_symbols` as server-issued state behind
-`sem.context.top_k`.
+Rust semantic-mcp treats `sem.capsule` `top_k_symbols` as server-issued state
+behind `sem.context.top_k`; caller-supplied `top_k_symbols` is rejected
+fail-closed (`cargo test -p semantic-mcp --test caller_topk_rejected`).
 
 ## Truth Placement
 

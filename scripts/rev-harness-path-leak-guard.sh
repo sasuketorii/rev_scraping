@@ -34,7 +34,13 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+REPO_ROOT="${REV_HARNESS_REPO_ROOT:-${PROJECT_ROOT:-}}"
+if [[ -n "$REPO_ROOT" ]]; then
+  REPO_ROOT="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)" || REPO_ROOT=""
+fi
+if [[ -z "$REPO_ROOT" ]]; then
+  REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+fi
 
 die() { printf 'rev-harness-path-leak-guard: %s\n' "$*" >&2; exit "${2:-2}"; }
 

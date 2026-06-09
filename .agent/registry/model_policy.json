@@ -163,6 +163,22 @@
     ],
     "fixture_evidence": "forbidden"
   },
+  "review_round_policy": {
+    "schema_note": "Canonical machine-readable cap on rereview ROUNDS for low-risk slices. This caps the fix-and-rereview loop count only; it never relaxes I-12 smoke-gated dual-LGTM (two agent families are always required for phase advance).",
+    "default_max_passes": 2,
+    "default_passes_explanation": "One initial review (R1) plus one Conditional-resolution rereview. Applies to low-risk classes such as docs-only, test-fix, and local-rename.",
+    "risk_exempt_classes": [
+      "design",
+      "acceptance-gate",
+      "security",
+      "wrapper",
+      "semantic-change",
+      "broad-refactor"
+    ],
+    "risk_exempt_explanation": "Risk-exempt classes MAY exceed default_max_passes because multi-round review on these surfaces is load-bearing. The cap is advisory for these classes, not a forced stop.",
+    "dual_lgtm_invariant": "I-12 (smoke-gated dual-LGTM, two families for phase advance) is UNCHANGED by this policy. The cap governs rereview rounds within a family/loop, never the cross-family requirement.",
+    "authority": "docs/manual/verification-truth-matrix.md"
+  },
   "generated_artifact": {
     "path": ".agent/generated/codex_model_policy.runtime.json",
     "generated_at": "2026-04-25T00:00:00Z"

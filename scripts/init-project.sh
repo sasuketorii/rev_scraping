@@ -43,11 +43,69 @@ write_literal_file() {
 
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
-PROJECT_ID_TOOL="${PROJECT_ROOT}/scripts/project-id.sh"
+PROJECT_ID_TOOL="${SCRIPT_DIR}/project-id.sh"
+
+usage() {
+    cat >&2 <<'USAGE'
+usage: scripts/init-project.sh [project_name] [--self-test --target <dir>]
+USAGE
+}
+
+SELF_TEST=0
+TARGET_DIR=""
+PROJECT_NAME_ARG=""
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --self-test)
+            SELF_TEST=1
+            shift
+            ;;
+        --target)
+            if [[ "$#" -lt 2 ]]; then
+                log_error "--target には値が必要です"
+                exit 2
+            fi
+            TARGET_DIR="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --*)
+            log_error "不明なオプションです: $1"
+            usage
+            exit 2
+            ;;
+        *)
+            if [[ -n "$PROJECT_NAME_ARG" ]]; then
+                log_error "プロジェクト名は1つだけ指定できます"
+                usage
+                exit 2
+            fi
+            PROJECT_NAME_ARG="$1"
+            shift
+            ;;
+    esac
+done
+
+if [[ "$SELF_TEST" == "1" && -z "$TARGET_DIR" ]]; then
+    log_error "--self-test には --target <dir> が必要です"
+    exit 2
+fi
+
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}"
+if [[ -n "$TARGET_DIR" ]]; then
+    mkdir -p "$TARGET_DIR" || {
+        log_error "target ディレクトリを作成できません: $TARGET_DIR"
+        exit 1
+    }
+    PROJECT_ROOT="$(cd "$TARGET_DIR" && pwd -P)"
+fi
 
 # プロジェクト名を取得（引数または現在のディレクトリ名）
-PROJECT_NAME="${1:-$(basename "$PROJECT_ROOT")}"
+PROJECT_NAME="${PROJECT_NAME_ARG:-$(basename "$PROJECT_ROOT")}"
 
 # プロジェクト名の入力検証（コマンドインジェクション防止）
 if [[ ! "$PROJECT_NAME" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]]; then
@@ -90,6 +148,7 @@ create_directories() {
 # repo-local immutable project_id artifact
 # ==============================================================================
 bootstrap_project_id() {
+    local resolve_artifact_path="${1:-1}"
     if [[ ! -x "$PROJECT_ID_TOOL" ]]; then
         log_error "project_id helper が見つからないか実行不可です: $PROJECT_ID_TOOL"
         exit 1
@@ -102,6 +161,11 @@ bootstrap_project_id() {
         log_error "project_id artifact の生成に失敗しました"
         exit 1
     }
+
+    if [[ "$resolve_artifact_path" != "1" ]]; then
+        log_success "project_id artifact を準備しました: ${project_id}"
+        return 0
+    fi
 
     local artifact_path=""
     artifact_path="$(PROJECT_ID_REPO_ROOT="$PROJECT_ROOT" bash "$PROJECT_ID_TOOL" artifact-path)" || {
@@ -321,6 +385,12 @@ update_gitignore() {
         "workspace/"
         "*.log"
         ".DS_Store"
+        ".rev_harness/"
+        "semantic-db.json"
+        "semantic.db"
+        "semantic.db-wal"
+        "semantic.db-shm"
+        ".migration.lock"
     )
 
     for entry in "${entries[@]}"; do
@@ -378,8 +448,14 @@ main() {
     echo "=============================================="
     echo ""
 
-    create_directories
+    if [[ "$SELF_TEST" == "1" ]]; then
+        bootstrap_project_id 0
+        create_directories
+        return 0
+    fi
+
     bootstrap_project_id
+    create_directories
     create_requirements_template
     create_project_context
     update_gitignore

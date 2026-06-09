@@ -17,6 +17,7 @@ fn index_version_increments_monotonically_for_repeated_indexing() {
     for expected in 1..=8_u64 {
         let files = vec![(
             file_path.clone(),
+            std::path::PathBuf::from("lib.rs"),
             "rust".to_string(),
             format!("hash-{expected}"),
         )];
@@ -47,7 +48,8 @@ fn index_version_serializes_two_concurrent_writers_without_skip_or_duplicate() {
         let barrier = Arc::clone(&barrier);
         handles.push(thread::spawn(move || {
             barrier.wait();
-            let files = vec![(path, "rust".to_string(), hash.to_string())];
+            let index_key = std::path::PathBuf::from(path.file_name().unwrap());
+            let files = vec![(path, index_key, "rust".to_string(), hash.to_string())];
             let mut conn = Connection::open(&db_path).unwrap();
             conn.pragma_update(None, "busy_timeout", 30000).unwrap();
             incremental::index_files(&mut conn, "proj", &files, &IndexConfig::default(), false)

@@ -71,12 +71,14 @@ fn open_and_migrate(db_path: &str) -> shared::error::Result<Connection> {
 
 /// Index source files using a database at the given path.
 ///
-/// Each entry in `files` is `(file_path, language, file_hash)`.
+/// Each entry in `files` is `(read_path, index_key, language, file_hash)`:
+/// `read_path` is the absolute filesystem path (stat/read/parse) and
+/// `index_key` is the repo-relative DB value. See [`incremental::index_files`].
 /// Opens the database, runs migrations, indexes files, and returns the result.
 pub fn index_files_at_path(
     db_path: &str,
     project_id: &str,
-    files: &[(PathBuf, String, String)],
+    files: &[(PathBuf, PathBuf, String, String)],
     config: &IndexConfig,
     gc_orphans: bool,
 ) -> shared::error::Result<IndexResult> {

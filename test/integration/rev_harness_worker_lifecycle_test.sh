@@ -151,7 +151,7 @@ test_runtime_thread_claim_fails_closed() {
 test_missing_artifact_path_fails_closed() {
   local root="$TMP_ROOT/missing-artifact"
   setup_fixture "$root"
-  rm -f "$root/evidence/worker-active.md"
+  /bin/rm -f "$root/evidence/worker-active.md"
 
   assert_fails_with "missing-artifact" "$root" "missing artifact path" validate --manifest lifecycle.json
 }

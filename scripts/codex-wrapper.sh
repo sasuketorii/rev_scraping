@@ -19,6 +19,9 @@ readonly FIXED_APPROVAL_POLICY="never"
 readonly DEFAULT_ROLE="standard"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+readonly CODEX_WRAPPER_TIMEOUT_SECS=1800
+readonly CODEX_WRAPPER_MAX_ATTEMPTS=2
+readonly CODEX_WRAPPER_TRANSIENT_EXHAUSTED_EXIT=75
 
 # Vendoring 防止 guard
 # shellcheck source=scripts/_canonical-guard.sh
@@ -55,12 +58,15 @@ AGENT_CORE_BIN=""
 METRICS_ACTIVE=false
 METRICS_EMITTED=false
 METRICS_STDERR_CAPTURE=""
+METRICS_STDIN_CAPTURE=""
 METRICS_CHILD_PID=""
 METRICS_EXITING_FROM_SIGNAL=false
 METRICS_STARTED_MS=""
 METRICS_TIMESTAMP=""
 METRICS_DELEGATION_ID=""
 SPECIALTY_STATUS="none"
+TIMEOUT_BIN=""
+TRANSIENT_REASON=""
 
 REMAINING_ARGS=()
 FILTERED_ARGS=()
@@ -269,6 +275,9 @@ cleanup_metrics_capture() {
   if [[ -n "${METRICS_STDERR_CAPTURE}" && -f "${METRICS_STDERR_CAPTURE}" ]]; then
     /bin/rm -f "${METRICS_STDERR_CAPTURE}"
   fi
+  if [[ -n "${METRICS_STDIN_CAPTURE}" && -f "${METRICS_STDIN_CAPTURE}" ]]; then
+    /bin/rm -f "${METRICS_STDIN_CAPTURE}"
+  fi
 }
 
 on_wrapper_exit() {
@@ -371,6 +380,7 @@ load_runtime_policy() {
     || die "generated stable_default_model does not match source policy"
   [[ "${MINIMUM_ALLOWED_MODEL}" == "${source_minimum}" ]] \
     || die "generated minimum_allowed_model does not match source policy"
+  # Non-retryable trust boundary: this fails before any codex process attempt.
   [[ "${runtime_fallback}" == "forbidden" && "${source_fallback}" == "forbidden" ]] \
     || die "runtime fallback below minimum must be forbidden"
 
@@ -419,11 +429,18 @@ Role map:
 Notes:
   - Default role is ${DEFAULT_ROLE}.
   - Role can be supplied by --role, CODEX_WRAPPER_ROLE, or AGENT_ROLE.
+  - Duplicate --role values merge silently for shim chains; different values
+    fail immediately with the shim source.
   - Caller overrides for profile, model, reasoning effort, sandbox, approval,
     web-search, and workspace-expansion controls are blocked.
   - Normal harness flow is non-interactive. Session continuation is manual-only
     and requires both --manual-session and a real TTY.
   - Legacy wrapper scripts are compatibility shims that exec this script.
+  - Codex execution uses up to ${CODEX_WRAPPER_MAX_ATTEMPTS} attempts for transient-only failures:
+    timeout, network/transport errors, or signal-like process death. Exit 144
+    is not retried. Exhausted transient retries exit ${CODEX_WRAPPER_TRANSIENT_EXHAUSTED_EXIT}.
+  - Per-attempt timeout is ${CODEX_WRAPPER_TIMEOUT_SECS}s when gtimeout/timeout is available;
+    if unavailable, timeout is skipped and transient retry remains enabled.
   - Runtime stderr is caller-owned; harness callers must store it under a
     run-local stderr/ directory and keep only pointer metadata near outputs.
 EOF
@@ -486,7 +503,8 @@ parse_wrapper_args() {
           die "--role requires one of: standard|research|coder|high-coder|reviewer"
         fi
         if [[ -n "${explicit_role}" ]]; then
-          die "--role can only be specified once"
+          if [[ "${explicit_role}" == "$1" ]]; then shift; continue; fi
+          die "--role conflict: existing='${explicit_role}' duplicate='$1' (shim source: ${CODEX_WRAPPER_SHIM_ROLE:-unset})"
         fi
         explicit_role="$1"
         EXPLICIT_ROLE_PROVIDED=true
@@ -494,7 +512,8 @@ parse_wrapper_args() {
         ;;
       --role=*)
         if [[ -n "${explicit_role}" ]]; then
-          die "--role can only be specified once"
+          if [[ "${explicit_role}" == "${1#--role=}" ]]; then shift; continue; fi
+          die "--role conflict: existing='${explicit_role}' duplicate='${1#--role=}' (shim source: ${CODEX_WRAPPER_SHIM_ROLE:-unset})"
         fi
         explicit_role="${1#--role=}"
         EXPLICIT_ROLE_PROVIDED=true
@@ -574,6 +593,7 @@ parse_wrapper_args() {
   done
 
   resolve_role "${explicit_role}"
+  unset CODEX_WRAPPER_SHIM_ROLE
 }
 
 ensure_specialty_session_mode_supported() {
@@ -891,6 +911,64 @@ run_subscription_auth_guard() {
   bash "${PROJECT_ROOT}/scripts/subscription-auth-guard.sh" check --provider codex >&2
 }
 
+detect_timeout_bin() {
+  if command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_BIN="gtimeout"
+  elif command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_BIN="timeout"
+  else
+    TIMEOUT_BIN=""
+    log_warn "timeout command not found; running codex without per-attempt timeout"
+  fi
+}
+
+network_transport_stderr() {
+  local stderr_file="$1"
+  [[ -f "${stderr_file}" ]] || return 1
+  grep -Eiq \
+    'network|transport|connection (reset|refused|closed|aborted)|socket hang up|dns|temporary failure|timed? ?out|timeout|tls|ssl|econnreset|enotfound|etimedout|eai_again|http (5[0-9][0-9]|502|503|504)|status (5[0-9][0-9]|502|503|504)|bad gateway|service unavailable|gateway timeout' \
+    "${stderr_file}"
+}
+
+classify_transient_failure() {
+  local status="$1"
+  local stderr_file="$2"
+  TRANSIENT_REASON=""
+
+  case "${status}" in
+    124)
+      TRANSIENT_REASON="timeout"
+      return 0
+      ;;
+    144)
+      return 1
+      ;;
+    130|143)
+      return 1
+      ;;
+  esac
+
+  if network_transport_stderr "${stderr_file}"; then
+    TRANSIENT_REASON="network/transport"
+    return 0
+  fi
+
+  if [[ "${status}" =~ ^[0-9]+$ && "${status}" -gt 128 && "${status}" -le 159 ]]; then
+    TRANSIENT_REASON="process-death"
+    return 0
+  fi
+
+  return 1
+}
+
+run_codex_attempt() {
+  if [[ -n "${TIMEOUT_BIN}" ]]; then
+    "${TIMEOUT_BIN}" "${CODEX_WRAPPER_TIMEOUT_SECS}" "$@"
+  else
+    "$@"
+  fi
+}
+
 run_codex_command() {
   METRICS_STDERR_CAPTURE="$(mktemp "${TMPDIR:-/tmp}/rev-harness-codex-stderr.XXXXXX")"
   # NOTE: synchronous execution (no &/wait) — backgrounding the child caused
@@ -901,14 +979,49 @@ run_codex_command() {
   # stderr is forwarded to the wrapper's own stderr after codex exits; callers
   # still see diagnostics and parse_token_metrics still has a stable file to
   # read, but stderr is not interleaved in real time.
-  set +e
-  "$@" 2> "${METRICS_STDERR_CAPTURE}"
-  local status=$?
-  set -e
-  if [[ -s "${METRICS_STDERR_CAPTURE}" ]]; then
-    cat "${METRICS_STDERR_CAPTURE}" >&2
+  local capture_stdin="${CODEX_WRAPPER_CAPTURE_STDIN:-false}"
+  local attempt=1
+  local status=0
+
+  if [[ "${HAS_STDIN_FLAG}" == "true" || "${capture_stdin}" == "true" ]]; then
+    METRICS_STDIN_CAPTURE="$(mktemp "${TMPDIR:-/tmp}/rev-harness-codex-stdin.XXXXXX")"
+    cat > "${METRICS_STDIN_CAPTURE}" || true
   fi
-  return "$status"
+
+  while [[ "${attempt}" -le "${CODEX_WRAPPER_MAX_ATTEMPTS}" ]]; do
+    : > "${METRICS_STDERR_CAPTURE}"
+    set +e
+    if [[ -n "${METRICS_STDIN_CAPTURE}" ]]; then
+      run_codex_attempt "$@" < "${METRICS_STDIN_CAPTURE}" 2> "${METRICS_STDERR_CAPTURE}"
+    else
+      run_codex_attempt "$@" 2> "${METRICS_STDERR_CAPTURE}"
+    fi
+    status=$?
+    set -e
+
+    if [[ -s "${METRICS_STDERR_CAPTURE}" ]]; then
+      cat "${METRICS_STDERR_CAPTURE}" >&2
+    fi
+
+    if [[ "${status}" -eq 0 ]]; then
+      return 0
+    fi
+
+    if classify_transient_failure "${status}" "${METRICS_STDERR_CAPTURE}"; then
+      if [[ "${attempt}" -lt "${CODEX_WRAPPER_MAX_ATTEMPTS}" ]]; then
+        log_warn "transient codex failure (${TRANSIENT_REASON}, exit ${status}); retrying attempt $((attempt + 1))/${CODEX_WRAPPER_MAX_ATTEMPTS}"
+        sleep "${attempt}"
+        attempt=$((attempt + 1))
+        continue
+      fi
+      log_error "transient codex retries exhausted (${TRANSIENT_REASON}, exit ${status}); returning ${CODEX_WRAPPER_TRANSIENT_EXHAUSTED_EXIT}"
+      return "${CODEX_WRAPPER_TRANSIENT_EXHAUSTED_EXIT}"
+    fi
+
+    return "${status}"
+  done
+
+  return "${CODEX_WRAPPER_TRANSIENT_EXHAUSTED_EXIT}"
 }
 
 run_codex_with_specialty_preamble() {
@@ -917,7 +1030,7 @@ run_codex_with_specialty_preamble() {
     exec_args+=("-")
   fi
 
-  run_codex_command codex exec \
+  CODEX_WRAPPER_CAPTURE_STDIN=true run_codex_command codex exec \
     --sandbox "${FIXED_SANDBOX_MODE}" \
     -c "approval_policy=${FIXED_APPROVAL_POLICY}" \
     -c "model=${FIXED_MODEL}" \
@@ -964,6 +1077,7 @@ main() {
   if ! command -v codex >/dev/null 2>&1; then
     die "codex CLI not found in PATH"
   fi
+  detect_timeout_bin
 
   if [[ "${CMD_TYPE}" == "resume" ]]; then
     if [[ -z "${SESSION_ID}" ]]; then

@@ -1,0 +1,29 @@
+# rev_harness HSDI Phase H / T-H-4b
+#
+# Purpose: persist environment-INDEPENDENT release-binary privacy hardening so
+# that even a plain `cargo build --release` collapses host usernames in
+# embedded debug paths.
+#
+# This file complements (does NOT replace) the full privacy remap performed by
+# scripts/ci/release-binary-privacy-scan.sh, which is the only path that
+# guarantees 0 hits across all five leak patterns. CI / release builds MUST go
+# through that script.
+#
+# Why we keep host-specific remaps out of this file:
+#   - cargo does NOT expand $HOME / $CARGO_HOME / $RUSTUP_HOME inside
+#     .cargo/config.toml rustflags arrays.
+#   - rustc's --remap-path-prefix takes the literal string; embedding a
+#     hard-coded username would itself be a privacy leak.
+#   - Therefore the FROM side here uses only the generic, host-agnostic
+#     /Users/ and /home/ prefixes.
+#   - patterns 3-4 (.cargo/registry/src/, .rustup/toolchains/) are
+#     CI-script-only because cargo does not expand env vars in rustflags.
+#     See scripts/ci/release-binary-privacy-scan.sh privacy_rustflags() for
+#     runtime coverage.
+
+[build]
+rustflags = [
+  "-C", "strip=symbols",
+  "--remap-path-prefix=/Users/=",
+  "--remap-path-prefix=/home/=",
+]

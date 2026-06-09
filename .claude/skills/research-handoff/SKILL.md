@@ -1,6 +1,6 @@
 ---
 name: research-handoff
-description: Own the reusable external research and handoff workflow for Phase 2.
+description: Own the reusable external research and handoff workflow for Phase 2. Use for research handoff, external doc research, reviewer-evidence pack, doc verification.
 allowed-tools: Read, Bash, Grep, Glob
 ---
 

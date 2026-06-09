@@ -1,0 +1,101 @@
+# 主要技術スタック 公式ドキュメントリンク一覧
+
+```json
+{
+  "フロントエンドスタック": {
+    "React": "https://react.dev/",
+    "Next.js": "https://nextjs.org/docs",
+    "Vue.js": "https://vuejs.org/",
+    "Nuxt.js": "https://nuxt.com/docs",
+    "Angular": "https://angular.io/docs",
+    "Svelte": "https://svelte.dev/docs",
+    "SvelteKit": "https://kit.svelte.dev/docs",
+    "Remix": "https://remix.run/docs",
+    "Vite": "https://vitejs.dev/guide/",
+    "TypeScript": "https://www.typescriptlang.org/docs/",
+    "Tailwind CSS": "https://tailwindcss.com/docs",
+    "shadcn/ui": "https://ui.shadcn.com/docs",
+    "shadcn/ui (Next.js)": "https://ui.shadcn.com/docs/installation/next",
+    "Astro": "https://docs.astro.build/",
+    "Flutter": "https://docs.flutter.dev/",
+    "Yew (Rust)": "https://yew.rs/docs/getting-started/introduction",
+    "Leptos (Rust)": "https://leptos.dev/docs/getting-started/introduction"
+  },
+  "バックエンドスタック": {
+    "Node.js": "https://nodejs.org/en/docs/",
+    "Express": "https://expressjs.com/",
+    "NestJS": "https://docs.nestjs.com/",
+    "FastAPI (Python)": "https://fastapi.tiangolo.com/",
+    "uv (Python Toolchain)": "https://docs.astral.sh/uv/",
+    "Django (Python)": "https://docs.djangoproject.com/en/stable/",
+    "Flask (Python)": "https://flask.palletsprojects.com/en/latest/",
+    "PHP": "https://www.php.net/docs.php",
+    "Laravel (PHP)": "https://laravel.com/docs",
+    "Ruby on Rails": "https://guides.rubyonrails.org/",
+    "Spring Boot (Java)": "https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/",
+    "ASP.NET Core": "https://learn.microsoft.com/aspnet/core/",
+    "Go": "https://go.dev/doc/",
+    "Gin (Go)": "https://gin-gonic.com/docs/",
+    "Echo (Go)": "https://echo.labstack.com/docs",
+    "Fiber (Go)": "https://docs.gofiber.io/",
+    "Rust": "https://doc.rust-lang.org/book/",
+    "Actix Web (Rust)": "https://actix.rs/docs/",
+    "Rocket (Rust)": "https://rocket.rs/guide/",
+    "Axum (Rust)": "https://docs.rs/axum/latest/axum/",
+    "Warp (Rust)": "https://docs.rs/warp/latest/warp/",
+    "Tokio (Rust)": "https://tokio.rs/tokio/tutorial",
+    "Serde (Rust)": "https://serde.rs/",
+    "SQLx (Rust)": "https://docs.rs/sqlx/latest/sqlx/",
+    "Diesel (Rust)": "https://diesel.rs/guides/",
+    "Sea-ORM (Rust)": "https://www.sea-ql.org/SeaORM/docs/",
+    "reqwest (Rust)": "https://docs.rs/reqwest/latest/reqwest/",
+    "Tauri v2 (Rust)": "https://v2.tauri.app/"
+  },
+  "データベース": {
+    "PostgreSQL": "https://www.postgresql.org/docs/",
+    "MySQL": "https://dev.mysql.com/doc/",
+    "MariaDB": "https://mariadb.com/kb/en/documentation/",
+    "SQLite": "https://www.sqlite.org/docs.html",
+    "MongoDB": "https://www.mongodb.com/docs/",
+    "Redis": "https://redis.io/docs/",
+    "DynamoDB": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/",
+    "Cassandra": "https://cassandra.apache.org/doc/latest/",
+    "Elasticsearch": "https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html",
+    "Supabase": "https://supabase.com/docs"
+  },
+  "サーバー・インフラ": {
+    "Nginx": "https://nginx.org/en/docs/",
+    "Apache HTTP Server": "https://httpd.apache.org/docs/",
+    "Caddy": "https://caddyserver.com/docs/",
+    "Docker": "https://docs.docker.com/",
+    "Kubernetes": "https://kubernetes.io/docs/",
+    "AWS": "https://docs.aws.amazon.com/",
+    "Google Cloud Platform (GCP)": "https://cloud.google.com/docs",
+    "Microsoft Azure": "https://learn.microsoft.com/azure/",
+    "Terraform": "https://developer.hashicorp.com/terraform/docs",
+    "Ansible": "https://docs.ansible.com/"
+  },
+  "AIコーディングツール (CLI)": {
+    "Cursor CLI": "https://docs.cursor.com/cli/using",
+    "Cursor Changelog": "https://cursor.sh/changelog",
+    "Cursor Documentation": "https://docs.cursor.com/",
+    "Anthropic Claude (Console)": "https://console.anthropic.com/",
+    "Google Gemini (AI Studio)": "https://aistudio.google.com/",
+    "OpenAI Platform": "https://platform.openai.com/docs"
+  },
+  "AIコーディングツール / ハーネス更新ソース": {
+    "OpenAI Codex Changelog": "https://developers.openai.com/codex/changelog",
+    "OpenAI Codex Workflows": "https://developers.openai.com/codex/workflows",
+    "OpenAI Codex Prompting": "https://developers.openai.com/codex/prompting",
+    "OpenAI Codex App Server": "https://developers.openai.com/codex/app-server",
+    "OpenAI Codex GitHub Releases": "https://github.com/openai/codex/releases",
+    "OpenAI Codex Plugin for Claude Code": "https://github.com/openai/codex-plugin-cc",
+    "OpenAI Prompt Guidance": "https://developers.openai.com/api/docs/guides/prompt-guidance",
+    "Claude Code Subagents": "https://docs.anthropic.com/en/docs/claude-code/sub-agents",
+    "Claude Code Settings": "https://docs.anthropic.com/en/docs/claude-code/settings",
+    "Claude Code Hooks": "https://docs.anthropic.com/en/docs/claude-code/hooks",
+    "Claude Code Current Subagents Reference": "https://code.claude.com/docs/en/sub-agents",
+    "HermesAgent": "https://github.com/NousResearch/hermes-agent"
+  }
+}
+```

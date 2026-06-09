@@ -57,7 +57,8 @@ test_manifest_contract() {
     and (.client_distribution.exclude_globs | index(".claude/tmp/**"))
     and (.client_distribution.exclude_globs | index("workspace/**"))
     and .client_distribution.ship_semantic_db == false
-    and (.managed_candidate_globs | index("AGENTS.md"))
+    and (.managed_candidate_globs | index(".claude/commands/**"))
+    and (.merge_globs | index("AGENTS.md"))
   ' "$MANIFEST" >/dev/null || fail "manifest contract mismatch"
 }
 
@@ -89,7 +90,7 @@ test_plan_json_preserves_project_id_and_blocks_dirty_managed_path() {
   mkdir -p "$target"
   make_legacy_fixture "$target"
   plan_file="$target/.claude/plan.json"
-  printf '\nmanaged local edit\n' >> "$target/AGENTS.md"
+  printf '\nmanaged local edit\n' >> "$target/.claude/commands/legacy.md"
 
   bash "$UPGRADE" plan --target "$target" --source-ref refs/tags/v0.11.0 --output "$plan_file"
   [[ -f "$plan_file" ]] || fail "plan output file was not written"
@@ -102,8 +103,8 @@ test_plan_json_preserves_project_id_and_blocks_dirty_managed_path() {
   assert_jq "$plan_json" '.apply.implemented == false and .apply.allowed == false' "plan should be inspect/plan only"
   assert_jq "$plan_json" '.preserve_paths | index(".shared/project_id")' "plan should preserve project_id path"
   assert_jq "$plan_json" '.client_distribution.exclude_globs | index(".claude/tmp/**")' "plan should expose client distribution exclusions"
-  assert_jq "$plan_json" '.managed_candidate_paths | index("AGENTS.md")' "plan should include managed candidate path"
-  assert_jq "$plan_json" '.blockers[] | select(.code == "dirty_managed_path" and .path == "AGENTS.md")' "plan should block dirty managed path"
+  assert_jq "$plan_json" '.managed_candidate_paths | index(".claude/commands/legacy.md")' "plan should include managed candidate path"
+  assert_jq "$plan_json" '.blockers[] | select(.code == "dirty_managed_path" and .path == ".claude/commands/legacy.md")' "plan should block dirty managed path"
 }
 
 test_plan_blocks_deleted_tracked_managed_path() {
@@ -112,12 +113,12 @@ test_plan_blocks_deleted_tracked_managed_path() {
   target="$tmp/legacy"
   mkdir -p "$target"
   make_legacy_fixture "$target"
-  rm "$target/AGENTS.md"
+  git -C "$target" rm -q .claude/commands/legacy.md
 
   plan_json="$(bash "$UPGRADE" plan --target "$target" --source-ref refs/tags/v0.11.0)"
 
-  assert_jq "$plan_json" '.managed_candidate_paths | index("AGENTS.md")' "plan should retain deleted tracked managed path inventory"
-  assert_jq "$plan_json" '.blockers[] | select(.code == "dirty_managed_path" and .path == "AGENTS.md" and (.git_status | contains("D")))' "plan should block deleted tracked managed path"
+  assert_jq "$plan_json" '.managed_candidate_paths | index(".claude/commands/legacy.md")' "plan should retain deleted tracked managed path inventory"
+  assert_jq "$plan_json" '.blockers[] | select(.code == "dirty_managed_path" and .path == ".claude/commands/legacy.md" and (.git_status | contains("D")))' "plan should block deleted tracked managed path"
 }
 
 test_plan_blocks_renamed_tracked_managed_path() {
@@ -126,12 +127,12 @@ test_plan_blocks_renamed_tracked_managed_path() {
   target="$tmp/legacy"
   mkdir -p "$target"
   make_legacy_fixture "$target"
-  git -C "$target" mv AGENTS.md RENAMED.md
+  git -C "$target" mv .claude/commands/legacy.md .claude/commands/renamed.md
 
   plan_json="$(bash "$UPGRADE" plan --target "$target" --source-ref refs/tags/v0.11.0)"
 
-  assert_jq "$plan_json" '.managed_candidate_paths | index("AGENTS.md")' "plan should retain renamed tracked managed path inventory"
-  assert_jq "$plan_json" '.blockers[] | select(.code == "dirty_managed_path" and .path == "AGENTS.md" and (.git_status | contains("D")))' "plan should block renamed tracked managed path"
+  assert_jq "$plan_json" '.managed_candidate_paths | index(".claude/commands/legacy.md")' "plan should retain renamed tracked managed path inventory"
+  assert_jq "$plan_json" '.blockers[] | select(.code == "dirty_managed_path" and (.path | contains(".claude/commands/legacy.md")) and (.git_status | contains("R")))' "plan should block renamed tracked managed path"
 }
 
 test_inspect_and_plan_stdout_do_not_mutate_target() {

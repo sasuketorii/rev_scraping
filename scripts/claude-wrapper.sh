@@ -35,7 +35,19 @@ if [[ -r "${SCRIPT_DIR}/_shim-log.sh" ]]; then
   # shellcheck disable=SC1091
   source "${SCRIPT_DIR}/_shim-log.sh"
   if declare -F shim_log_hit >/dev/null 2>&1; then
-    shim_log_hit "task-tool" "$@" || true
+    # help is side-effect-free for deterministic I-5 parity; detect it only on a
+    # STANDALONE --help/-h argument (identical to the parser's --help|-h) case),
+    # so a non-help prompt that merely contains the substring still logs.
+    _rev_is_help=false
+    for _rev_arg in "$@"; do
+      case "$_rev_arg" in
+        --help|-h) _rev_is_help=true; break ;;
+      esac
+    done
+    if [[ "$_rev_is_help" == false ]]; then
+      shim_log_hit "task-tool" "$@" || true
+    fi
+    unset _rev_is_help _rev_arg
   fi
 else
   echo "[shim-log] WARN: _shim-log.sh が見つかりません (continue)" >&2

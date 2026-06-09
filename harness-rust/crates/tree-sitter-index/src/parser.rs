@@ -20,6 +20,7 @@ use shared::error::AgentError;
 /// | `"python"` | `lang-python` |
 /// | `"go"` | `lang-go` |
 /// | `"shell"`, `"bash"` | `lang-shell` |
+/// | `"markdown"` | `lang-markdown` |
 pub fn get_language(lang: &str) -> Option<tree_sitter::Language> {
     match lang {
         #[cfg(feature = "lang-rust")]
@@ -39,6 +40,9 @@ pub fn get_language(lang: &str) -> Option<tree_sitter::Language> {
 
         #[cfg(feature = "lang-shell")]
         "shell" | "bash" => Some(tree_sitter_bash::LANGUAGE.into()),
+
+        #[cfg(feature = "lang-markdown")]
+        "markdown" => Some(tree_sitter_md::LANGUAGE.into()),
 
         _ => None,
     }
@@ -81,6 +85,7 @@ pub fn detect_language(file_path: &str) -> Option<&'static str> {
         "py" => Some("python"),
         "go" => Some("go"),
         "sh" | "bash" => Some("shell"),
+        "md" | "markdown" => Some("markdown"),
         _ => None,
     }
 }
@@ -127,6 +132,8 @@ mod tests {
         assert_eq!(detect_language("lib.py"), Some("python"));
         assert_eq!(detect_language("main.go"), Some("go"));
         assert_eq!(detect_language("run.sh"), Some("shell"));
+        assert_eq!(detect_language("README.md"), Some("markdown"));
+        assert_eq!(detect_language("README.markdown"), Some("markdown"));
     }
 
     #[test]

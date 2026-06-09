@@ -229,5 +229,19 @@
       "FINAL"
     ],
     "_source_lines": "verification-truth-matrix.md:63"
+  },
+  "review_round_policy": {
+    "default_max_passes": 2,
+    "risk_exempt_classes": [
+      "design",
+      "acceptance-gate",
+      "security",
+      "wrapper",
+      "semantic-change",
+      "broad-refactor"
+    ],
+    "canonical_source": ".agent/registry/model_policy.json (review_round_policy)",
+    "note": "Caps rereview ROUNDS for low-risk classes only; never relaxes I-12 dual-LGTM (two families for phase advance).",
+    "_source_lines": "verification-truth-matrix.md:253-263"
   }
 }

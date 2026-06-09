@@ -112,10 +112,9 @@ FULL_STEPS=(
   "rev_harness_dual_native|bash test/integration/rev_harness_dual_native_check_test.sh"
   "self_growth_proposal_cycle|bash test/integration/self_growth_proposal_cycle_test.sh"
   "rev_harness_static_asset_check|bash test/integration/rev_harness_static_asset_check_test.sh"
-  "semantic_build|bash scripts/run-semantic-node-tool.sh npm --prefix scripts/semantic-mcp-server ci && bash scripts/run-semantic-node-tool.sh npm --prefix scripts/semantic-mcp-server run build"
-  "semantic_test|bash scripts/run-semantic-node-tool.sh npm --prefix scripts/semantic-mcp-server test"
+  "semantic_rust_build|bash -c 'cd harness-rust && cargo check -p semantic-mcp -p tree-sitter-index'"
   "semantic_cli_contract_parity|bash test/integration/semantic_cli_contract_parity_test.sh"
-  "semantic_backend_contract_parity|bash test/integration/semantic_backend_contract_parity_test.sh"
+  "semantic_mcp_contract_tests|bash -c 'cd harness-rust && cargo test -p semantic-mcp'"
   "native_reviewer_surface_smoke|\"$BASH_BIN\" test/integration/native_reviewer_surface_smoke.sh"
   "codex_mcp_zombie_cleanup_contract|bash test/integration/codex_mcp_zombie_cleanup_contract_test.sh"
   "codex_mcp_zombie_cleanup_live|bash test/integration/codex_mcp_zombie_cleanup_live_test.sh"
@@ -139,7 +138,6 @@ FULL_STEPS=(
   "rev_harness_janitor_inspect|bash scripts/rev-harness-janitor.sh inspect --json | jq -e '.schema_version == \"rev-harness-janitor/v1\" and .janitor_command == \"inspect\" and .delete_enabled == false and .archive_enabled == false and .apply_enabled == false' >/dev/null"
   "semantic_coordination|bash test/integration/semantic_coordination_test.sh"
   "semantic_registry_export_contract|bash test/integration/semantic_registry_export_contract_test.sh"
-  "semantic_review_queue_runtime|bash test/integration/semantic_review_queue_runtime_test.sh"
   "context_capsule_help|bash .claude/commands/lib/context_capsule.sh --help"
   "shadow_verify_help|bash .claude/commands/lib/shadow_verify.sh --help"
   "benchmark_surface_contract|bash test/integration/harness_benchmark_contract_test.sh"
@@ -679,22 +677,6 @@ run_step_inherited_output() {
   printf '%s\t%s\t%s\t%s\n' "$slug" "COMPLETE" "$status" "$elapsed_ms" >> "$STEP_EVENTS_FILE"
 }
 
-cleanup_queue_runtime_test_processes() {
-  local pid=""
-  local patterns=(
-    'bash( -x)? test/integration/semantic_review_queue_runtime_test.sh'
-    'scripts/semantic-mcp-server/dist/cli.js queue enqueue --project-id queueruntime-'
-  )
-
-  for pattern in "${patterns[@]}"; do
-    while IFS= read -r pid; do
-      [[ -n "$pid" ]] || continue
-      kill -TERM "$pid" 2>/dev/null || true
-      sleep 1
-      kill -KILL "$pid" 2>/dev/null || true
-    done < <(({ ps -o pid=,command= -ax 2>/dev/null || true; } | awk -v pattern="$pattern" '$0 ~ pattern { print $1 }'))
-  done
-}
 
 collect_inventory_metrics() {
   local current_inventory_file="$RUN_DIR/current_wrapper_inventory_wc.txt"
@@ -1018,11 +1000,6 @@ write_latest_pointers() {
 
 while IFS='|' read -r step_slug step_command; do
   case "$step_slug" in
-    semantic_review_queue_runtime)
-      cleanup_queue_runtime_test_processes
-      run_step_inherited_output "$step_slug" "$step_command" "$QUEUE_RUNTIME_TIMEOUT_SECS"
-      cleanup_queue_runtime_test_processes
-      ;;
     common_task_contract_smoke)
       run_step_inherited_output "$step_slug" "$step_command" "$COMMON_TASK_CONTRACT_TIMEOUT_SECS"
       ;;

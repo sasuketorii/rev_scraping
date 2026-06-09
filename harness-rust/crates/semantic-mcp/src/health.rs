@@ -9,7 +9,7 @@ use crate::context::ServerContext;
 use crate::db;
 
 /// Number of MCP tools provided by this server.
-const TOOL_COUNT: usize = 9;
+const TOOL_COUNT: usize = 10;
 /// Server version.
 const VERSION: &str = "0.1.0";
 
@@ -97,7 +97,7 @@ mod tests {
         let ctx = test_ctx("test-project");
         let result = handle_health(&ctx).unwrap();
         assert_eq!(result["version"], "0.1.0");
-        assert_eq!(result["tool_count"], 9);
+        assert_eq!(result["tool_count"], 10);
     }
 
     #[test]

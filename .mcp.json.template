@@ -1,0 +1,15 @@
+{
+  "_README": "Per-machine MCP config template. Copy to .mcp.json and replace placeholders.",
+  "_INSTRUCTIONS": [
+    "1. cp .mcp.json.template .mcp.json",
+    "2. Replace $HARNESS_ROOT with the absolute path to your rev_harness checkout",
+    "3. .mcp.json is gitignored (per-machine config)",
+    "4. project_id is auto-resolved from this repo's .shared/project_id (adopter-PWD path, rev_harness >= 0.0.23)"
+  ],
+  "mcpServers": {
+    "semantic-mcp": {
+      "command": "$HARNESS_ROOT/scripts/launch-semantic-mcp.sh",
+      "args": []
+    }
+  }
+}

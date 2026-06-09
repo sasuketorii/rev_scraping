@@ -51,16 +51,75 @@ enum InvocationMode {
 
 fn classify_mode(args: &[String]) -> InvocationMode {
     match args.first().map(String::as_str) {
+        Some("-h" | "--help" | "help") => {
+            print_help();
+            std::process::exit(0);
+        }
         Some(first) if first.starts_with('-') => InvocationMode::Server,
         Some(_) => InvocationMode::Cli,
         None => InvocationMode::Server,
     }
 }
 
+fn print_help() {
+    println!(
+        r#"semantic-mcp
+
+Usage:
+  semantic-mcp [--project-id <id>] [--repo-root <path>]
+  semantic-mcp <group> <command> [flags]
+
+Modes:
+  server    Run stdio MCP server mode when the first argument is a flag.
+  cli       Run a semantic-mcp CLI command when the first argument is a group.
+
+Known groups:
+  context, capsule, search, admin, review, health
+
+Reference:
+  docs/manual/semantic-mcp-cli.md"#
+    );
+}
+
 fn run_server(args: &[String]) -> Result<(), String> {
     let project_id = resolve_project_id_from_args(args)?;
-    let repo_root = resolve_repo_root_from_args(args)?;
+    // `trusted_repo_root` is Some ONLY when an explicit, validated `--repo-root`
+    // was supplied (absolute, existing, non-symlink directory). It is the ONLY
+    // value we are ever willing to persist into projects.root_path.
+    let trusted_repo_root = resolve_trusted_repo_root_from_args(args)?;
     let (conn, db_path) = db::open_project_connection(&project_id)?;
+
+    // BLOCKER #3b: NEVER backfill projects.root_path from process CWD. A wrong
+    // root_path is catastrophic (orphan-GC would later delete a LIVE DB once the
+    // bogus CWD vanishes); a blank root_path is safe (it falls back to age-TTL
+    // and is never treated as an orphan). So we only record the project root +
+    // pointer when we have a trustworthy `--repo-root`. When absent, we leave
+    // root_path blank on purpose.
+    match trusted_repo_root.as_deref() {
+        Some(root) => {
+            if let Err(error) =
+                db::record_project_root_and_pointer(&conn, &project_id, root, &db_path)
+            {
+                eprintln!(
+                    "[semantic-mcp-server] warning: failed to record project root/pointer project_id={project_id} error={error}"
+                );
+            }
+        }
+        None => {
+            eprintln!(
+                "[semantic-mcp-server] note: no trusted --repo-root supplied; leaving projects.root_path BLANK (safe age-TTL fallback) project_id={project_id}"
+            );
+        }
+    }
+
+    // Runtime context root: used only to validate repo-relative paths while
+    // serving — it is NEVER persisted to projects.root_path. A CWD fallback here
+    // is harmless because it cannot influence orphan-GC.
+    let repo_root = match trusted_repo_root {
+        Some(root) => root,
+        None => std::env::current_dir().map_err(|e| format!("failed to resolve cwd: {e}"))?,
+    };
+
     let _db_lock = match SemanticDbLock::try_acquire(&db_path) {
         Ok(lock) => Some(lock),
         Err(error) => {
@@ -503,7 +562,25 @@ fn parse_gc_options(args: &[String]) -> Result<GcOptions, String> {
             continue;
         }
         if token == "--force" {
+            // --force is the destructive acknowledgement: it both enables the
+            // delete path (force) and disables dry-run. Dry-run remains the
+            // default whenever --force is absent.
             options.force = true;
+            options.dry_run = false;
+            index += 1;
+            continue;
+        }
+        if token == "--prune-missing-root" || token == "--orphans" {
+            options.mode = shared::semantic_gc::GcMode::OrphansMissingRoot;
+            index += 1;
+            continue;
+        }
+        // `--apply` is the I-11 second opt-in: it performs deletion. It must be
+        // combined with `--force` (the destructive acknowledgement) to actually
+        // remove anything; on its own it only disables dry-run, and `--force`
+        // remains required by the delete guard below.
+        if token == "--apply" {
+            options.dry_run = false;
             index += 1;
             continue;
         }
@@ -627,7 +704,19 @@ fn resolve_project_id_from_args(args: &[String]) -> Result<String, String> {
     validate_project_id(&project_id)
 }
 
-fn resolve_repo_root_from_args(args: &[String]) -> Result<PathBuf, String> {
+/// Resolve a TRUSTWORTHY repo root from `--repo-root` only.
+///
+/// Returns:
+/// - `Ok(Some(root))` when an explicit `--repo-root` was supplied and validates
+///   as an absolute, existing, non-symlink directory. This is the only value we
+///   ever persist into `projects.root_path`.
+/// - `Ok(None)` when no `--repo-root` was supplied. The caller must NOT backfill
+///   `projects.root_path` in this case (blank is safe; a guessed CWD is not).
+/// - `Err(_)` only on malformed flag usage (blank value, duplicate, missing
+///   value). A supplied-but-unusable `--repo-root` (does not exist, symlink, not
+///   a dir) is treated as "no trusted root" (`Ok(None)`) rather than a hard
+///   error so the server still boots and simply leaves root_path blank.
+fn resolve_trusted_repo_root_from_args(args: &[String]) -> Result<Option<PathBuf>, String> {
     let mut repo_root: Option<String> = None;
     let mut index = 0usize;
 
@@ -668,14 +757,37 @@ fn resolve_repo_root_from_args(args: &[String]) -> Result<PathBuf, String> {
         index += 1;
     }
 
-    let root = match repo_root {
+    let raw = match repo_root {
+        // Explicit blank value is a usage error (the launcher passed an empty
+        // string), not a silent "no root".
         Some(value) if value.trim().is_empty() => {
             return Err("--repo-root must not be blank".into())
         }
-        Some(value) => PathBuf::from(value),
-        None => std::env::current_dir().map_err(|e| format!("failed to resolve cwd: {e}"))?,
+        Some(value) => value,
+        // No --repo-root at all: NEVER fall back to CWD. Leave root_path blank.
+        None => return Ok(None),
     };
-    validate_repo_root(&root)
+
+    let path = PathBuf::from(raw);
+    // A supplied root must be absolute to be trustworthy. A relative root is
+    // CWD-dependent (the exact failure mode that deleted the live DB), so we
+    // refuse to trust it and leave root_path blank.
+    if !path.is_absolute() {
+        eprintln!(
+            "[semantic-mcp-server] note: --repo-root is not absolute; not trusting it for root_path: {}",
+            path.display()
+        );
+        return Ok(None);
+    }
+    match validate_repo_root(&path) {
+        Ok(canonical) => Ok(Some(canonical)),
+        Err(reason) => {
+            eprintln!(
+                "[semantic-mcp-server] note: --repo-root failed validation ({reason}); leaving root_path blank"
+            );
+            Ok(None)
+        }
+    }
 }
 
 fn validate_repo_root(path: &Path) -> Result<PathBuf, String> {
@@ -737,12 +849,137 @@ fn install_signal_handlers() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_env;
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    #[test]
+    fn trusted_repo_root_is_none_without_flag() {
+        // BLOCKER #3b: with NO --repo-root, we must NOT fall back to CWD. The
+        // resolver returns None so the server leaves projects.root_path blank.
+        let resolved =
+            resolve_trusted_repo_root_from_args(&["--project-id".into(), "demo".into()]).unwrap();
+        assert!(
+            resolved.is_none(),
+            "no --repo-root must yield None (blank root_path), never CWD"
+        );
+    }
+
+    #[test]
+    fn trusted_repo_root_is_some_for_valid_absolute_dir() {
+        // BLOCKER #3b: a valid absolute --repo-root is trusted and recorded.
+        let dir = unique_temp_dir("semantic-mcp-trusted-root");
+        let resolved = resolve_trusted_repo_root_from_args(&[
+            "--project-id".into(),
+            "demo".into(),
+            "--repo-root".into(),
+            dir.display().to_string(),
+        ])
+        .unwrap();
+        let canonical = dir.canonicalize().unwrap();
+        assert_eq!(
+            resolved.as_deref(),
+            Some(canonical.as_path()),
+            "valid absolute --repo-root must be trusted and canonicalized"
+        );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn trusted_repo_root_is_none_for_nonexistent_dir() {
+        // A supplied-but-missing root is untrusted → None (blank root_path),
+        // not a guess. Server still boots.
+        let missing = std::env::temp_dir().join("semantic-mcp-missing-root-DOES-NOT-EXIST-zzz");
+        let _ = fs::remove_dir_all(&missing);
+        let resolved = resolve_trusted_repo_root_from_args(&[
+            "--repo-root".into(),
+            missing.display().to_string(),
+        ])
+        .unwrap();
+        assert!(
+            resolved.is_none(),
+            "nonexistent --repo-root must not be trusted"
+        );
+    }
+
+    #[test]
+    fn trusted_repo_root_is_none_for_relative_dir() {
+        // A relative root is CWD-dependent (the exact live-DB-deletion failure
+        // mode) → untrusted → None.
+        let resolved =
+            resolve_trusted_repo_root_from_args(&["--repo-root".into(), "some/relative".into()])
+                .unwrap();
+        assert!(resolved.is_none(), "relative --repo-root must not be trusted");
+    }
+
+    #[test]
+    fn trusted_repo_root_rejects_blank_value() {
+        let error =
+            resolve_trusted_repo_root_from_args(&["--repo-root".into(), "   ".into()]).unwrap_err();
+        assert_eq!(error, "--repo-root must not be blank");
+    }
+
+    #[test]
+    fn backfill_leaves_root_path_blank_without_repo_root_then_records_with_one() {
+        // BLOCKER #3b end-to-end: prove that the db backfill, when fed the
+        // resolver output, records a blank root_path when there is no trusted
+        // root, and the real root when there is one.
+        let _guard = test_env::lock_only();
+        let tmp = unique_temp_dir("semantic-mcp-backfill");
+        let db_path = tmp.join("semantic.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE projects (
+                 id TEXT PRIMARY KEY,
+                 name TEXT NOT NULL,
+                 root_path TEXT,
+                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+             );",
+        )
+        .unwrap();
+
+        // No trusted root → we must NOT call the backfill; insert a blank row
+        // exactly as the server would leave it (untouched root_path).
+        let trusted: Option<PathBuf> =
+            resolve_trusted_repo_root_from_args(&["--project-id".into(), "demo".into()]).unwrap();
+        assert!(trusted.is_none());
+        conn.execute(
+            "INSERT INTO projects (id, name, root_path) VALUES ('demo', 'demo', '')",
+            [],
+        )
+        .unwrap();
+        let root_path: String = conn
+            .query_row("SELECT root_path FROM projects WHERE id='demo'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(root_path, "", "no --repo-root => root_path stays blank");
+
+        // Now with a valid absolute root, the backfill records it.
+        let valid_root = tmp.join("repo");
+        fs::create_dir_all(&valid_root).unwrap();
+        let trusted = resolve_trusted_repo_root_from_args(&[
+            "--repo-root".into(),
+            valid_root.display().to_string(),
+        ])
+        .unwrap()
+        .expect("valid root trusted");
+        db::record_project_root_and_pointer(&conn, "demo", &trusted, &db_path).unwrap();
+        let recorded: String = conn
+            .query_row("SELECT root_path FROM projects WHERE id='demo'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            recorded,
+            valid_root.canonicalize().unwrap().display().to_string(),
+            "valid --repo-root must be recorded into root_path"
+        );
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
 
     #[test]
     fn classify_queue_commands_as_cli() {
@@ -786,7 +1023,7 @@ mod tests {
 
     #[test]
     fn project_id_validate_trims_before_returning_json() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = test_env::lock_only();
         let previous_home = std::env::var_os("HOME");
         let previous_userprofile = std::env::var_os("USERPROFILE");
         let temp_root = unique_temp_dir("semantic-mcp-cli-project-id-trim");
@@ -918,7 +1155,7 @@ mod tests {
 
     #[test]
     fn run_cli_queue_enqueue_can_export_snapshot_in_same_invocation() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = test_env::lock_only();
         let temp_root = unique_temp_dir("semantic-mcp-cli-enqueue-export");
         let repo_root = temp_root.join("repo");
         let home_root = temp_root.join("home");

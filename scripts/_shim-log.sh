@@ -73,7 +73,8 @@ shim_log_hit() {
 
   # ディレクトリ作成 (失敗時は fail-open)
   if ! mkdir -p "$log_dir" 2>/dev/null; then
-    _shim_log_warn "log dir 作成失敗: ${log_dir} (continue)"
+    local _safe_dir="${log_dir/#${HOME}/\~}"
+    _shim_log_warn "log dir 作成失敗: ${_safe_dir} (continue)"
     return 0
   fi
 
@@ -106,8 +107,9 @@ shim_log_hit() {
   line=$(printf '{"ts":"%s","caller_hash":"%s","pid":%d,"ppid":%d,"rewrite_target":"%s","argv_hash":"%s"%s}\n' \
     "$ts" "$caller_hash" "$pid" "$ppid" "$rewrite_target" "$argv_hash" "$job_id_part")
 
-  if ! printf '%s\n' "$line" >> "$log_file" 2>/dev/null; then
-    _shim_log_warn "log 書込失敗: ${log_file} (continue)"
+  if ! printf '%s\n' "$line" 2>/dev/null >> "$log_file"; then
+    local _safe_file="${log_file/#${HOME}/\~}"
+    _shim_log_warn "log 書込失敗: ${_safe_file} (continue)"
     return 0
   fi
 

@@ -88,6 +88,12 @@ Coderは、要件からコードを生成し、テストを通じて品質を担
 - セッション終了時に `.agent/active/sow/YYYYMMDD_[TaskName].md` を作成
 - 実施内容・結果・残課題を記録
 
+### 7.5 Completion Contract
+- Long-running 出力を `tail -f` で待たない。bounded poll / artifact read に切り替え、session timeout を誘発しない
+- agent 終了前に進捗を `wip(<task-id>): graceful checkpoint` 形式で commit し、closeout では `wip:` checkpoint として明記する
+- bg job は `run_in_background + Monitor` で監視し、`tail -f` および 30 秒超の `sleep` を使わない
+- acceptance evidence として `.agent/active/hsdi/<task-id>/acceptance.md` を必ず書く
+
 ---
 
 ## 成果物

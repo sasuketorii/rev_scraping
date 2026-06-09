@@ -27,5 +27,8 @@ fn topk_fails_closed_when_file_parse_cache_entry_is_missing() {
     )
     .unwrap_err();
     assert!(error.contains("file_parse_cache miss"));
-    assert!(error.contains("run context update first"));
+    // Actionable miss error (Slice B item 3): points at the source-first
+    // index-all bootstrap, NOT lazy in-request indexing.
+    assert!(error.contains("index-all"));
+    assert!(error.contains("not yet indexed"));
 }

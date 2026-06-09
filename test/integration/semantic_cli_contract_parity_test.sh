@@ -48,23 +48,6 @@ load_rust_workspace_root() {
   [[ -f "$RUST_WORKSPACE_ROOT/Cargo.toml" ]] || fail "trusted rust workspace manifest not found: $RUST_WORKSPACE_ROOT/Cargo.toml"
 }
 
-run_node_cli_capture() {
-  local stdout_file="$1"
-  local stderr_file="$2"
-  shift 2
-
-  load_trusted_runtime_env node
-  (
-    cd "$REPO_ROOT"
-    /usr/bin/env -i \
-      "PATH=$RUNTIME_PATH" \
-      "HOME=$RUNTIME_HOME" \
-      "$RUNTIME_BINARY" \
-      "$REPO_ROOT/scripts/semantic-mcp-server/dist/cli.js" \
-      "$@"
-  ) >"$stdout_file" 2>"$stderr_file"
-}
-
 run_rust_cli_capture() {
   local stdout_file="$1"
   local stderr_file="$2"
@@ -82,14 +65,6 @@ run_rust_cli_capture() {
   ) >"$stdout_file" 2>"$stderr_file"
 }
 
-assert_json_equals() {
-  local left_file="$1"
-  local right_file="$2"
-
-  diff -u <(jq -S . "$left_file") <(jq -S . "$right_file") >/dev/null \
-    || fail "JSON payloads differed: $left_file vs $right_file"
-}
-
 assert_trimmed_stderr_equals() {
   local expected="$1"
   local file_path="$2"
@@ -100,76 +75,57 @@ assert_trimmed_stderr_equals() {
   [[ "$actual" == "$expected" ]] || fail "unexpected stderr in $file_path: $actual"
 }
 
-test_project_id_validate_trim_parity() {
-  local node_out="$TMP_ROOT/node-project-id-trim.json"
-  local node_err="$TMP_ROOT/node-project-id-trim.stderr"
+# Rust-only CLI contract regression. The Node semantic backend was retired in
+# de-overkill S3-B3; the former Node<->Rust parity diff is gone. These cases
+# pin the Rust CLI's concrete per-verb output/exit/stderr contract.
+test_project_id_validate_trim() {
   local rust_out="$TMP_ROOT/rust-project-id-trim.json"
   local rust_err="$TMP_ROOT/rust-project-id-trim.stderr"
 
-  run_node_cli_capture "$node_out" "$node_err" project-id validate --value " demo "
   run_rust_cli_capture "$rust_out" "$rust_err" project-id validate --value " demo "
 
-  jq -e '.ok == true and .project_id == "demo"' "$node_out" >/dev/null 2>&1 \
-    || fail "node project-id validate did not normalize whitespace"
   jq -e '.ok == true and .project_id == "demo"' "$rust_out" >/dev/null 2>&1 \
     || fail "rust project-id validate did not normalize whitespace"
-  [[ ! -s "$node_err" ]] || fail "node project-id validate emitted stderr unexpectedly"
   [[ ! -s "$rust_err" ]] || fail "rust project-id validate emitted stderr unexpectedly"
-  assert_json_equals "$node_out" "$rust_out"
 }
 
-test_project_id_validate_rejects_agent_base_with_parity() {
-  local node_out="$TMP_ROOT/node-project-id-agent-base.stdout"
-  local node_err="$TMP_ROOT/node-project-id-agent-base.stderr"
+test_project_id_validate_rejects_agent_base() {
   local rust_out="$TMP_ROOT/rust-project-id-agent-base.stdout"
   local rust_err="$TMP_ROOT/rust-project-id-agent-base.stderr"
   local expected="[semantic-mcp-cli] project_id literal 'agent_base' is forbidden; bootstrap a repo-local immutable id"
 
-  if run_node_cli_capture "$node_out" "$node_err" project-id validate --value agent_base; then
-    fail "node project-id validate unexpectedly accepted agent_base"
-  fi
   if run_rust_cli_capture "$rust_out" "$rust_err" project-id validate --value agent_base; then
     fail "rust project-id validate unexpectedly accepted agent_base"
   fi
 
-  [[ ! -s "$node_out" ]] || fail "node project-id reject path wrote stdout unexpectedly"
   [[ ! -s "$rust_out" ]] || fail "rust project-id reject path wrote stdout unexpectedly"
-  assert_trimmed_stderr_equals "$expected" "$node_err"
   assert_trimmed_stderr_equals "$expected" "$rust_err"
 }
 
-test_unknown_command_contract_parity() {
-  local node_out="$TMP_ROOT/node-unknown-command.stdout"
-  local node_err="$TMP_ROOT/node-unknown-command.stderr"
+test_unknown_command_contract() {
   local rust_out="$TMP_ROOT/rust-unknown-command.stdout"
   local rust_err="$TMP_ROOT/rust-unknown-command.stderr"
   local expected="[semantic-mcp-cli] unknown command: bogus cmd"
 
-  if run_node_cli_capture "$node_out" "$node_err" bogus cmd; then
-    fail "node CLI unexpectedly accepted unknown command"
-  fi
   if run_rust_cli_capture "$rust_out" "$rust_err" bogus cmd; then
     fail "rust CLI unexpectedly accepted unknown command"
   fi
 
-  [[ ! -s "$node_out" ]] || fail "node unknown-command path wrote stdout unexpectedly"
   [[ ! -s "$rust_out" ]] || fail "rust unknown-command path wrote stdout unexpectedly"
-  assert_trimmed_stderr_equals "$expected" "$node_err"
   assert_trimmed_stderr_equals "$expected" "$rust_err"
 }
 
 main() {
   require_cmd jq
   require_cmd cargo
-  require_cmd diff
   require_cmd mktemp
 
   TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/semantic_cli_contract_parity.XXXXXX")"
   load_rust_workspace_root
 
-  test_project_id_validate_trim_parity
-  test_project_id_validate_rejects_agent_base_with_parity
-  test_unknown_command_contract_parity
+  test_project_id_validate_trim
+  test_project_id_validate_rejects_agent_base
+  test_unknown_command_contract
 
   printf 'PASS: semantic_cli_contract_parity_test\n'
 }

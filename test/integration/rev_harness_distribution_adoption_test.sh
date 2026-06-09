@@ -276,7 +276,7 @@ test_missing_prerequisite_manifest_fails_closed() {
   local output=""
 
   setup_fixture "$root"
-  rm -f "$root/.agent/registry/rev_harness_distribution_adoption_prerequisites.json"
+  /bin/rm -f "$root/.agent/registry/rev_harness_distribution_adoption_prerequisites.json"
 
   if output="$(run_preflight_for_root "$root" --check --json 2>"$TMP_ROOT/rev-harness-distribution-missing-prereq.err")"; then
     fail "missing prerequisite manifest should fail distribution/adoption preflight"

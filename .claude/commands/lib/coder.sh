@@ -14,6 +14,47 @@ _CODER_LIB_DIR="${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 _CODER_REPO_ROOT="${REPO_ROOT:-$(cd "$_CODER_LIB_DIR/../../.." && pwd)}"
 _CODER_CONTEXT_CAPSULE_SH="${_CODER_LIB_DIR}/context_capsule.sh"
 _CODER_CONTEXT_ANALYSIS_SH="${_CODER_LIB_DIR}/context_analysis.sh"
+_CODER_MODEL_IO_GUARD="${REV_HARNESS_MODEL_IO_GUARD:-${_CODER_REPO_ROOT}/scripts/rev-harness-model-io-guard.sh}"
+
+_coder_model_io_quarantine_dir() {
+  local repo_root=""
+  repo_root="$(cd "$_CODER_REPO_ROOT" && pwd -P 2>/dev/null)" || repo_root="$_CODER_REPO_ROOT"
+  printf '%s\n' "${repo_root}/.claude/tmp/call-invoke-guard/quarantine"
+}
+
+_coder_guard_prompt_file() {
+  local prompt_file="$1"
+  local label="$2"
+
+  if [[ -x "$_CODER_MODEL_IO_GUARD" ]]; then
+    bash "$_CODER_MODEL_IO_GUARD" prompt-budget --file "$prompt_file" --label "$label" \
+      --max-bytes "${REV_HARNESS_MODEL_IO_PROMPT_MAX_BYTES:-262144}" \
+      --warn-bytes "${REV_HARNESS_MODEL_IO_PROMPT_WARN_BYTES:-196608}" || return 1
+  fi
+}
+
+_coder_write_sanitized_model_io_stub() {
+  local output_file="$1"
+  local label="$2"
+
+  {
+    printf '[ERROR] model I/O guard blocked unsafe output for %s.\n' "$label"
+    printf 'See sanitized guard metadata under .claude/tmp/call-invoke-guard/.\n'
+    printf '\n---OUTPUT-END---\n'
+  } > "$output_file"
+}
+
+_coder_scan_output_file() {
+  local output_file="$1"
+  local label="$2"
+
+  if [[ -x "$_CODER_MODEL_IO_GUARD" ]]; then
+    if ! bash "$_CODER_MODEL_IO_GUARD" scan-output --file "$output_file" --label "$label" --quarantine-dir "$(_coder_model_io_quarantine_dir)"; then
+      _coder_write_sanitized_model_io_stub "$output_file" "$label"
+      return 1
+    fi
+  fi
+}
 
 # 互換ガード: context_capsule/context_analysis 未配置時は従来動作
 if [[ -f "$_CODER_CONTEXT_CAPSULE_SH" ]]; then
@@ -360,6 +401,11 @@ _coder_run_codex_prompt() {
     /bin/rm -f "$prompt_file" 2>/dev/null || true
     die "_coder_run_codex_prompt: failed to write prompt file"
   fi
+  if ! _coder_guard_prompt_file "$prompt_file" "coder:$codex_role"; then
+    /bin/rm -f "$prompt_file" 2>/dev/null || true
+    log_error "Coder prompt budget guard blocked launch (engine: codex, role: $codex_role)"
+    return 1
+  fi
 
   local start_epoch
   start_epoch=$(date +%s)
@@ -370,11 +416,19 @@ _coder_run_codex_prompt() {
   else
     run_exit=$?
     /bin/rm -f "$prompt_file" 2>/dev/null || true
+    if [[ -f "$output_file" ]]; then
+      _coder_scan_output_file "$output_file" "coder:$codex_role" || true
+    fi
     log_error "Coder execution failed (engine: codex, role: $codex_role, wrapper: $wrapper_label, exit: $run_exit)"
     return "$run_exit"
   fi
 
   /bin/rm -f "$prompt_file" 2>/dev/null || true
+
+  if ! _coder_scan_output_file "$output_file" "coder:$codex_role"; then
+    log_error "Coder output marker guard blocked promotion (engine: codex, role: $codex_role)"
+    return 1
+  fi
 
   local session_id
   session_id=$(get_latest_codex_session "$start_epoch" 2>/dev/null || true)

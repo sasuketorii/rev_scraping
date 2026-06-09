@@ -229,6 +229,64 @@ pub fn validate_revharness_schema(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+/// Record the authoritative project root for dispose-together tooling.
+///
+/// Two side effects, both lazy and idempotent:
+///
+/// 1. REPAIR `projects.root_path` for `project_id` with the absolute, TRUSTED
+///    `repo_root`. The caller MUST only invoke this with a value that came from
+///    `resolve_trusted_repo_root_from_args` (absolute, existing, non-symlink,
+///    canonicalized directory). Because the supplied root is authoritative, we
+///    make `projects.root_path` authoritative too: we INSERT a fresh row, fill a
+///    blank/NULL `root_path`, AND overwrite a stale/wrong non-blank `root_path`
+///    that differs from the trusted root.
+///
+///    This is the BLOCKER-1 fix: previously we only filled a blank/NULL value,
+///    so a DB that already held a WRONG `root_path` kept it forever. Orphan-GC
+///    would then see that (now-missing) wrong path and delete a LIVE project DB.
+///    Every server open with a valid `--repo-root` now repairs the value, so a
+///    poisoned root can never survive to mislead orphan-GC.
+///
+///    We never write a CWD-derived or otherwise untrusted value: the gating that
+///    guarantees only a trusted `--repo-root` reaches this function lives in the
+///    caller (`run_server`), preserving the R2 guarantee. When no trusted
+///    `--repo-root` is supplied, the caller does not call this at all, so an
+///    existing `root_path` is left AS-IS (never blanked, never guessed).
+/// 2. Lazily write the project-local pointer file
+///    `<repo_root>/.rev_harness/semantic-db.json` (see `shared::semantic_pointer`).
+///
+/// Both steps are best-effort: a failure here is logged by the caller and must
+/// not abort server startup. The pointer/backfill are convenience + GC anchors,
+/// not correctness-critical for serving queries.
+pub fn record_project_root_and_pointer(
+    conn: &Connection,
+    project_id: &str,
+    repo_root: &Path,
+    db_path: &Path,
+) -> Result<(), String> {
+    let root_path = repo_root.display().to_string();
+
+    // Insert a row if none exists; otherwise make the trusted root authoritative.
+    // The ON CONFLICT update now fires whenever the stored value DIFFERS from the
+    // trusted root — including a stale/wrong non-blank value — so a poisoned
+    // root_path is repaired on every open with a valid --repo-root. The
+    // `WHERE ... IS DISTINCT FROM` guard avoids a needless write (and updated_at
+    // churn) when the value already matches.
+    conn.execute(
+        "INSERT INTO projects (id, name, root_path, created_at, updated_at)
+         VALUES (?1, ?2, ?3, datetime('now'), datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET
+             root_path = ?3,
+             updated_at = datetime('now')
+         WHERE projects.root_path IS NOT ?3",
+        rusqlite::params![project_id, project_id, root_path],
+    )
+    .map_err(|e| format!("failed to record project root_path: {e}"))?;
+
+    shared::semantic_pointer::write_pointer_if_absent(repo_root, project_id, db_path)?;
+    Ok(())
+}
+
 pub fn touch_last_accessed(conn: &Connection) -> Result<(), String> {
     let now = chrono::Utc::now().timestamp();
     let last = conn
@@ -1248,6 +1306,110 @@ CREATE INDEX IF NOT EXISTS idx_review_runs_project_phase_kind
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn record_project_root_writes_pointer_and_backfills_root_path() {
+        let conn = Connection::open_in_memory().expect("open in-memory db");
+        run_migrations(&conn).expect("migrations");
+
+        let project_root = tempfile::tempdir().expect("project root");
+        let db_path = Path::new("/external/v1/proj-xyz/semantic.db");
+
+        record_project_root_and_pointer(&conn, "proj-xyz", project_root.path(), db_path)
+            .expect("record project root");
+
+        // root_path backfilled.
+        let root_path: String = conn
+            .query_row(
+                "SELECT root_path FROM projects WHERE id = 'proj-xyz'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("projects row");
+        assert_eq!(root_path, project_root.path().display().to_string());
+
+        // Pointer written with exactly the 3 fields.
+        let pointer =
+            shared::semantic_pointer::read_pointer(project_root.path()).expect("pointer present");
+        assert_eq!(pointer.project_id, "proj-xyz");
+        assert_eq!(pointer.db_path, db_path.display().to_string());
+        assert!(!pointer.created_at.is_empty());
+    }
+
+    #[test]
+    fn record_project_root_repairs_stale_wrong_root_path() {
+        // BLOCKER-1 fix: a DB that already holds a WRONG non-blank root_path must
+        // be REPAIRED to the trusted repo_root on open. Previously this value was
+        // left as-is, and orphan-GC would then delete a LIVE DB once the bogus
+        // path vanished.
+        let conn = Connection::open_in_memory().expect("open in-memory db");
+        run_migrations(&conn).expect("migrations");
+        conn.execute(
+            "INSERT INTO projects (id, name, root_path, created_at, updated_at)
+             VALUES ('proj-xyz', 'proj-xyz', '/wrong/stale/root', datetime('now'), datetime('now'))",
+            [],
+        )
+        .expect("seed existing row");
+
+        let project_root = tempfile::tempdir().expect("project root");
+        record_project_root_and_pointer(
+            &conn,
+            "proj-xyz",
+            project_root.path(),
+            Path::new("/external/v1/proj-xyz/semantic.db"),
+        )
+        .expect("record project root");
+
+        let root_path: String = conn
+            .query_row(
+                "SELECT root_path FROM projects WHERE id = 'proj-xyz'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("projects row");
+        assert_eq!(
+            root_path,
+            project_root.path().display().to_string(),
+            "stale wrong root_path must be repaired to the trusted repo_root"
+        );
+    }
+
+    #[test]
+    fn record_project_root_noop_when_already_matching() {
+        // When the stored root_path already equals the trusted root, the
+        // ON CONFLICT update must NOT fire (no needless updated_at churn).
+        let conn = Connection::open_in_memory().expect("open in-memory db");
+        run_migrations(&conn).expect("migrations");
+        let project_root = tempfile::tempdir().expect("project root");
+        let root_str = project_root.path().display().to_string();
+        conn.execute(
+            "INSERT INTO projects (id, name, root_path, created_at, updated_at)
+             VALUES ('proj-xyz', 'proj-xyz', ?1, '2000-01-01 00:00:00', '2000-01-01 00:00:00')",
+            rusqlite::params![root_str],
+        )
+        .expect("seed existing row");
+
+        record_project_root_and_pointer(
+            &conn,
+            "proj-xyz",
+            project_root.path(),
+            Path::new("/external/v1/proj-xyz/semantic.db"),
+        )
+        .expect("record project root");
+
+        let (root_path, updated_at): (String, String) = conn
+            .query_row(
+                "SELECT root_path, updated_at FROM projects WHERE id = 'proj-xyz'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("projects row");
+        assert_eq!(root_path, root_str, "matching root_path unchanged");
+        assert_eq!(
+            updated_at, "2000-01-01 00:00:00",
+            "no update fired when value already matches"
+        );
+    }
 
     #[test]
     fn open_in_memory_and_migrate() {

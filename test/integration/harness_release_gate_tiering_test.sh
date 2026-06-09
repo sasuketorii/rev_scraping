@@ -199,7 +199,7 @@ assert_default_full_dry_run_smoke() {
   local output=""
   output="$("$BASH_BIN" "$RELEASE_GATE" --dry-run 2>&1)"
   contains "$output" "DRY-RUN: tier=full" || fail "default dry-run did not preserve full tier default"
-  contains "$output" "semantic_build" || fail "default full dry-run did not include full gate steps"
+  contains "$output" "semantic_rust_build" || fail "default full dry-run did not include full gate steps"
 }
 
 assert_canonical_minimal_full_rejected() {

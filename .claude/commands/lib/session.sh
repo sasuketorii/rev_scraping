@@ -106,6 +106,46 @@ CLAUDE_WRAPPER="${CLAUDE_WRAPPER:-}"
 CODEX_WRAPPER_CODER_CANONICAL="${CODEX_WRAPPER_CODER_CANONICAL:-${CODEX_WRAPPER_HIGH:-}}"
 _SESSION_LIB_DIR="${LIB_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 _SESSION_REPO_ROOT="${REPO_ROOT:-$(cd "$_SESSION_LIB_DIR/../../.." && pwd)}"
+_SESSION_MODEL_IO_GUARD="${REV_HARNESS_MODEL_IO_GUARD:-${_SESSION_REPO_ROOT}/scripts/rev-harness-model-io-guard.sh}"
+
+_session_model_io_quarantine_dir() {
+  local repo_root=""
+  repo_root="$(cd "$_SESSION_REPO_ROOT" && pwd -P 2>/dev/null)" || repo_root="$_SESSION_REPO_ROOT"
+  printf '%s\n' "${repo_root}/.claude/tmp/call-invoke-guard/quarantine"
+}
+
+_session_guard_prompt_file() {
+  local prompt_file="$1"
+  local label="$2"
+
+  if [[ -x "$_SESSION_MODEL_IO_GUARD" ]]; then
+    bash "$_SESSION_MODEL_IO_GUARD" prompt-budget --file "$prompt_file" --label "$label" \
+      --max-bytes "${REV_HARNESS_MODEL_IO_PROMPT_MAX_BYTES:-262144}" \
+      --warn-bytes "${REV_HARNESS_MODEL_IO_PROMPT_WARN_BYTES:-196608}" || return 1
+  fi
+}
+
+_session_write_sanitized_model_io_stub() {
+  local output_file="$1"
+  local label="$2"
+
+  {
+    printf '[ERROR] model I/O guard blocked unsafe output for %s.\n' "$label"
+    printf 'See sanitized guard metadata under .claude/tmp/call-invoke-guard/.\n'
+  } > "$output_file"
+}
+
+_session_scan_output_file() {
+  local output_file="$1"
+  local label="$2"
+
+  if [[ -x "$_SESSION_MODEL_IO_GUARD" ]]; then
+    if ! bash "$_SESSION_MODEL_IO_GUARD" scan-output --file "$output_file" --label "$label" --quarantine-dir "$(_session_model_io_quarantine_dir)"; then
+      _session_write_sanitized_model_io_stub "$output_file" "$label"
+      return 1
+    fi
+  fi
+}
 
 _session_resolve_canonical_wrapper_path() {
   local candidate="${1:-}"
@@ -167,6 +207,11 @@ _session_run_claude_wrapper() {
     /bin/rm -f "$prompt_file" 2>/dev/null
     die "${caller_name}: failed to write prompt file"
   fi
+  if ! _session_guard_prompt_file "$prompt_file" "$caller_name"; then
+    /bin/rm -f "$prompt_file" "$temp_output" 2>/dev/null
+    log_error "${caller_name}: prompt budget guard blocked launch"
+    return 1
+  fi
 
   if [[ -n "$output_file" ]]; then
     target_output="$output_file"
@@ -177,14 +222,27 @@ _session_run_claude_wrapper() {
 
   effort_level="$(_resolve_claude_effort_level)"
 
-  if ! "$CLAUDE_WRAPPER" "$@" \
+  local wrapper_exit=0
+  if "$CLAUDE_WRAPPER" "$@" \
     --mode orchestrator-full \
     --input "$prompt_file" \
     --output "$target_output" \
     --effort "$effort_level" \
     --timeout "$timeout_secs"; then
+    :
+  else
+    wrapper_exit=$?
+    if [[ -f "$target_output" ]]; then
+      _session_scan_output_file "$target_output" "$caller_name" || true
+    fi
     /bin/rm -f "$prompt_file" "$temp_output" 2>/dev/null
     log_error "$failure_message"
+    return "$wrapper_exit"
+  fi
+
+  if ! _session_scan_output_file "$target_output" "$caller_name"; then
+    /bin/rm -f "$prompt_file" "$temp_output" 2>/dev/null
+    log_error "${caller_name}: output marker guard blocked promotion"
     return 1
   fi
 
@@ -377,6 +435,10 @@ codex_session_start() {
   _ensure_coder_codex_wrapper
 
   log_info "Starting Codex session..."
+  if ! _session_guard_prompt_file "$prompt_file" "codex_session_start"; then
+    log_error "codex_session_start: prompt budget guard blocked launch"
+    return 1
+  fi
 
   # セッションID誤紐付け防止: Codex実行前のepoch時刻を記録
   local start_epoch
@@ -389,6 +451,10 @@ codex_session_start() {
   else
     exit_code=$?
     log_warn "Codex execution returned: $exit_code"
+  fi
+
+  if [[ -f "$output_file" ]] && ! _session_scan_output_file "$output_file" "codex_session_start"; then
+    return 1
   fi
 
   # 最新のセッションIDを取得（after_epochで実行開始以降のセッションのみ対象）

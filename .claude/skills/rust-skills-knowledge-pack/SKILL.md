@@ -1,5 +1,5 @@
 ---
-name: rust-skills-architecture
+name: rust-skills-knowledge-pack
 description: RustSkills / REV-C Inc. systems architecture and implementation skill. Use when designing, reviewing, implementing, benchmarking, or updating high-load Rust async HTTP workers, Leptos/WASM builders, Ratatui+CPAL realtime audio agents, E2EE/privacy infrastructure, autonomous AI/data/search platforms, and Rust dependency governance.
 ---
 
@@ -105,6 +105,78 @@ rkyv: frozen snapshots and context bundles
 ```
 
 Do not store raw PII in vector payloads. Keep deletion and consent boundaries explicit.
+
+---
+
+## 3.5 Forward-looking / R&D status labels
+
+This pack documents both currently-adopted patterns and forward-looking work
+that adopting projects must gate behind a dedicated migration slice. Every
+forward-looking topic carries an explicit `Status:` label so router callers and
+reviewers can tell at a glance which rows are Adopt-now vs. R&D-only.
+
+`Status:` values used throughout this pack:
+
+- `Status: Adopt` — already in scope for current REV-C / RustSkills code.
+- `Status: informational refresh` — patch-level upstream tracking; no behavioral
+  change required.
+- `Status: R&D` — evaluate behind a feature flag or in a sandbox; do not enable
+  in product Cargo manifests without a separate slice.
+- `Status: R&D + DR` — R&D plus a Deep Research source pack refresh is required
+  before any adoption decision (see `rust-skills-update-prompt.md`).
+- `Status: R&D + DR + workspace migration slice required` — reserved for
+  cross-cutting upgrades that touch product `Cargo.toml` / `Cargo.lock` or
+  database access patterns.
+
+Forward-looking row catalog (each row is R&D-only at the pack level; adopter
+projects override per-workspace). Status label appears on its own line so that
+router callers can grep `^Status:` at the start of a line.
+
+### 3.5.1 Rust 1.96 toolchain
+Status: R&D + DR
+MSRV bump requires per-product audit + `cargo deny` rerun. Coordinate with
+edition 2024 migration row before any product Cargo manifest change.
+
+### 3.5.2 edition 2024 migration
+Status: R&D + DR
+Only after Rust 1.96 lands and `cargo fix --edition` has been rerun against the
+entire workspace. No edits to product `Cargo.toml` from this pack alone.
+
+### 3.5.3 aws-lc-rs Rustls provider
+Status: R&D
+Evaluate as alternative to `ring` / default rustls provider. Requires advisory
+review, interop test against existing `quinn` / `rustls` stack, and per-target
+build matrix.
+
+### 3.5.4 cargo-vet supply-chain attestation
+Status: R&D
+Sandbox in CI before enforcing import gates. Start with informational mode and
+graduate to enforcing once trust set is populated.
+
+### 3.5.5 OpenTelemetry / opentelemetry-rust integration
+Status: R&D
+Replaces ad-hoc `tracing` exporters. SLO + cardinality sign-off required before
+enabling default exporters in production binaries.
+
+### 3.5.6 HTTP/3 / hyper 1.6 / h3 / quinn rollout
+Status: R&D
+Requires patched `quinn-proto >= 0.11.14` plus rollout gating. Do not enable on
+public edges by default; canary behind a per-workspace feature flag.
+
+### 3.5.7 sqlx 0.7 → 0.9 major upgrade
+Status: R&D + DR + workspace migration slice required
+`sqlx 0.8` is the transitional anchor; query macro / Connection trait changes
+need a per-workspace migration slice that re-runs the offline query cache.
+
+### 3.5.8 tokio / hyper / reqwest / wasm-bindgen / cargo-deny patch bumps
+Status: informational refresh
+Track upstream patch advisories; no migration slice unless an advisory is
+involved or MSRV moves.
+
+None of the forward-looking rows above sit inside an Adopt section. Adopting
+workspaces must encode their own Adopt baseline (pinned versions, MSRV, feature
+flags) inside the workspace `Cargo.toml` and surface drift via the relevant
+audit harness, not by editing this pack.
 
 ---
 

@@ -21,6 +21,7 @@ tree-sitter-javascript = { workspace = true, optional = true }
 tree-sitter-python = { workspace = true, optional = true }
 tree-sitter-go = { workspace = true, optional = true }
 tree-sitter-bash = { workspace = true, optional = true }
+tree-sitter-md = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -33,7 +34,9 @@ lang-typescript = ["dep:tree-sitter-typescript", "dep:tree-sitter-javascript"]
 lang-python = ["dep:tree-sitter-python"]
 lang-go = ["dep:tree-sitter-go"]
 lang-shell = ["dep:tree-sitter-bash"]
-all-languages = ["lang-rust", "lang-typescript", "lang-python", "lang-go", "lang-shell"]
+lang-markdown = ["dep:tree-sitter-md"]
+all-languages = ["lang-rust", "lang-typescript", "lang-python", "lang-go", "lang-shell", "lang-markdown"]
+full = ["all-languages"]
 
 [[bench]]
 name = "index_files"

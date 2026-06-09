@@ -211,8 +211,11 @@ fn do_upsert_symbols_inner(
     file_hash: &str,
     symbols: &[(crate::types::RawSymbol, Option<i64>)],
 ) -> shared::error::Result<Vec<i64>> {
-    // Delete existing symbols for this file.
-    remove_file_symbols_inner(conn, project_id, file_path)?;
+    // Replace existing symbols for this file. Dependencies originating from
+    // this file are removed because they will be re-extracted below. Inbound
+    // dependencies from unchanged files are preserved as unresolved rows and
+    // relinked by resolve_pending_dependencies after the new symbols land.
+    replace_file_symbols_inner(conn, project_id, file_path)?;
 
     let mut ids = Vec::with_capacity(symbols.len());
 
@@ -226,6 +229,8 @@ fn do_upsert_symbols_inner(
             ids.push(child_id);
         }
     }
+
+    resolve_preserved_inbound_dependencies_for_file_inner(conn, project_id, file_path)?;
 
     Ok(ids)
 }
@@ -481,8 +486,7 @@ fn do_update_parse_cache_inner(
     conn: &Connection,
     update: &ParseCacheUpdate<'_>,
 ) -> shared::error::Result<()> {
-    let updated_at_unix_ms =
-        unix_ms_to_i64(update.updated_at_unix_ms, "updated_at_unix_ms")?;
+    let updated_at_unix_ms = unix_ms_to_i64(update.updated_at_unix_ms, "updated_at_unix_ms")?;
     conn.execute(
         "INSERT OR REPLACE INTO file_parse_cache
          (project_id, file_path, file_hash, grammar_version, parsed_at, symbol_count,
@@ -568,7 +572,7 @@ pub struct GcReport {
 pub fn gc_symbols_not_in_snapshot_in_tx(
     tx: &rusqlite::Transaction,
     project_id: &str,
-    snapshot_paths_absolute: &std::collections::HashSet<String>,
+    snapshot_paths: &std::collections::HashSet<String>,
     tx_start_unix_ms: u64,
 ) -> shared::error::Result<GcReport> {
     let tx_start_unix_ms = unix_ms_to_i64(tx_start_unix_ms, "tx_start_unix_ms")?;
@@ -583,7 +587,7 @@ pub fn gc_symbols_not_in_snapshot_in_tx(
     for row in rows {
         let file_path =
             row.map_err(|e| AgentError::Database(format!("failed to read GC file path: {e}")))?;
-        if snapshot_paths_absolute.contains(&file_path) {
+        if snapshot_paths.contains(&file_path) {
             continue;
         }
 
@@ -703,6 +707,200 @@ fn remove_file_symbols_inner(
         params![project_id, file_path],
     )
     .map_err(|e| AgentError::Database(format!("failed to delete cache entry: {e}")))?;
+
+    Ok(())
+}
+
+/// Prepare a file for symbol replacement while preserving inbound dependency
+/// rows from unchanged files.
+///
+/// A per-file reindex deletes and reinserts the target file's symbols, which
+/// gives those symbols fresh row ids. If we delete inbound dependencies where
+/// unchanged callers point at the old target ids, reverse impact analysis loses
+/// those callers until they are reparsed. Instead, null the target id and keep
+/// the stable `to_name`; dependency resolution relinks the row to the new target
+/// symbol in the same indexing transaction.
+fn replace_file_symbols_inner(
+    conn: &Connection,
+    project_id: &str,
+    file_path: &str,
+) -> shared::error::Result<()> {
+    // Dependencies originating from this file will be freshly extracted.
+    conn.execute(
+        "DELETE FROM symbol_dependencies
+         WHERE from_symbol_id IN (
+             SELECT id FROM symbols WHERE project_id = ?1 AND file_path = ?2
+         )",
+        params![project_id, file_path],
+    )
+    .map_err(|e| AgentError::Database(format!("failed to delete from-dependencies: {e}")))?;
+
+    remember_inbound_dependency_scope(conn, project_id, file_path)?;
+
+    // Preserve unchanged callers by retaining their dependency rows and marking
+    // them unresolved until the replacement symbols are inserted. These rows
+    // are scoped above so they can only relink back into this same file; if the
+    // target no longer exists, they are deleted before global resolution.
+    conn.execute(
+        "UPDATE symbol_dependencies
+         SET to_symbol_id = NULL
+         WHERE to_symbol_id IN (
+             SELECT id FROM symbols WHERE project_id = ?1 AND file_path = ?2
+         )",
+        params![project_id, file_path],
+    )
+    .map_err(|e| AgentError::Database(format!("failed to preserve to-dependencies: {e}")))?;
+
+    conn.execute(
+        "DELETE FROM symbols WHERE project_id = ?1 AND file_path = ?2",
+        params![project_id, file_path],
+    )
+    .map_err(|e| AgentError::Database(format!("failed to delete symbols: {e}")))?;
+
+    conn.execute(
+        "DELETE FROM file_parse_cache WHERE project_id = ?1 AND file_path = ?2",
+        params![project_id, file_path],
+    )
+    .map_err(|e| AgentError::Database(format!("failed to delete cache entry: {e}")))?;
+
+    Ok(())
+}
+
+fn ensure_preserved_inbound_scope_table(conn: &Connection) -> shared::error::Result<()> {
+    conn.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS preserved_inbound_dependency_scope (
+            dependency_id INTEGER PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            file_path TEXT NOT NULL
+        )",
+    )
+    .map_err(|e| {
+        AgentError::Database(format!(
+            "failed to create preserved inbound dependency scope: {e}"
+        ))
+    })?;
+    Ok(())
+}
+
+fn remember_inbound_dependency_scope(
+    conn: &Connection,
+    project_id: &str,
+    file_path: &str,
+) -> shared::error::Result<()> {
+    ensure_preserved_inbound_scope_table(conn)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO preserved_inbound_dependency_scope
+         (dependency_id, project_id, file_path)
+         SELECT d.id, ?1, ?2
+           FROM symbol_dependencies d
+          WHERE d.project_id = ?1
+            AND d.to_symbol_id IN (
+                SELECT id FROM symbols WHERE project_id = ?1 AND file_path = ?2
+            )",
+        params![project_id, file_path],
+    )
+    .map_err(|e| {
+        AgentError::Database(format!("failed to remember inbound dependency scope: {e}"))
+    })?;
+    Ok(())
+}
+
+fn resolve_preserved_inbound_dependencies_for_file_inner(
+    conn: &Connection,
+    project_id: &str,
+    file_path: &str,
+) -> shared::error::Result<()> {
+    ensure_preserved_inbound_scope_table(conn)?;
+
+    conn.execute(
+        "UPDATE symbol_dependencies
+            SET to_symbol_id = (
+                SELECT s.id
+                  FROM symbols s
+                 WHERE s.project_id = ?1
+                   AND s.file_path = ?2
+                   AND s.qualified_name = symbol_dependencies.to_name
+            )
+          WHERE project_id = ?1
+            AND to_symbol_id IS NULL
+            AND id IN (
+                SELECT dependency_id
+                  FROM preserved_inbound_dependency_scope
+                 WHERE project_id = ?1 AND file_path = ?2
+            )
+            AND (
+                SELECT COUNT(*)
+                  FROM symbols s
+                 WHERE s.project_id = ?1
+                   AND s.file_path = ?2
+                   AND s.qualified_name = symbol_dependencies.to_name
+            ) = 1",
+        params![project_id, file_path],
+    )
+    .map_err(|e| {
+        AgentError::Database(format!(
+            "failed to relink preserved inbound dependencies by qualified name: {e}"
+        ))
+    })?;
+
+    conn.execute(
+        "UPDATE symbol_dependencies
+            SET to_symbol_id = (
+                SELECT s.id
+                  FROM symbols s
+                 WHERE s.project_id = ?1
+                   AND s.file_path = ?2
+                   AND s.name = symbol_dependencies.to_name
+            )
+          WHERE project_id = ?1
+            AND to_symbol_id IS NULL
+            AND id IN (
+                SELECT dependency_id
+                  FROM preserved_inbound_dependency_scope
+                 WHERE project_id = ?1 AND file_path = ?2
+            )
+            AND (
+                SELECT COUNT(*)
+                  FROM symbols s
+                 WHERE s.project_id = ?1
+                   AND s.file_path = ?2
+                   AND s.name = symbol_dependencies.to_name
+            ) = 1",
+        params![project_id, file_path],
+    )
+    .map_err(|e| {
+        AgentError::Database(format!(
+            "failed to relink preserved inbound dependencies by name: {e}"
+        ))
+    })?;
+
+    conn.execute(
+        "DELETE FROM symbol_dependencies
+          WHERE project_id = ?1
+            AND to_symbol_id IS NULL
+            AND id IN (
+                SELECT dependency_id
+                  FROM preserved_inbound_dependency_scope
+                 WHERE project_id = ?1 AND file_path = ?2
+            )",
+        params![project_id, file_path],
+    )
+    .map_err(|e| {
+        AgentError::Database(format!(
+            "failed to delete stale preserved inbound dependencies: {e}"
+        ))
+    })?;
+
+    conn.execute(
+        "DELETE FROM preserved_inbound_dependency_scope
+          WHERE project_id = ?1 AND file_path = ?2",
+        params![project_id, file_path],
+    )
+    .map_err(|e| {
+        AgentError::Database(format!(
+            "failed to clear preserved inbound dependency scope: {e}"
+        ))
+    })?;
 
     Ok(())
 }

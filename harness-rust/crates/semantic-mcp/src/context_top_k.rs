@@ -38,13 +38,12 @@ struct TopKResponse {
 
 pub fn handle_context_top_k(ctx: &ServerContext, input: &Value) -> Result<Value, String> {
     let input = normalize_input(ctx, input)?;
-    let absolute_files = input
+    // symbols.file_path is now repo-relative, so impact_analysis must query by
+    // the repo-relative changed_files (no repo_root.join). normalize_input has
+    // already validated and normalized these to repo-relative forward-slash
+    // form.
+    let changed_refs = input
         .changed_files
-        .iter()
-        .map(|file| ctx.repo_root.join(file))
-        .map(|path| path_to_forward_slashes(&path))
-        .collect::<Vec<_>>();
-    let changed_refs = absolute_files
         .iter()
         .map(String::as_str)
         .collect::<Vec<_>>();
@@ -343,8 +342,21 @@ fn symbol_key(symbol: &tree_sitter_index::Symbol) -> String {
     )
 }
 
+/// Return a repo-relative, forward-slash path for a stored `symbols.file_path`.
+///
+/// CRITICAL silent-drop guard (I-2 omission landmine): since the path flip,
+/// `symbols.file_path` is stored REPO-RELATIVE. If this still only handled
+/// absolute inputs (`strip_prefix(repo_root)` → `None` on a relative input),
+/// rank_top_k would silently skip EVERY top-k symbol and break the capsule by
+/// omission. So a relative input passes through unchanged; an absolute input is
+/// still stripped for migration/back-compat; an absolute path outside the repo
+/// root yields `None`.
 fn repo_relative_path(repo_root: &Path, file_path: &str) -> Result<Option<String>, String> {
     let path = PathBuf::from(file_path);
+    if path.is_relative() {
+        // Already repo-relative (the post-flip storage form): pass through.
+        return Ok(Some(path_to_forward_slashes(&path)));
+    }
     let relative = match path.strip_prefix(repo_root) {
         Ok(relative) => relative,
         Err(_) => return Ok(None),
@@ -359,13 +371,58 @@ fn path_to_forward_slashes(path: &Path) -> String {
 fn map_topk_freshness_error(error: FreshnessError) -> String {
     match error {
         FreshnessError::MissingCacheEntry(path) => {
+            // Actionable, NOT lazy-index: indexing is edit-driven, so a changed
+            // file that has not been Edit/Write-touched (i.e. stable source) has
+            // no parse-cache row yet. Tell the caller exactly how to populate it
+            // with the source-first bootstrap, and that the file is otherwise
+            // picked up on the next orchestration iteration.
             format!(
-                "sem.context.top_k failed: file_parse_cache miss for {path}; run context update first"
+                "sem.context.top_k failed: file_parse_cache miss for {path}. \
+                 This file is not yet indexed (indexing is edit-driven; stable \
+                 source that was not just edited is not covered). Run the \
+                 source-first full reindex once: `agent-core context index-all \
+                 --apply` from the repo root (or `scripts/semantic-bootstrap.sh \
+                 --index-all`), then retry. Edited files are also indexed \
+                 automatically on the next iteration."
             )
         }
         FreshnessError::InvalidIndexVersion(value) => {
             format!("sem.context.top_k failed: read index version: _ts_meta.index_version invalid: {value}")
         }
         other => format!("sem.context.top_k failed: freshness snapshot: {other}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn repo_relative_path_passes_through_already_relative_input() {
+        // CRITICAL silent-drop guard: post path-flip, symbols.file_path is
+        // stored repo-relative. A relative input must pass through unchanged so
+        // rank_top_k does NOT skip the symbol (which would break the capsule by
+        // omission).
+        let repo_root = Path::new("/tmp/revh-test/project");
+        let out = repo_relative_path(repo_root, "src/foo/bar.rs").unwrap();
+        assert_eq!(out, Some("src/foo/bar.rs".to_string()));
+    }
+
+    #[test]
+    fn repo_relative_path_strips_absolute_under_root_for_backcompat() {
+        // Legacy/migration back-compat: an absolute path under the repo root is
+        // still stripped to repo-relative.
+        let repo_root = Path::new("/tmp/revh-test/project");
+        let out =
+            repo_relative_path(repo_root, "/tmp/revh-test/project/src/foo/bar.rs").unwrap();
+        assert_eq!(out, Some("src/foo/bar.rs".to_string()));
+    }
+
+    #[test]
+    fn repo_relative_path_drops_absolute_outside_root() {
+        let repo_root = Path::new("/tmp/revh-test/project");
+        let out = repo_relative_path(repo_root, "/etc/passwd").unwrap();
+        assert_eq!(out, None);
     }
 }

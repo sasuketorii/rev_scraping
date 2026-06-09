@@ -140,7 +140,7 @@ docs/generated/codex-model-policy.md|\
 AGENTS.md|CLAUDE.md|.agent_rules/RULES.md|.codex/*|.codex/**/*|\
 .claude/settings.json|.claude/commands/*|.claude/commands/**/*|\
 .agent/registry/*|.agent/registry/**/*|.agent/generated/*|.agent/generated/**/*|\
-scripts/semantic-mcp-server/*|scripts/semantic-mcp-server/**/*|harness-rust/*|harness-rust/**/*)
+harness-rust/*|harness-rust/**/*)
       raise_to "heavy"
       append_reason "heavy surface: $path"
       return 0

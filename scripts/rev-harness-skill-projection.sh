@@ -664,8 +664,9 @@ for line in frontmatter_text.splitlines():
     item = re.match(r"^([A-Za-z0-9_-]+):(?:[ \t]*(.*))?$", line)
     if item:
         frontmatter[item.group(1)] = (item.group(2) or "").strip().strip("\"").strip(chr(39))
-if frontmatter.get("name") != expected_name:
-    raise SystemExit(f"frontmatter name does not match expected skill: {frontmatter.get('name')} != {expected_name}")
+actual_name = frontmatter.get("name")
+if actual_name != expected_name:
+    raise SystemExit(f"frontmatter name does not match expected skill: {actual_name} != {expected_name}")
 if not frontmatter.get("description"):
     raise SystemExit("description must be non-empty")
 if not body.strip():

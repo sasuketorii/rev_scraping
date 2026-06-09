@@ -211,10 +211,10 @@ run_skill_projection_check() {
     .status == "PASS"
     and .mode == "acceptance"
     and .acceptance_eligible == true
-    and any(.sources[]; .skill == "rustskills-architecture" and .status == "PASS")
-    and any(.projections[]; .skill == "rustskills-architecture" and .provider == "claude" and .activation_status == "project-local-active" and .auto_discoverable == true and .status == "PASS")
-    and any(.projections[]; .skill == "rustskills-architecture" and .provider == "codex-installed" and .activation_status == "installed-active" and .auto_discoverable == true and .status == "PASS")
-    and any(.projections[]; .skill == "rustskills-architecture" and .provider == "codex-generated" and .activation_status == "install-required" and .auto_discoverable == false and .status == "PASS")
+    and any(.sources[]; .skill == "rustskills-architecture-legacy" and .status == "PASS")
+    and any(.projections[]; .skill == "rustskills-architecture-legacy" and .provider == "claude" and .activation_status == "project-local-active" and .auto_discoverable == true and .status == "PASS")
+    and any(.projections[]; .skill == "rustskills-architecture-legacy" and .provider == "codex-installed" and .activation_status == "installed-active" and .auto_discoverable == true and .status == "PASS")
+    and any(.projections[]; .skill == "rustskills-architecture-legacy" and .provider == "codex-generated" and .activation_status == "install-required" and .auto_discoverable == false and .status == "PASS")
     and all(.projections[]; if .provider == "codex-generated" then (.activation_status == "install-required" and .auto_discoverable == false) else true end)
   ' "$SKILL_REPORT_JSON" >/dev/null || {
     record_failure "skill-projection" "active skill path contract failed" "$SKILL_MANIFEST_DISPLAY"
@@ -523,7 +523,7 @@ SKILL_REPORT_JSON="$TMP_DIR/skill-projection.json"
 : >"$FAILURES_JSONL"
 : >"$PREREQUISITES_JSONL"
 printf 'null\n' >"$SKILL_REPORT_JSON"
-trap 'rm -rf "$TMP_DIR"' EXIT
+trap 'rm -rf "$TMP_DIR" >/dev/null 2>&1 || true' EXIT
 
 validate_distribution_manifest || true
 validate_required_docs || true
@@ -536,3 +536,4 @@ if [[ -s "$FAILURES_JSONL" ]]; then
 fi
 
 emit_report "PASS"
+exit 0

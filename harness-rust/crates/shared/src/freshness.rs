@@ -39,11 +39,17 @@ pub fn snapshot(
     let repo_root = repo_root.canonicalize()?;
     let mut pairs = Vec::with_capacity(changed_files_repo_relative.len());
     for rel in changed_files_repo_relative {
-        let absolute = validate_repo_relative_path(&repo_root, rel)?;
-        let absolute_key = path_to_forward_slashes(&absolute);
-        let hash = lookup_file_hash(conn, project_id, &absolute_key)?
+        // Validate the path on disk (symlink / escape / traversal guards) using
+        // the absolute join, but key file_parse_cache and the rollup by the
+        // REPO-RELATIVE string — file_parse_cache.file_path is now stored
+        // repo-relative (path flip). Storage + rollup input flip together, so
+        // sem.capsule freshness-verify stays internally consistent (the
+        // FILE_SHA_ROLLUP value changes intentionally; there is no golden).
+        validate_repo_relative_path(&repo_root, rel)?;
+        let relative_key = path_to_forward_slashes(Path::new(rel));
+        let hash = lookup_file_hash(conn, project_id, &relative_key)?
             .ok_or_else(|| FreshnessError::MissingCacheEntry(rel.clone()))?;
-        pairs.push((absolute_key, hash));
+        pairs.push((relative_key, hash));
     }
     pairs.sort_by(|a, b| a.0.cmp(&b.0));
     let rollup_input = pairs

@@ -170,12 +170,11 @@ setup_native_layout_repo() {
 copy_runtime_launcher_scripts() {
   local repo_root="$1"
 
-  mkdir -p "$repo_root/scripts" "$repo_root/scripts/semantic-mcp-server"
+  mkdir -p "$repo_root/scripts"
   /bin/cp "$REPO_ROOT/scripts/project-id.sh" "$repo_root/scripts/project-id.sh"
   /bin/cp "$REPO_ROOT/scripts/resolve-semantic-project-id.sh" "$repo_root/scripts/resolve-semantic-project-id.sh"
   /bin/cp "$REPO_ROOT/scripts/semantic-review-queue.sh" "$repo_root/scripts/semantic-review-queue.sh"
   /bin/cp "$REPO_ROOT/scripts/launch-semantic-mcp.sh" "$repo_root/scripts/launch-semantic-mcp.sh"
-  ln -s "$REPO_ROOT/scripts/semantic-mcp-server/node_modules" "$repo_root/scripts/semantic-mcp-server/node_modules"
   chmod +x \
     "$repo_root/scripts/project-id.sh" \
     "$repo_root/scripts/resolve-semantic-project-id.sh" \
@@ -183,6 +182,9 @@ copy_runtime_launcher_scripts() {
     "$repo_root/scripts/launch-semantic-mcp.sh"
 }
 
+# NEGATIVE CONTROL: plant a fake Node entrypoint at the LEGACY location (the
+# Node tree was removed in S3-B3). The launcher must NEVER execute it; tests
+# assert this log is never written, proving the deleted Node path is dead.
 write_runtime_node_entrypoint() {
   local repo_root="$1"
   local log_path="$repo_root/.runtime-node.log"
@@ -1117,7 +1119,6 @@ mkdir -p "$NODE_RUNTIME_REPO"
 NODE_RUNTIME_REPO="$(cd "$NODE_RUNTIME_REPO" && pwd -P)"
 copy_runtime_launcher_scripts "$NODE_RUNTIME_REPO"
 NODE_RUNTIME_LOG="$(write_runtime_node_entrypoint "$NODE_RUNTIME_REPO")"
-NODE_RUNTIME_ENTRY="$NODE_RUNTIME_REPO/scripts/semantic-mcp-server/dist/index.js"
 NODE_RUNTIME_PRELOAD="$TMP_RUNTIME/node-options-preload.js"
 NODE_RUNTIME_PRELOAD_MARKER="$TMP_RUNTIME/node-options-preload.marker"
 NODE_RUNTIME_HOSTILE_BIN="$TMP_RUNTIME/node-hostile-bin"
@@ -1140,6 +1141,27 @@ HOSTILE_RUNTIME_REPO="$(cd "$HOSTILE_RUNTIME_REPO" && pwd -P)"
 copy_runtime_launcher_scripts "$HOSTILE_RUNTIME_REPO"
 HOSTILE_RUNTIME_LOG="$(write_runtime_node_entrypoint "$HOSTILE_RUNTIME_REPO")"
 
+ADOPTER_RUNTIME_HARNESS_REPO="$TMP_RUNTIME/adopter-harness-repo"
+mkdir -p "$ADOPTER_RUNTIME_HARNESS_REPO"
+ADOPTER_RUNTIME_HARNESS_REPO="$(cd "$ADOPTER_RUNTIME_HARNESS_REPO" && pwd -P)"
+copy_runtime_launcher_scripts "$ADOPTER_RUNTIME_HARNESS_REPO"
+ADOPTER_RUNTIME_HARNESS_LOG="$(write_runtime_node_entrypoint "$ADOPTER_RUNTIME_HARNESS_REPO")"
+
+ADOPTER_RUNTIME_REPO="$TMP_RUNTIME/adopter-repo"
+mkdir -p "$ADOPTER_RUNTIME_REPO"
+ADOPTER_RUNTIME_REPO="$(cd "$ADOPTER_RUNTIME_REPO" && pwd -P)"
+setup_native_layout_repo "$ADOPTER_RUNTIME_REPO"
+
+ADOPTER_CORRUPT_RUNTIME_REPO="$TMP_RUNTIME/adopter-corrupt-repo"
+mkdir -p "$ADOPTER_CORRUPT_RUNTIME_REPO"
+ADOPTER_CORRUPT_RUNTIME_REPO="$(cd "$ADOPTER_CORRUPT_RUNTIME_REPO" && pwd -P)"
+setup_native_layout_repo "$ADOPTER_CORRUPT_RUNTIME_REPO"
+
+ADOPTER_SAMEID_RUNTIME_REPO="$TMP_RUNTIME/adopter-sameid-repo"
+mkdir -p "$ADOPTER_SAMEID_RUNTIME_REPO"
+ADOPTER_SAMEID_RUNTIME_REPO="$(cd "$ADOPTER_SAMEID_RUNTIME_REPO" && pwd -P)"
+setup_native_layout_repo "$ADOPTER_SAMEID_RUNTIME_REPO"
+
 (
   cd "$NODE_RUNTIME_REPO"
   git init -q
@@ -1154,11 +1176,21 @@ HOSTILE_RUNTIME_LOG="$(write_runtime_node_entrypoint "$HOSTILE_RUNTIME_REPO")"
   [[ -f "$RUNTIME_ARTIFACT_PATH" ]] || fail "artifact path missing after bootstrap: $RUNTIME_ARTIFACT_PATH"
   [[ "$RUNTIME_ID" =~ ^samplerepo-[a-f0-9]{12}$ ]] || fail "unexpected runtime project_id: $RUNTIME_ID"
 
+  # S3-B3: the Node backend tree is deleted. The escape env
+  # REV_HARNESS_ALLOW_NODE_SEMANTIC=1 is now a fail-closed no-op (it can no
+  # longer resurrect the Node launcher). With no Rust workspace present, the
+  # exec path must fail closed and never execute the planted Node entrypoint.
+  set +e
+  REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
   PATH="$NODE_RUNTIME_ID_HOSTILE_BIN:$(real_allowlisted_node_dir):/usr/bin:/bin" \
-    bash scripts/project-id.sh exec-mcp-server extra --flag >/dev/null
-
-  RUNTIME_LAUNCH_OUT="$(cat "$NODE_RUNTIME_LOG")"
-  assert_contains "args=$NODE_RUNTIME_ENTRY --project-id $RUNTIME_ID extra --flag" "$RUNTIME_LAUNCH_OUT"
+    bash scripts/project-id.sh exec-mcp-server extra --flag \
+    >"$TMP_RUNTIME/node_escape_noop.stdout" \
+    2>"$TMP_RUNTIME/node_escape_noop.stderr"
+  node_escape_noop_rc=$?
+  set -e
+  [[ "$node_escape_noop_rc" -ne 0 ]] || fail "escape env must remain fail-closed (Node backend removed in S3)"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME/node_escape_noop.stderr")"
+  [[ ! -e "$NODE_RUNTIME_LOG" ]] || fail "escape env must not resurrect the removed Node entrypoint"
   assert_hostile_path_binary_not_executed "$NODE_RUNTIME_ID_HOSTILE_BIN" id
 
   if SEMANTIC_PROJECT_ID_RESOLVER=/tmp/fake-resolver.sh \
@@ -1195,25 +1227,33 @@ HOSTILE_RUNTIME_LOG="$(write_runtime_node_entrypoint "$HOSTILE_RUNTIME_REPO")"
   assert_contains "PROJECT_ID_REPO_ROOT override is forbidden for exec-mcp-server" "$(cat "$TMP_RUNTIME/hostile_bypass.stderr")"
   [[ ! -e "$HOSTILE_RUNTIME_LOG" ]] || fail "foreign runtime entrypoint executed through PROJECT_ID_REPO_ROOT bypass"
 
+  # S3-B3: escape env + caller NODE_OPTIONS must still fail closed (Node tree
+  # gone). The caller's NODE_OPTIONS preload must never be evaluated because no
+  # node entrypoint is ever launched.
+  set +e
+  REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
   NODE_OPTIONS="--require $NODE_RUNTIME_PRELOAD" \
-    bash scripts/launch-semantic-mcp.sh extra --flag >/dev/null
+    bash scripts/launch-semantic-mcp.sh extra --flag \
+    >"$TMP_RUNTIME/node_options_noop.stdout" \
+    2>"$TMP_RUNTIME/node_options_noop.stderr"
+  node_options_noop_rc=$?
+  set -e
+  [[ "$node_options_noop_rc" -ne 0 ]] || fail "escape env + NODE_OPTIONS must remain fail-closed (Node backend removed)"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME/node_options_noop.stderr")"
+  [[ ! -e "$NODE_RUNTIME_LOG" ]] || fail "escape env must not resurrect the removed Node entrypoint"
+  [[ ! -e "$NODE_RUNTIME_PRELOAD_MARKER" ]] || fail "fail-closed path must not evaluate caller NODE_OPTIONS"
 
-  RUNTIME_LAUNCH_OUT="$(cat "$NODE_RUNTIME_LOG")"
-  assert_contains "args=$NODE_RUNTIME_ENTRY --project-id $RUNTIME_ID extra --flag" "$RUNTIME_LAUNCH_OUT"
-  assert_contains "node_options=" "$RUNTIME_LAUNCH_OUT"
-  assert_not_contains "node_options=--require $NODE_RUNTIME_PRELOAD" "$RUNTIME_LAUNCH_OUT"
-  [[ ! -e "$NODE_RUNTIME_PRELOAD_MARKER" ]] || fail "project-id node runtime must not inherit caller NODE_OPTIONS"
-
-  rm -f "$NODE_RUNTIME_LOG"
-  if PATH="$NODE_RUNTIME_HOSTILE_BIN:$(real_allowlisted_node_dir):/usr/bin:/bin" \
+  /bin/rm -f "$NODE_RUNTIME_LOG"
+  if REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
+    PATH="$NODE_RUNTIME_HOSTILE_BIN:$(real_allowlisted_node_dir):/usr/bin:/bin" \
     bash scripts/launch-semantic-mcp.sh extra --flag \
       >"$TMP_RUNTIME/node_path_poison.stdout" \
       2>"$TMP_RUNTIME/node_path_poison.stderr"; then
-    fail "project-id node runtime unexpectedly accepted PATH-first hostile node wrapper"
+    fail "escape env must fail closed even with a PATH-first hostile node wrapper"
   fi
-  assert_contains "node runtime not found" "$(cat "$TMP_RUNTIME/node_path_poison.stderr")"
-  [[ ! -e "$NODE_RUNTIME_LOG" ]] || fail "project-id node runtime should fail closed before repo-local entrypoint execution"
-  [[ ! -e "$NODE_RUNTIME_HOSTILE_BIN/node.marker" ]] || fail "project-id node runtime must not execute PATH-first hostile node wrapper"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME/node_path_poison.stderr")"
+  [[ ! -e "$NODE_RUNTIME_LOG" ]] || fail "fail-closed path must not execute a repo-local node entrypoint"
+  [[ ! -e "$NODE_RUNTIME_HOSTILE_BIN/node.marker" ]] || fail "fail-closed path must not execute a PATH-first hostile node wrapper"
 
   if NODE_OPTIONS="--require $NODE_RUNTIME_PRELOAD" \
       PATH="$NODE_RUNTIME_HOSTILE_BIN:$(real_allowlisted_node_dir):/usr/bin:/bin" \
@@ -1228,6 +1268,10 @@ HOSTILE_RUNTIME_LOG="$(write_runtime_node_entrypoint "$HOSTILE_RUNTIME_REPO")"
   [[ ! -e "$NODE_RUNTIME_HOSTILE_BIN/node.marker" ]] || fail "removed direct Rust CLI surface should not execute PATH-first hostile node wrapper"
 )
 
+# S3-B3: with the Rust workspace absent (helper __internal-rust-workspace-root
+# returns 3), exec-mcp-server must fail closed in project-id.sh itself. The Node
+# backend was removed, so the helper's former Node runtime path is never
+# reached — the escape env is a fail-closed no-op with a clear message.
 TMP_RUNTIME_DIAG="$(mktemp -d "${TMPDIR:-/tmp}/semantic_project_id_runtime_diag.XXXXXX")"
 RUNTIME_DIAG_REPO="$TMP_RUNTIME_DIAG/repo"
 mkdir -p "$RUNTIME_DIAG_REPO"
@@ -1242,14 +1286,6 @@ write_literal_file "$RUNTIME_DIAG_REPO/scripts/semantic-review-queue.sh" \
   '  __internal-rust-workspace-root)' \
   '    exit 3' \
   '    ;;' \
-  '  __internal-run-runtime)' \
-  "    printf '%s\\n' 'semantic-review-queue.sh: trusted node runtime is incompatible with semantic queue backend: /fake/node' >&2" \
-  '    exit 1' \
-  '    ;;' \
-  '  __internal-runtime-env)' \
-  "    printf '%s\\n' 'semantic-review-queue.sh: unexpected __internal-runtime-env invocation' >&2" \
-  '    exit 91' \
-  '    ;;' \
   '  *)' \
   "    printf 'semantic-review-queue.sh: unexpected invocation: %s\\n' \"\$*\" >&2" \
   '    exit 92' \
@@ -1262,14 +1298,14 @@ chmod +x "$RUNTIME_DIAG_REPO/scripts/semantic-review-queue.sh"
   git init -q
   bash scripts/project-id.sh bootstrap SampleRepo >/dev/null
 
-  if bash scripts/project-id.sh exec-mcp-server \
+  if REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
+    bash scripts/project-id.sh exec-mcp-server \
       >"$TMP_RUNTIME_DIAG/runtime_diag.stdout" \
       2>"$TMP_RUNTIME_DIAG/runtime_diag.stderr"; then
-    fail "project-id exec-mcp-server should surface helper runtime diagnostics"
+    fail "project-id exec-mcp-server should fail closed when Rust workspace is absent"
   fi
-  assert_contains "trusted node runtime is incompatible with semantic queue backend" "$(cat "$TMP_RUNTIME_DIAG/runtime_diag.stderr")"
-  assert_not_contains "unexpected __internal-runtime-env invocation" "$(cat "$TMP_RUNTIME_DIAG/runtime_diag.stderr")"
-  assert_not_contains "node runtime not found: node" "$(cat "$TMP_RUNTIME_DIAG/runtime_diag.stderr")"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME_DIAG/runtime_diag.stderr")"
+  assert_not_contains "unexpected invocation" "$(cat "$TMP_RUNTIME_DIAG/runtime_diag.stderr")"
 )
 
 NO_CARGO_RUNTIME_REPO="$TMP_RUNTIME/no-cargo-repo"
@@ -1288,11 +1324,31 @@ PATH_WITHOUT_CARGO="$(real_allowlisted_node_dir):$(path_without_command_dir carg
   NO_CARGO_RUNTIME_ID="$(bash scripts/project-id.sh bootstrap NoCargoRepo)"
   [[ "$NO_CARGO_RUNTIME_ID" =~ ^nocargorepo-[a-f0-9]{12}$ ]] || fail "unexpected no-cargo runtime project_id: $NO_CARGO_RUNTIME_ID"
 
+  set +e
   PATH="$PATH_WITHOUT_CARGO" \
-    bash scripts/launch-semantic-mcp.sh extra --flag >/dev/null
+    bash scripts/launch-semantic-mcp.sh extra --flag \
+    >"$TMP_RUNTIME/no_cargo_fail_closed.stdout" \
+    2>"$TMP_RUNTIME/no_cargo_fail_closed.stderr"
+  no_cargo_rc=$?
+  set -e
 
-  NO_CARGO_LAUNCH_OUT="$(cat "$NO_CARGO_RUNTIME_LOG")"
-  assert_contains "args=$NO_CARGO_RUNTIME_REPO/scripts/semantic-mcp-server/dist/index.js --project-id $NO_CARGO_RUNTIME_ID extra --flag" "$NO_CARGO_LAUNCH_OUT"
+  [[ "$no_cargo_rc" -ne 0 ]] || fail "no-cargo runtime should fail closed (Node backend removed in S3)"
+  assert_contains "Rust semantic backend required" "$(cat "$TMP_RUNTIME/no_cargo_fail_closed.stderr")"
+  [[ ! -e "$NO_CARGO_RUNTIME_LOG" ]] || fail "no-cargo runtime must not execute a Node entrypoint"
+
+  # S3-B3: the Node tree is deleted; REV_HARNESS_ALLOW_NODE_SEMANTIC is now a
+  # no-op and must still fail closed with a clear "Node backend removed" message.
+  set +e
+  REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
+  PATH="$PATH_WITHOUT_CARGO" \
+    bash scripts/launch-semantic-mcp.sh extra --flag \
+    >"$TMP_RUNTIME/no_cargo_escape.stdout" \
+    2>"$TMP_RUNTIME/no_cargo_escape.stderr"
+  no_cargo_escape_rc=$?
+  set -e
+  [[ "$no_cargo_escape_rc" -ne 0 ]] || fail "escape env must remain fail-closed (Node backend removed)"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME/no_cargo_escape.stderr")"
+  [[ ! -e "$NO_CARGO_RUNTIME_LOG" ]] || fail "escape env must not resurrect the removed Node entrypoint"
 )
 
 NO_RUST_RUNTIME_REPO="$TMP_RUNTIME/no-rust-repo"
@@ -1308,11 +1364,30 @@ NO_RUST_RUNTIME_LOG="$(write_runtime_node_entrypoint "$NO_RUST_RUNTIME_REPO")"
   NO_RUST_RUNTIME_ID="$(bash scripts/project-id.sh bootstrap NoRustRepo)"
   [[ "$NO_RUST_RUNTIME_ID" =~ ^norustrepo-[a-f0-9]{12}$ ]] || fail "unexpected no-rust runtime project_id: $NO_RUST_RUNTIME_ID"
 
+  set +e
   PATH="$(real_allowlisted_node_dir):$(path_without_command_dir cargo)" \
-    bash scripts/launch-semantic-mcp.sh extra --flag >/dev/null
+    bash scripts/launch-semantic-mcp.sh extra --flag \
+    >"$TMP_RUNTIME/no_rust_fail_closed.stdout" \
+    2>"$TMP_RUNTIME/no_rust_fail_closed.stderr"
+  no_rust_rc=$?
+  set -e
 
-  NO_RUST_LAUNCH_OUT="$(cat "$NO_RUST_RUNTIME_LOG")"
-  assert_contains "args=$NO_RUST_RUNTIME_REPO/scripts/semantic-mcp-server/dist/index.js --project-id $NO_RUST_RUNTIME_ID extra --flag" "$NO_RUST_LAUNCH_OUT"
+  [[ "$no_rust_rc" -ne 0 ]] || fail "no-rust runtime should fail closed (Node backend removed in S3)"
+  assert_contains "Rust semantic backend required" "$(cat "$TMP_RUNTIME/no_rust_fail_closed.stderr")"
+  [[ ! -e "$NO_RUST_RUNTIME_LOG" ]] || fail "no-rust runtime must not execute a Node entrypoint"
+
+  # S3-B3: escape env is a fail-closed no-op now that the Node tree is gone.
+  set +e
+  REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
+  PATH="$(real_allowlisted_node_dir):$(path_without_command_dir cargo)" \
+    bash scripts/launch-semantic-mcp.sh extra --flag \
+    >"$TMP_RUNTIME/no_rust_escape.stdout" \
+    2>"$TMP_RUNTIME/no_rust_escape.stderr"
+  no_rust_escape_rc=$?
+  set -e
+  [[ "$no_rust_escape_rc" -ne 0 ]] || fail "escape env must remain fail-closed (Node backend removed)"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME/no_rust_escape.stderr")"
+  [[ ! -e "$NO_RUST_RUNTIME_LOG" ]] || fail "escape env must not resurrect the removed Node entrypoint"
 )
 
 SYMLINK_RUNTIME_REPO="$TMP_RUNTIME/symlink-repo"
@@ -1367,12 +1442,30 @@ write_repo_local_rust_bridge_fixture_at "$LEGACY_ONLY_RUNTIME_REPO" "toRust-Idea
   LEGACY_ONLY_RUNTIME_ID="$(bash scripts/project-id.sh bootstrap LegacyOnlyRepo)"
   [[ "$LEGACY_ONLY_RUNTIME_ID" =~ ^legacyonlyrepo-[a-f0-9]{12}$ ]] || fail "unexpected legacy-only runtime project_id: $LEGACY_ONLY_RUNTIME_ID"
 
+  set +e
   PATH="$(real_allowlisted_node_dir):$(path_without_command_dir cargo)" \
     bash scripts/launch-semantic-mcp.sh extra --flag \
-    >/dev/null
+    >"$TMP_RUNTIME/legacy_only_fail_closed.stdout" \
+    2>"$TMP_RUNTIME/legacy_only_fail_closed.stderr"
+  legacy_only_rc=$?
+  set -e
 
-  LEGACY_ONLY_LAUNCH_OUT="$(cat "$LEGACY_ONLY_RUNTIME_LOG")"
-  assert_contains "args=$LEGACY_ONLY_RUNTIME_REPO/scripts/semantic-mcp-server/dist/index.js --project-id $LEGACY_ONLY_RUNTIME_ID extra --flag" "$LEGACY_ONLY_LAUNCH_OUT"
+  [[ "$legacy_only_rc" -ne 0 ]] || fail "legacy-only runtime should fail closed (Node backend removed in S3)"
+  assert_contains "Rust semantic backend required" "$(cat "$TMP_RUNTIME/legacy_only_fail_closed.stderr")"
+  [[ ! -e "$LEGACY_ONLY_RUNTIME_LOG" ]] || fail "legacy-only runtime must not execute a Node entrypoint"
+
+  # S3-B3: escape env is a fail-closed no-op now that the Node tree is gone.
+  set +e
+  REV_HARNESS_ALLOW_NODE_SEMANTIC=1 \
+  PATH="$(real_allowlisted_node_dir):$(path_without_command_dir cargo)" \
+    bash scripts/launch-semantic-mcp.sh extra --flag \
+    >"$TMP_RUNTIME/legacy_only_escape.stdout" \
+    2>"$TMP_RUNTIME/legacy_only_escape.stderr"
+  legacy_only_escape_rc=$?
+  set -e
+  [[ "$legacy_only_escape_rc" -ne 0 ]] || fail "escape env must remain fail-closed (Node backend removed)"
+  assert_contains "Node backend removed; Rust required" "$(cat "$TMP_RUNTIME/legacy_only_escape.stderr")"
+  [[ ! -e "$LEGACY_ONLY_RUNTIME_LOG" ]] || fail "escape env must not resurrect the removed Node entrypoint"
 )
 
 if command -v cargo >/dev/null 2>&1; then
@@ -1418,14 +1511,14 @@ if command -v cargo >/dev/null 2>&1; then
     assert_not_contains "rustc_wrapper=$RUST_RUNTIME_WRAPPER" "$RUST_RUNTIME_OUT"
     [[ ! -e "$RUST_RUNTIME_WRAPPER_MARKER" ]] || fail "project-id cargo runtime must not inherit caller RUSTC_WRAPPER"
 
-    rm -f "$RUST_RUNTIME_LOG"
+    /bin/rm -f "$RUST_RUNTIME_LOG"
     if PATH="$RUST_RUNTIME_HOSTILE_BIN:$(real_allowlisted_cargo_dir):$(real_allowlisted_node_dir):/usr/bin:/bin" \
       bash scripts/launch-semantic-mcp.sh \
         >"$TMP_RUNTIME/rust_path_poison.stdout" \
         2>"$TMP_RUNTIME/rust_path_poison.stderr"; then
       fail "project-id cargo runtime unexpectedly accepted PATH-first hostile cargo wrapper"
     fi
-    assert_contains "semantic MCP entrypoint not found" "$(cat "$TMP_RUNTIME/rust_path_poison.stderr")"
+    assert_contains "Rust semantic backend required" "$(cat "$TMP_RUNTIME/rust_path_poison.stderr")"
     [[ ! -e "$RUST_RUNTIME_LOG" ]] || fail "project-id cargo runtime should fail closed before repo-local Rust launch"
     [[ ! -e "$RUST_RUNTIME_HOSTILE_BIN/cargo.marker" ]] || fail "project-id cargo runtime must not execute PATH-first hostile cargo wrapper"
 
@@ -1443,15 +1536,15 @@ if command -v cargo >/dev/null 2>&1; then
   )
 fi
 
-[[ "$(jq -r '.mcpServers.semantic.command' "$REPO_ROOT/.claude/settings.json")" == "./scripts/launch-semantic-mcp.sh" ]] \
-  || fail "settings semantic command did not point to ./scripts/launch-semantic-mcp.sh"
-[[ "$(jq -r '.mcpServers.semantic.args | length' "$REPO_ROOT/.claude/settings.json")" == "0" ]] \
-  || fail "settings semantic args should be empty when launch wrapper owns argv"
+[[ "$(jq -r '.mcpServers["semantic-mcp"].command' "$REPO_ROOT/.claude/settings.json")" == "./scripts/launch-semantic-mcp.sh" ]] \
+  || fail "settings semantic-mcp command did not point to ./scripts/launch-semantic-mcp.sh"
+[[ "$(jq -r '.mcpServers["semantic-mcp"].args | length' "$REPO_ROOT/.claude/settings.json")" == "0" ]] \
+  || fail "settings semantic-mcp args should be empty when launch wrapper owns argv"
 if grep -q 'agent_base' "$REPO_ROOT/.claude/settings.json"; then
   fail "settings.json still contains legacy literal agent_base"
 fi
-python3 -c 'import sys, tomllib; data = tomllib.load(open(sys.argv[1], "rb")); command = data.get("mcp_servers", {}).get("semantic", {}).get("command"); raise SystemExit(0 if command == "./scripts/launch-semantic-mcp.sh" else 1)' \
-  "$REPO_ROOT/.codex/config.toml" >/dev/null || fail "Codex semantic command did not point to ./scripts/launch-semantic-mcp.sh"
+python3 -c 'import sys, tomllib; data = tomllib.load(open(sys.argv[1], "rb")); command = data.get("mcp_servers", {}).get("semantic-mcp", {}).get("command"); raise SystemExit(0 if command == "./scripts/launch-semantic-mcp.sh" else 1)' \
+  "$REPO_ROOT/.codex/config.toml" >/dev/null || fail "Codex semantic-mcp command did not point to ./scripts/launch-semantic-mcp.sh"
 
 # 3. reviewer live state remains scratch only.
 TMP_REVIEW="$(mktemp -d "${TMPDIR:-/tmp}/semantic_project_id_review_state.XXXXXX")"

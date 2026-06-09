@@ -1,6 +1,6 @@
 ---
 name: "staff-code-reviewer"
-description: "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。"
+description: "PR をブロックすべき問題、リリース前に修正すべき問題、または明示的にリスク受容すべき問題を特定する役割。trigger: コードレビュー依頼、PR レビュー、リリース前の最終チェック、バグやセキュリティ問題の検出。— Use for code review, PR review, pull request review, reviewer LGTM, security review, release gate."
 source_specialty_file: "docs/roles/reviewer/specialties/staff-code-reviewer.md"
 source_manifest_hash: "eda83f98f89f9c8e24d5a2a08d045ddac65bc29946ddbe91beabcb981266fe44"
 canonical_role: "reviewer"

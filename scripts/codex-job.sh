@@ -326,7 +326,7 @@ cmd_start() {
   # 0.0.6 PR-A: --keep-prompt 未指定なら子の最後に prompt を消す。
   local cleanup_prompt_cmd=""
   if ! $keep_prompt; then
-    cleanup_prompt_cmd='rm -f "$3" 2>/dev/null || true;'
+    cleanup_prompt_cmd='/bin/rm -f "$3" 2>/dev/null || true;'
   fi
   (
     # 子プロセスは新しいセッションで動かしたい所だが setsid は macOS にない。
@@ -424,7 +424,7 @@ cmd_wait() {
   fi
 
   # 0.0.6 PR-A (HIGH-1 境界):
-  #   timeout=0 : 即時 check のみ。完了済なら exit code、未完了なら 124。
+  #   timeout=0 : 即時 check のみ。完了済なら exit code、実行中なら 124。
   #   timeout>=1: 各イテレーションで exit_code を先に確認 → 終了 → sleep。
   #   sleep は min(remaining, POLL_INTERVAL) で実効 1 秒境界も尊重。
   local elapsed=0
@@ -461,6 +461,24 @@ cmd_wait() {
   fi
 
   refresh_status "$job_dir" || true
+  if [[ -f "${job_dir}/exit_code" ]]; then
+    cat "${job_dir}/status.json"
+    local ec
+    ec=$(cat "${job_dir}/exit_code")
+    return "$ec"
+  fi
+
+  local state status_ec
+  state=$(json_get "${job_dir}/status.json" state)
+  if [[ "$state" != "running" ]]; then
+    cat "${job_dir}/status.json"
+    status_ec=$(json_get "${job_dir}/status.json" exit_code)
+    if [[ "$status_ec" =~ ^[0-9]+$ ]]; then
+      return "$status_ec"
+    fi
+    return 1
+  fi
+
   cat "${job_dir}/status.json"
   return $EX_TIMEOUT
 }
@@ -582,7 +600,7 @@ cmd_gc() {
     fi
     if [[ "$ended_secs" -le "$cutoff" ]]; then
       # 0.0.6 PR-A (HIGH-3): rm 失敗を握りつぶさず、summary に計上して継続。
-      if rm -rf "$d"; then
+      if /bin/rm -rf "$d"; then
         deleted=$((deleted + 1))
       else
         failed=$((failed + 1))
@@ -614,9 +632,9 @@ SUBCOMMANDS:
 
   wait <job-id> [--timeout <sec>]
       Block until the job completes or <sec> elapses (default 900s).
-      --timeout 0 returns immediately: exit code 0 if already completed,
-      exit 124 otherwise. Returns the job's own exit code, or 124 on
-      timeout.
+      --timeout 0 returns immediately: the job's own exit code if
+      already completed, or 124 if still running. Returns the job's own
+      exit code, or 124 on timeout.
 
   result <job-id> [--field <name>]
       Print status.json (or a single field's value) for a completed

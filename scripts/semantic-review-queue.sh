@@ -280,19 +280,6 @@ resolve_node_runtime_home() {
   trusted_runtime_owner_home
 }
 
-semantic_mcp_server_root() {
-  local repo_root="${1:-}"
-  local root=""
-
-  if [[ -n "$repo_root" ]]; then
-    root="$(cd "$repo_root/scripts/semantic-mcp-server" && pwd -P)" || return 1
-  else
-    root="$(cd "$(script_dir)/semantic-mcp-server" && pwd -P)" || return 1
-  fi
-  [[ -d "$root" ]] || return 1
-  printf '%s\n' "$root"
-}
-
 trusted_runtime_dir_patterns() {
   local home_dir=""
   home_dir="$(trim_trailing_slash "$(trusted_runtime_owner_home)")"
@@ -689,35 +676,6 @@ is_skippable_symlinked_node_runtime_candidate() {
   esac
 }
 
-node_binary_supports_semantic_queue() {
-  local binary_path="${1:-}"
-  local repo_root="${2:-}"
-  local server_root=""
-  local runtime_home=""
-  local exec_path=""
-
-  [[ -n "$binary_path" && -x "$binary_path" ]] || return 1
-  server_root="$(semantic_mcp_server_root "$repo_root")" || return 1
-  runtime_home="$(trusted_runtime_owner_home)" || return 1
-  exec_path="$(runtime_binary_dir "$binary_path"):/usr/bin:/bin"
-
-  (
-    cd "$server_root" && \
-      printf '%s\n' \
-        'const Database = require("better-sqlite3");' \
-        'const db = new Database(":memory:");' \
-        'db.prepare("SELECT 1").get();' \
-        'db.close();' \
-        | /usr/bin/env -i "PATH=$exec_path" "HOME=$runtime_home" "$binary_path" - >/dev/null 2>&1
-  )
-}
-
-node_semantic_queue_dependency_present() {
-  local repo_root="${1:-}"
-  local server_root=""
-  server_root="$(semantic_mcp_server_root "$repo_root")" || return 1
-  [[ -e "$server_root/node_modules/better-sqlite3" ]]
-}
 
 node_runtime_fallback_candidates() {
   local home_dir=""
@@ -770,19 +728,16 @@ resolve_compatible_node_binary() {
     esac
     seen_candidates+="$candidate"$'\n'
     if ! resolved="$(resolve_runtime_candidate node "$candidate" "$path_value")"; then
-      last_probe_error="trusted node runtime candidate rejected before compatibility probe: $candidate"
+      last_probe_error="trusted node runtime candidate rejected: $candidate"
       is_skippable_symlinked_node_runtime_candidate "$candidate" || return 1
       continue
     fi
-    if ! node_semantic_queue_dependency_present "$repo_root"; then
-      printf '%s\n' "$resolved"
-      return 0
-    fi
-    if node_binary_supports_semantic_queue "$resolved" "$repo_root"; then
-      printf '%s\n' "$resolved"
-      return 0
-    fi
-    last_probe_error="trusted node runtime is incompatible with semantic queue backend: $resolved"
+    # The Node semantic backend was removed (S3-B3); there is no longer a
+    # node_modules tree to probe for runtime compatibility. Any
+    # trusted, resolvable node binary is accepted (the `node` runtime contract
+    # is still exposed for generic tooling via __internal-runtime-env/-run-runtime).
+    printf '%s\n' "$resolved"
+    return 0
   done < <(node_runtime_candidates "$path_value")
 
   if [[ -n "$last_probe_error" ]]; then
@@ -1281,21 +1236,9 @@ resolve_rust_semantic_backend() {
   return 0
 }
 
-semantic_node_cli_entrypoint() {
-  local root="${1:-}"
-  [[ -n "$root" ]] || die "repo root is required"
-
-  local cli_entrypoint="${root}/scripts/semantic-mcp-server/dist/cli.js"
-  [[ -f "$cli_entrypoint" ]] || die "semantic MCP CLI entrypoint not found: $cli_entrypoint"
-  is_repo_local_real_path "$root" "$cli_entrypoint" \
-    || die "semantic MCP CLI entrypoint must be a repo-local real file: $cli_entrypoint"
-  printf '%s\n' "$cli_entrypoint"
-}
-
 run_cli() {
   local repo_root="$1"
   shift
-  local cli_entrypoint=""
   local rust_backend_status=0
 
   if resolve_rust_semantic_backend "$repo_root"; then
@@ -1323,8 +1266,14 @@ run_cli() {
     esac
   fi
 
-  cli_entrypoint="$(semantic_node_cli_entrypoint "$repo_root")"
-  run_trusted_runtime node --repo-root "$repo_root" -- "$cli_entrypoint" "$@"
+  # The Node semantic CLI backend has been removed (de-overkill S3-B3). Rust is
+  # the only supported backend. The legacy escape env
+  # REV_HARNESS_ALLOW_NODE_SEMANTIC is now a no-op (the Node tree was deleted);
+  # call it out explicitly so anyone still setting it understands why.
+  if [[ "${REV_HARNESS_ALLOW_NODE_SEMANTIC:-}" == "1" ]]; then
+    die "Node backend removed; Rust required. REV_HARNESS_ALLOW_NODE_SEMANTIC is now a no-op (the Node tree was deleted in S3). Build the Rust backend with \`cargo build -p semantic-mcp\`."
+  fi
+  die "Rust semantic backend required; build with \`cargo build -p semantic-mcp\`. The Rust workspace (harness-rust/) could not be resolved."
 }
 
 internal_rust_workspace_root_main() {

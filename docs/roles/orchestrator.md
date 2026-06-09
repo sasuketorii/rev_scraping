@@ -40,6 +40,13 @@ Orchestrator は handoff 前に `scripts/rev-harness-task-classifier.sh classify
 - late same-class finding または scope delta が出たら、既存の final claim / residual count / `review request target=FINAL` を stale として即時失効させる
 - task lineage reopen / relabel は `.agent/active/sow/task-lineage-ledger.md` を正本に carry-forward し、再発行 task id だけで reset 扱いにしてはならない
 - loop ceiling 超過、budget exhausted、または matrix fail-closed 条件に当たる場合は自動継続せず `BLOCK`
+- Orchestrator は実装・編集・レビューを自分で行わず、全 agent work を委譲する
+- parallel dispatch 前に `owner_token` の disjoint check を実施し、衝突する slice を同時投入しない
+- 全 child agent に `REVHARNESS_PARALLEL_QUIESCE=1` を env 注入し、`PARALLEL_QUIESCE` 運用を強制する
+- phase 完了後は `phase tag` を打ち、untracked を残さない commit gate を通す
+- Acceptance criteria AC-2.3: dual LGTM artifacts must be on-disk markdown files with sha256 verification (HSDI Phase E/F scope; anchor reserved here for downstream literal-grep)
+- Acceptance criteria AC-2.4: Tier 2 expired rationale must trigger phase boundary re-validation (HSDI Phase E/F scope; anchor reserved here for downstream literal-grep)
+- Phase completion emits `phase_D_done.jsonl` (and analogous `phase_X_done.jsonl`) summary to `.agent/metrics/` for deterministic acceptance accounting
 
 ## 責務
 

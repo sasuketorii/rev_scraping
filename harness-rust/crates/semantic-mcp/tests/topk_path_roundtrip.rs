@@ -22,7 +22,12 @@ fn topk_returns_repo_relative_symbol_paths() {
     tree_sitter_index::incremental::index_files(
         &mut conn,
         "proj",
-        &[(file_path.clone(), "rust".to_string(), "hash-1".to_string())],
+        &[(
+            file_path.clone(),
+            std::path::PathBuf::from("src/lib.rs"),
+            "rust".to_string(),
+            "hash-1".to_string(),
+        )],
         &IndexConfig::default(),
         false,
     )

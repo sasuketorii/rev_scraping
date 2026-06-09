@@ -135,6 +135,6 @@
   "runtime_fallback_below_minimum": "forbidden",
   "schema_version": "codex-model-runtime-policy/v1",
   "source_policy_path": ".agent/registry/model_policy.json",
-  "source_policy_sha256": "a5e13a7967c8c091de8039ea39b5a3d267596ec7b7fd0a5511e104c092d16f10",
+  "source_policy_sha256": "420b4f7c948a3b0ae2490820484c5b66d3749b8f701141de645ba160c35a5e92",
   "stable_default_model": "gpt-5.5"
 }

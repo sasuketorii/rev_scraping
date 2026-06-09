@@ -61,3 +61,4 @@ For skill edits, also run:
 ```bash
 python3 ${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py .claude/skills/development-junk-cleanup
 ```
+Related: `rev-harness-lifecycle` (clean subcommand calls `rev-harness-janitor.sh build-cleanup` for build artifacts).

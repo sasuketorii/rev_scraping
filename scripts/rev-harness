@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+source "$SCRIPT_DIR/_canonical-guard.sh" 2>/dev/null || true
+
+TARGET_ROOT=""
+PROJECT_ROOT=""
+STATE_FILE=""
+LOCK_FILE=""
+
+DRY_RUN=false
+JSON_OUTPUT=false
+STRICT=false
+VERBOSE=false
+TARGET_ARG=""
+SUBCOMMAND=""
+PASSTHRU=()
+WITH_MCP_WIRE=false
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/rev-harness [global flags] <command> [args]
+
+Global flags: --dry-run --json --strict --verbose --target <path> --with-mcp-wire --help -h
+
+Commands:
+  install
+  clean
+  repair
+  status
+  upgrade
+  uninstall
+  verify / doctor
+  help
+
+Deferred:
+  upgrade apply / uninstall --apply: deferred to Phase G+1
+EOF
+}
+
+now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+
+json_escape() { local s=${1-}; s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/\\n}; s=${s//$'\r'/\\r}; s=${s//$'\t'/\\t}; printf '%s' "$s"; }
+
+global_flags() {
+  local out=()
+  [[ "$DRY_RUN" == true ]] && out+=(--dry-run)
+  [[ "$JSON_OUTPUT" == true ]] && out+=(--json)
+  [[ "$STRICT" == true ]] && out+=(--strict)
+  [[ "$VERBOSE" == true ]] && out+=(--verbose)
+  [[ "${#out[@]}" -gt 0 ]] || return 0
+  printf '%s\n' "${out[@]}"
+}
+
+parse_args() {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --dry-run) DRY_RUN=true; shift ;;
+      --json) JSON_OUTPUT=true; shift ;;
+      --strict) STRICT=true; shift ;;
+      --verbose) VERBOSE=true; shift ;;
+      --target) [[ "$#" -ge 2 ]] || { printf 'rev-harness: --target requires a path\n' >&2; exit 2; }; TARGET_ARG="$2"; shift 2 ;;
+      --with-mcp-wire) WITH_MCP_WIRE=true; shift ;;
+      --help|-h) if [[ -z "$SUBCOMMAND" ]]; then SUBCOMMAND="help"; else PASSTHRU+=("$1"); fi; shift ;;
+      --*) PASSTHRU+=("$1"); shift ;;
+      *)
+        if [[ -z "$SUBCOMMAND" ]]; then SUBCOMMAND="$1"; else PASSTHRU+=("$1"); fi
+        shift
+        ;;
+    esac
+  done
+}
+
+resolve_roots() {
+  TARGET_ROOT="$(resolve_target_root "$TARGET_ARG")" || exit $?
+  PROJECT_ROOT="$TARGET_ROOT"
+  STATE_FILE="$TARGET_ROOT/.rev-harness-state/state.json"
+  LOCK_FILE="$TARGET_ROOT/.agent/registry/.rev-harness-facade.lock"
+}
+
+resolve_roots_without_self_install_guard() {
+  if [[ -n "$TARGET_ARG" ]]; then
+    TARGET_ROOT="$(cd "$TARGET_ARG" 2>/dev/null && pwd -P)" || {
+      printf 'ERROR: --target path not accessible: %s\n' "$TARGET_ARG" >&2
+      exit 2
+    }
+  elif [[ -n "${REV_HARNESS_ADOPTER_ROOT:-}" ]]; then
+    TARGET_ROOT="$(cd "$REV_HARNESS_ADOPTER_ROOT" 2>/dev/null && pwd -P)" || {
+      printf 'ERROR: REV_HARNESS_ADOPTER_ROOT not accessible: %s\n' "$REV_HARNESS_ADOPTER_ROOT" >&2
+      exit 2
+    }
+  else
+    TARGET_ROOT="$(pwd -P)"
+  fi
+  PROJECT_ROOT="$TARGET_ROOT"
+  STATE_FILE="$TARGET_ROOT/.rev-harness-state/state.json"
+  LOCK_FILE="$TARGET_ROOT/.agent/registry/.rev-harness-facade.lock"
+}
+
+state_phase() {
+  if [[ -f "$STATE_FILE" ]] && command -v jq >/dev/null 2>&1; then
+    jq -r '.phase // .current_phase // "unknown"' "$STATE_FILE" 2>/dev/null || printf 'unknown\n'
+  else
+    printf 'uninstalled\n'
+  fi
+}
+
+project_id_value() {
+  local file="$PROJECT_ROOT/.shared/project_id"
+  [[ -f "$file" && ! -L "$file" ]] && sed -n '1p' "$file" || true
+}
+
+validate_project_id() {
+  local state_id="" local_id=""
+  [[ -f "$STATE_FILE" && -f "$PROJECT_ROOT/.shared/project_id" ]] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  state_id="$(jq -r '.project_id // empty' "$STATE_FILE" 2>/dev/null || true)"
+  local_id="$(project_id_value)"
+  [[ -z "$state_id" || -z "$local_id" || "$state_id" == "$local_id" ]] && return 0
+  printf 'project_id mismatch\n' >&2
+  return 64
+}
+
+append_history() {
+  local command="$1" exit_code="$2" before="$3" after="$4" ts tmp
+  [[ "$DRY_RUN" == false ]] || return 0
+  [[ -f "$STATE_FILE" ]] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  ts="$(now_iso)"
+  mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || return 0
+  tmp="$STATE_FILE.$$.$RANDOM.tmp"
+  jq -c --arg cmd "$command" --arg before "$before" --arg after "$after" --arg ts "$ts" --argjson exit "$exit_code" '.history=(((.history//[])+[{command:$cmd,exit:$exit,phase_before:$before,phase_after:$after,ts:$ts}])|.[-50:]) | if $cmd=="clean" then .last_clean_at=$ts elif $cmd=="repair" then .last_repair_at=$ts elif $cmd=="install" then .last_install_at=$ts else . end' "$STATE_FILE" > "$tmp" 2>/dev/null && mv "$tmp" "$STATE_FILE" 2>/dev/null || rm -f "$tmp"
+}
+
+emit_envelope() {
+  local command="$1" exit_code="$2" before="$3" after="$4" dry="$DRY_RUN"
+  local before_json after_json
+  if [[ -n "$before" ]]; then before_json="\"$(json_escape "$before")\""; else before_json="null"; fi
+  if [[ -n "$after" ]]; then after_json="\"$(json_escape "$after")\""; else after_json="null"; fi
+  printf '{"schema":"rev-harness-facade/v1","command":"%s","exit":%s,"phase_before":%s,"phase_after":%s,"ts":"%s","dry_run":%s}\n' \
+    "$(json_escape "$command")" "$exit_code" "$before_json" "$after_json" "$(now_iso)" "$dry"
+}
+
+with_lock() {
+  local timeout="${REV_HARNESS_LEASE_TIMEOUT:-30}" lock_dir exit_code
+  mkdir -p "$(dirname "$LOCK_FILE")"
+  if command -v flock >/dev/null 2>&1; then
+    (flock -w "$timeout" 9 || { printf 'lease timeout\n' >&2; exit 124; }; "$@") 9>"$LOCK_FILE"
+    return $?
+  fi
+  printf 'rev-harness: flock unavailable; using advisory sentinel lock\n' >&2
+  lock_dir="$LOCK_FILE.dir"
+  local start now
+  start="$(date +%s)"
+  until mkdir "$lock_dir" 2>/dev/null; do
+    now="$(date +%s)"
+    if (( now - start >= timeout )); then printf 'lease timeout\n' >&2; return 124; fi
+    sleep 1
+  done
+  FACADE_LOCK_DIR="$lock_dir"
+  trap '[[ -z "${FACADE_LOCK_DIR:-}" ]] || rmdir "$FACADE_LOCK_DIR" 2>/dev/null || true' EXIT
+  set +e
+  "$@"; exit_code=$?
+  set -e
+  rmdir "$lock_dir" 2>/dev/null || true
+  FACADE_LOCK_DIR=""
+  trap - EXIT
+  return "$exit_code"
+}
+
+run_child_enveloped() {
+  local command="$1"; shift
+  local before after exit_code
+  validate_project_id || return $?
+  before="$(state_phase)"
+  set +e
+  "$@"
+  exit_code=$?
+  set -e
+  after="$(state_phase)"
+  if [[ "$command" == "install" && "$exit_code" -eq 0 ]]; then after="installed"; fi
+  append_history "$command" "$exit_code" "$before" "$after"
+  [[ "$JSON_OUTPUT" == true ]] && emit_envelope "$command" "$exit_code" "$before" "$after"
+  return "$exit_code"
+}
+
+status_cmd() {
+  local doctor_out="" doctor_exit phase state_json project_id
+  validate_project_id || return $?
+  phase="$(state_phase)"
+  project_id="$(project_id_value)"
+  set +e
+  doctor_out="$(PROJECT_ROOT="$TARGET_ROOT" bash "$SCRIPT_DIR/harness-doctor.sh" --quick --json 2>/dev/null)"
+  doctor_exit=$?
+  set -e
+  if [[ "$JSON_OUTPUT" == true ]]; then
+    [[ -f "$STATE_FILE" && -s "$STATE_FILE" ]] && state_json="$(cat "$STATE_FILE")" || state_json="$(printf '{"phase":"uninstalled","project_id":"%s"}' "$(json_escape "$project_id")")"
+    printf '{"schema":"rev-harness-facade/v1","command":"status","exit":0,"phase":"%s","phase_before":"%s","phase_after":"%s","ts":"%s","dry_run":%s,"state":%s,"doctor_exit":%s}\n' \
+      "$(json_escape "$phase")" "$(json_escape "$phase")" "$(json_escape "$phase")" "$(now_iso)" "$DRY_RUN" "$state_json" "$doctor_exit"
+  else
+    printf 'phase: %s\n' "$phase"
+    [[ -n "$project_id" ]] && printf 'project_id: %s\n' "$project_id"
+    printf 'doctor_exit: %s\n' "$doctor_exit"
+    [[ -n "$doctor_out" ]] && printf '%s\n' "$doctor_out"
+  fi
+}
+
+clean_cmd() {
+  local flags=() out exit_code before after
+  mapfile -t flags < <(global_flags)
+  validate_project_id || return $?
+  before="$(state_phase)"
+  set +e
+  out="$(bash "$SCRIPT_DIR/rev-harness-janitor.sh" build-cleanup "${PASSTHRU[@]}" "${flags[@]}" 2>&1)"
+  exit_code=$?
+  set -e
+  if [[ "$exit_code" -ne 0 && "$out" == *"unknown"* ]]; then
+    printf 'rev-harness: janitor build-cleanup unavailable; falling back to inspect\n' >&2
+    set +e
+    out="$(bash "$SCRIPT_DIR/rev-harness-janitor.sh" inspect "${PASSTHRU[@]}" "${flags[@]}" 2>&1)"
+    exit_code=$?
+    set -e
+  fi
+  printf '%s\n' "$out"
+  after="$(state_phase)"
+  append_history clean "$exit_code" "$before" "$after"
+  [[ "$JSON_OUTPUT" == true ]] && emit_envelope clean "$exit_code" "$before" "$after"
+  return "$exit_code"
+}
+
+upgrade_cmd() {
+  local action="${PASSTHRU[0]:-inspect}" flags=() args=("${PASSTHRU[@]}")
+  mapfile -t flags < <(global_flags)
+  if [[ "$action" == "apply" ]]; then printf 'upgrade apply: deferred to Phase G+1\n' >&2; [[ "$JSON_OUTPUT" == true ]] && emit_envelope upgrade 2 "$(state_phase)" "$(state_phase)"; return 2; fi
+  [[ "$action" == "inspect" || "$action" == "plan" ]] || { printf 'unknown upgrade action: %s\n' "$action" >&2; return 2; }
+  if [[ "$action" == "inspect" && "${#args[@]}" -eq 0 ]]; then args=(inspect --target "$TARGET_ROOT"); fi
+  run_child_enveloped upgrade bash "$SCRIPT_DIR/rev-harness-upgrade.sh" "${args[@]}" "${flags[@]}"
+}
+
+uninstall_cmd() {
+  local flags=() arg
+  for arg in "${PASSTHRU[@]}"; do
+    if [[ "$arg" == "--apply" ]]; then printf 'uninstall --apply: deferred to Phase G+1\n' >&2; [[ "$JSON_OUTPUT" == true ]] && emit_envelope uninstall 2 "$(state_phase)" "$(state_phase)"; return 2; fi
+  done
+  mapfile -t flags < <(global_flags)
+  run_child_enveloped uninstall bash "$SCRIPT_DIR/rev-harness-uninstall.sh" --print-checklist "${PASSTHRU[@]}" "${flags[@]}"
+}
+
+parse_args "$@"
+if [[ "${SUBCOMMAND:-help}" == "install" || "${SUBCOMMAND:-help}" == "setup" ]]; then
+  resolve_roots
+elif [[ "${SUBCOMMAND:-help}" != "help" ]]; then
+  resolve_roots_without_self_install_guard
+fi
+
+case "${SUBCOMMAND:-help}" in
+  help) usage ;;
+  install|setup)
+    [[ "$SUBCOMMAND" == setup ]] && PASSTHRU=(--setup-only "${PASSTHRU[@]}")
+    mapfile -t gf < <(global_flags)
+    wire_env=(); [[ "$WITH_MCP_WIRE" == true ]] && wire_env=(REV_HARNESS_WITH_MCP_WIRE=1)
+    with_lock run_child_enveloped install env "${wire_env[@]}" bash "$SCRIPT_DIR/rev-harness-install.sh" --target "$TARGET_ROOT" "${PASSTHRU[@]}" "${gf[@]}"
+    ;;
+  verify|doctor)
+    df=(); [[ "$JSON_OUTPUT" == true ]] && df+=(--json); [[ "$STRICT" == true ]] && df+=(--strict)
+    exec env PROJECT_ROOT="$TARGET_ROOT" bash "$SCRIPT_DIR/harness-doctor.sh" --quick "${PASSTHRU[@]}" "${df[@]}"
+    ;;
+  repair)
+    mapfile -t gf < <(global_flags)
+    with_lock run_child_enveloped repair bash "$SCRIPT_DIR/rev-harness-repair.sh" "${PASSTHRU[@]}" "${gf[@]}"
+    ;;
+  status) status_cmd ;;
+  clean) with_lock clean_cmd ;;
+  upgrade) upgrade_cmd ;;
+  uninstall) with_lock uninstall_cmd ;;
+  *)
+    printf 'unknown sub-command: %s\n' "$SUBCOMMAND" >&2
+    exit 2
+    ;;
+esac

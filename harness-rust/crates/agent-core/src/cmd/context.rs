@@ -4,8 +4,8 @@
 //! deletion detection, and freshness validation — all without shelling
 //! out to `jq`.
 
-use harness_cache::{CacheManager, FileIndexEntry};
 use clap::Subcommand;
+use harness_cache::{CacheManager, FileIndexEntry};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -79,6 +79,73 @@ pub enum ContextAction {
         /// Stable project identifier.
         #[arg(long)]
         project_id: String,
+    },
+    /// Migrate the CURRENT project's semantic.db so `symbols.file_path` and
+    /// `file_parse_cache.file_path` are stored repo-relative (root-cause 2.2).
+    ///
+    /// Dry-run is the default. Current-project-only; reuses the orphan-GC safety
+    /// posture (RSEM application_id guard, trusted `projects.root_path`).
+    MigratePaths {
+        /// Apply the migration. Without this flag, only a dry-run report is
+        /// emitted (no DB writes).
+        #[arg(long)]
+        apply: bool,
+        /// Optional path to write a redacted JSONL evidence row.
+        #[arg(long)]
+        evidence: Option<String>,
+    },
+    /// Source-first FULL reindex of the CURRENT project (root-cause 2.1: index
+    /// coverage). Indexes the whole repo's source NOW — not just edit-touched
+    /// files — so `sem.symbols.search` / `sem.context.top_k` can find stable,
+    /// unedited code (e.g. nested product `scripts/sender-opt`).
+    ///
+    /// Resolves the repo via git, builds a full (`changed_only=false`) snapshot,
+    /// runs `index_symbols_from_snapshot` with `gc_orphans=true` so stale legacy
+    /// rows fall out, and calls `resolve_pending_dependencies` (via index_files).
+    /// Idempotent (file_hash + grammar_version). Dry-run is the DEFAULT and just
+    /// reports what WOULD be indexed; `--apply` writes to the DB.
+    ///
+    /// Current-project-only (project_id from `.shared/project_id`, DB from
+    /// `shared::paths`). Does NOT change tool schemas (I-13).
+    IndexAll {
+        /// Apply the reindex. Without this flag, only a dry-run report is emitted
+        /// (no DB writes) listing the candidate source files and counts.
+        #[arg(long)]
+        apply: bool,
+        /// Optional path to write a redacted JSONL evidence row.
+        #[arg(long)]
+        evidence: Option<String>,
+    },
+    /// Incremental post-commit reindex (D-1): index ONLY the files changed by
+    /// the most recent commit, leaving every other file's symbols untouched
+    /// (`gc_orphans=false`). Lightweight enough for a post-commit hook, where a
+    /// full `index-all` walk would be too slow.
+    ///
+    /// Resolves the changed-file set via git (`HEAD^` by default; first parent
+    /// for merges; root diff for the initial commit), filters to files with a
+    /// compiled tree-sitter grammar, and incrementally upserts them. Idempotent
+    /// (file_hash + grammar_version). Dry-run is the DEFAULT; `--apply` writes.
+    /// Commits larger than an internal ceiling are advisory-skipped in favour of
+    /// `index-all`.
+    ///
+    /// Current-project-only (project_id from `.shared/project_id`, DB from
+    /// `shared::paths`). Does NOT change tool schemas.
+    IndexCommit {
+        /// Base ref to diff the commit against. Defaults to `HEAD^` (first
+        /// parent for merge commits; root diff for the initial commit).
+        #[arg(long)]
+        base: Option<String>,
+        /// Head commit to diff to. Defaults to `HEAD`. Post-commit hooks pass
+        /// the immutable commit SHA captured synchronously before detaching.
+        #[arg(long)]
+        head: Option<String>,
+        /// Apply the incremental reindex. Without this flag, only a dry-run
+        /// report is emitted (no DB writes) listing candidate/indexable counts.
+        #[arg(long)]
+        apply: bool,
+        /// Optional path to write a redacted JSONL evidence row.
+        #[arg(long)]
+        evidence: Option<String>,
     },
 }
 
@@ -761,35 +828,8 @@ pub fn context_update(
     } else {
         collect_all_files(&repo_root)?
     };
-    let active_roots =
-        resolve_active_product_roots(&repo_root, plan_content.as_deref(), &candidate_files);
-    let files_to_index = filter_pathbufs_by_roots(&candidate_files, &repo_root, &active_roots);
-
-    let mut entries = Vec::new();
-    for file_path in &files_to_index {
-        let abs = if file_path.is_absolute() {
-            file_path.clone()
-        } else {
-            repo_root.join(file_path)
-        };
-
-        if !abs.is_file() || !should_index_file(file_path) {
-            continue;
-        }
-
-        match build_repomap_entry(&abs, &repo_root) {
-            Ok(entry) => entries.push(entry),
-            Err(e) => {
-                tracing::warn!(
-                    path = %file_path.display(),
-                    error = %e,
-                    "skipping file due to indexing error"
-                );
-            }
-        }
-    }
-
-    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    let entries =
+        source_entries_for_candidate_paths(&repo_root, &candidate_files, plan_content.as_deref())?;
 
     let snapshot = ContextSnapshot {
         files: entries,
@@ -817,6 +857,44 @@ pub fn context_update(
     Ok(())
 }
 
+/// Build source entries for a caller-supplied candidate universe using the same
+/// harness/admin path exclusions and product-root filtering as `context_update`.
+pub fn source_entries_for_candidate_paths(
+    repo_root: &Path,
+    candidate_files: &[PathBuf],
+    plan_content: Option<&str>,
+) -> Result<Vec<RepoMapEntry>> {
+    let active_roots = resolve_active_product_roots(repo_root, plan_content, candidate_files);
+    let files_to_index = filter_pathbufs_by_roots(candidate_files, repo_root, &active_roots);
+
+    let mut entries = Vec::new();
+    for file_path in &files_to_index {
+        let abs = if file_path.is_absolute() {
+            file_path.clone()
+        } else {
+            repo_root.join(file_path)
+        };
+
+        if !abs.is_file() || !should_index_file(file_path) {
+            continue;
+        }
+
+        match build_repomap_entry(&abs, repo_root) {
+            Ok(entry) => entries.push(entry),
+            Err(e) => {
+                tracing::warn!(
+                    path = %file_path.display(),
+                    error = %e,
+                    "skipping file due to indexing error"
+                );
+            }
+        }
+    }
+
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(entries)
+}
+
 /// Build a tree-sitter symbol index using file entries from a snapshot JSON.
 pub fn index_symbols_from_snapshot(
     snapshot: &Path,
@@ -826,13 +904,31 @@ pub fn index_symbols_from_snapshot(
     let repo_root = git::git_repo_root()?;
     let snapshot_data: ContextSnapshot = read_json(snapshot)?;
 
-    let files: Vec<(PathBuf, String, String)> = snapshot_data
+    // entry.path is already repo-relative (stripped in build_repomap_entry).
+    // index_key = entry.path (repo-relative DB value); read_path =
+    // repo_root.join(entry.path) (absolute, for filesystem IO during parse).
+    //
+    // Only keep files whose `language` has a compiled tree-sitter grammar. The
+    // repo-map's `detect_language` recognizes many languages (json, toml, yaml,
+    // sql, markdown, …) for tooling purposes, but `parser::parse_source` only
+    // supports the grammars built into this crate. Feeding an unsupported
+    // language (e.g. a `.json` config file) is counted as a PARSE FAILURE, and a
+    // full-source snapshot that begins with such files trips the parse-failure
+    // rate guard and aborts the whole batch. Such files produce zero symbols
+    // anyway, so filter them out up front. This makes `context index-all` robust
+    // on a whole-repo snapshot and is a no-op for the edit-driven path (which
+    // only ever fed already-parseable code files).
+    let files: Vec<(PathBuf, PathBuf, String, String)> = snapshot_data
         .files
         .into_iter()
         .filter_map(|entry| {
-            entry
-                .language
-                .map(|language| (repo_root.join(entry.path), language, entry.hash))
+            let language = entry.language?;
+            // Skip files whose language has no compiled tree-sitter grammar
+            // (`get_language` returns None) — `?` short-circuits the closure.
+            tree_sitter_index::parser::get_language(&language)?;
+            let read_path = repo_root.join(&entry.path);
+            let index_key = PathBuf::from(entry.path);
+            Some((read_path, index_key, language, entry.hash))
         })
         .collect();
 
@@ -918,6 +1014,34 @@ pub fn execute(action: ContextAction) -> Result<()> {
                 &project_id,
             )?;
             let json = serde_json::to_string_pretty(&result).map_err(AgentError::Json)?;
+            println!("{json}");
+            Ok(())
+        }
+        ContextAction::MigratePaths { apply, evidence } => {
+            let report = super::migrate_paths::run(apply, evidence.as_deref().map(Path::new))?;
+            let json = serde_json::to_string_pretty(&report).map_err(AgentError::Json)?;
+            println!("{json}");
+            Ok(())
+        }
+        ContextAction::IndexAll { apply, evidence } => {
+            let report = super::index_all::run(apply, evidence.as_deref().map(Path::new))?;
+            let json = serde_json::to_string_pretty(&report).map_err(AgentError::Json)?;
+            println!("{json}");
+            Ok(())
+        }
+        ContextAction::IndexCommit {
+            base,
+            head,
+            apply,
+            evidence,
+        } => {
+            let report = super::index_commit::run(
+                base.as_deref(),
+                head.as_deref(),
+                apply,
+                evidence.as_deref().map(Path::new),
+            )?;
+            let json = serde_json::to_string_pretty(&report).map_err(AgentError::Json)?;
             println!("{json}");
             Ok(())
         }
@@ -1286,6 +1410,72 @@ mod tests {
         ];
         let roots = collect_candidate_product_roots(&paths);
         assert_eq!(roots, vec!["app", "apps", "packages", "services"]);
+    }
+
+    // -- nested-product-scripts filter (root-cause 2.1, Slice B item 2) --------
+    //
+    // The harness `scripts/` exclude MUST be a TOP-LEVEL prefix only. A nested
+    // product path such as `contact_sender_v2/.../scripts/sender-opt` must NOT be
+    // wrongly excluded — that is the actual work target and excluding it would
+    // defeat the whole index-coverage fix.
+    #[test]
+    fn nested_product_scripts_are_not_harness_owned() {
+        // Top-level harness scripts/ IS excluded.
+        assert!(is_harness_owned_path("scripts/foo.sh"));
+        assert!(is_harness_owned_path("scripts/sender-opt/x.ts"));
+        // Nested product scripts/ is NOT excluded (different first component).
+        assert!(!is_harness_owned_path(
+            "contact_sender_v2/sidecar/scripts/sender-opt/proof-harness.ts"
+        ));
+        assert!(!is_harness_owned_path("apps/web/scripts/build.ts"));
+        assert!(!is_harness_owned_path("packages/ui/scripts/gen.ts"));
+        // Other top-level harness prefixes still excluded.
+        assert!(is_harness_owned_path(".agent/active/plan.md"));
+        assert!(is_harness_owned_path(".claude/settings.json"));
+        assert!(is_harness_owned_path("docs/manual/guide.md"));
+    }
+
+    #[test]
+    fn nested_product_scripts_survive_root_filtering() {
+        // End-to-end through filter_paths_by_roots: a sender-opt file under a
+        // product root is retained; top-level scripts/ and .agent/ are dropped.
+        let paths = vec![
+            "contact_sender_v2/sidecar/scripts/sender-opt/proof-harness.ts".to_string(),
+            "scripts/release.sh".to_string(),
+            ".agent/active/plan.md".to_string(),
+        ];
+        let roots = vec!["contact_sender_v2".to_string()];
+        let kept = filter_paths_by_roots(&paths, &roots);
+        assert_eq!(
+            kept,
+            vec!["contact_sender_v2/sidecar/scripts/sender-opt/proof-harness.ts".to_string()]
+        );
+    }
+
+    #[test]
+    fn source_entries_for_candidate_paths_match_index_all_filtering() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        fs::create_dir_all(repo.join("scripts")).unwrap();
+        fs::create_dir_all(repo.join("docs")).unwrap();
+        fs::create_dir_all(repo.join("apps/web/scripts")).unwrap();
+        fs::write(repo.join("scripts/admin.rs"), "fn admin() {}\n").unwrap();
+        fs::write(repo.join("docs/guide.rs"), "fn doc() {}\n").unwrap();
+        fs::write(
+            repo.join("apps/web/scripts/build.rs"),
+            "fn product_build() {}\n",
+        )
+        .unwrap();
+
+        let candidates = vec![
+            PathBuf::from("scripts/admin.rs"),
+            PathBuf::from("docs/guide.rs"),
+            PathBuf::from("apps/web/scripts/build.rs"),
+        ];
+
+        let entries = source_entries_for_candidate_paths(repo, &candidates, None).unwrap();
+        let paths: Vec<_> = entries.into_iter().map(|entry| entry.path).collect();
+        assert_eq!(paths, vec!["apps/web/scripts/build.rs".to_string()]);
     }
 
     #[test]

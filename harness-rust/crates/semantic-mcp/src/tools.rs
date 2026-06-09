@@ -13,6 +13,7 @@ use crate::health;
 use crate::preflight;
 use crate::registry;
 use crate::search;
+use crate::symbols_search;
 
 /// Tool names as constants.
 pub const TOOL_PREFLIGHT: &str = "sem.preflight";
@@ -23,6 +24,7 @@ pub const TOOL_REGISTRY_QUERY: &str = "sem.registry.query";
 pub const TOOL_REGISTRY_SET_STATUS: &str = "sem.registry.set_status";
 pub const TOOL_REGISTRY_DELETE: &str = "sem.registry.delete";
 pub const TOOL_SEARCH: &str = "sem.search";
+pub const TOOL_SYMBOLS_SEARCH: &str = "sem.symbols.search";
 pub const TOOL_HEALTH: &str = "sem.health";
 pub const TOOL_ADMIN_GC: &str = "sem.admin.gc";
 
@@ -131,6 +133,15 @@ const SEARCH_KEYS: &[&str] = &[
     "limit",
     "capsule_budget_tokens",
     "capsuleBudgetTokens",
+];
+const SYMBOLS_SEARCH_KEYS: &[&str] = &[
+    "project_id",
+    "query",
+    "kind",
+    "language",
+    "path_prefix",
+    "limit",
+    "capsule_budget_tokens",
 ];
 const HEALTH_KEYS: &[&str] = &[];
 const ADMIN_GC_KEYS: &[&str] = &["older_than_days", "dry_run", "force", "ignore_active_lock"];
@@ -358,6 +369,24 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         serde_json::json!({
+            "name": TOOL_SYMBOLS_SEARCH,
+            "description": "Read-only advisory free-form search over the tree-sitter symbols index by name or qualified_name substring.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string" },
+                    "query": { "type": "string" },
+                    "kind": { "type": "string" },
+                    "language": { "type": "string" },
+                    "path_prefix": { "type": "string" },
+                    "limit": { "anyOf": [{ "type": "integer" }, { "type": "string", "pattern": "^-?\\d+$" }] },
+                    "capsule_budget_tokens": { "anyOf": [{ "type": "integer" }, { "type": "string", "pattern": "^-?\\d+$" }] }
+                },
+                "required": ["query"],
+                "additionalProperties": false
+            }
+        }),
+        serde_json::json!({
             "name": TOOL_HEALTH,
             "description": "Check server health, database connectivity, and table readiness.",
             "inputSchema": {
@@ -398,6 +427,7 @@ pub fn call_tool(ctx: &ServerContext, name: &str, args: &Value) -> Result<Value,
         TOOL_REGISTRY_SET_STATUS => registry::handle_set_status(ctx, args),
         TOOL_REGISTRY_DELETE => registry::handle_delete(ctx, args),
         TOOL_SEARCH => search::handle_search(ctx, args),
+        TOOL_SYMBOLS_SEARCH => symbols_search::handle_symbols_search(ctx, args),
         TOOL_ADMIN_GC => admin_gc::handle_admin_gc(ctx, args),
         _ => Err(format!("Unknown tool: {name}")),
     }
@@ -413,6 +443,7 @@ pub fn validate_tool_arguments(name: &str, args: &Value) -> Result<(), String> {
         TOOL_REGISTRY_SET_STATUS => REGISTRY_SET_STATUS_KEYS,
         TOOL_REGISTRY_DELETE => REGISTRY_DELETE_KEYS,
         TOOL_SEARCH => SEARCH_KEYS,
+        TOOL_SYMBOLS_SEARCH => SYMBOLS_SEARCH_KEYS,
         TOOL_HEALTH => HEALTH_KEYS,
         TOOL_ADMIN_GC => ADMIN_GC_KEYS,
         _ => return Ok(()),

@@ -32,10 +32,13 @@ assert_not_invoked() {
 
 setup_wrapper_repo() {
   local repo="$1"
-  mkdir -p "$repo/scripts" "$repo/.agent/registry" "$repo/.agent/generated"
+  mkdir -p "$repo/scripts" "$repo/.agent/registry" "$repo/.agent/generated" "$repo/.shared"
   cp "$PROJECT_ROOT/scripts/codex-wrapper.sh" "$repo/scripts/codex-wrapper.sh"
+  cp "$PROJECT_ROOT/scripts/_canonical-guard.sh" "$repo/scripts/_canonical-guard.sh"
+  cp "$PROJECT_ROOT/scripts/_outbound-deny.sh" "$repo/scripts/_outbound-deny.sh"
   cp "$PROJECT_ROOT/.agent/registry/model_policy.json" "$repo/.agent/registry/model_policy.json"
   cp "$PROJECT_ROOT/.agent/generated/codex_model_policy.runtime.json" "$repo/.agent/generated/codex_model_policy.runtime.json"
+  printf '%s\n' 'model-policy-fixture' > "$repo/.shared/project_id"
   chmod +x "$repo/scripts/codex-wrapper.sh"
 }
 

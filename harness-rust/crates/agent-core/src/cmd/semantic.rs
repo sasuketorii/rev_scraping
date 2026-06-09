@@ -5,7 +5,7 @@ use std::path::Path;
 use clap::Subcommand;
 
 use shared::error::{AgentError, Result};
-use shared::semantic_gc::{run_gc, GcOptions, GcOutput};
+use shared::semantic_gc::{run_gc, GcMode, GcOptions, GcOutput};
 
 #[derive(Subcommand, Debug)]
 pub enum SemanticAction {
@@ -30,6 +30,13 @@ pub struct GcArgs {
     /// Include databases with active locks.
     #[arg(long)]
     pub ignore_active_lock: bool,
+    /// Dispose-together mode: delete RSEM-marked DBs whose recorded project
+    /// root_path no longer exists on disk. RSEM-validated, dry-run by default;
+    /// requires `--force` to actually delete (I-11 opt-in). A DB with a
+    /// blank/unknown root_path falls back to age-based TTL and is never an
+    /// orphan.
+    #[arg(long)]
+    pub prune_missing_root: bool,
     /// Emit stable JSON schema v1.
     #[arg(long)]
     pub json: bool,
@@ -42,18 +49,40 @@ pub fn run(action: SemanticAction) -> Result<i32> {
 }
 
 fn run_gc_cli(args: GcArgs) -> Result<i32> {
+    // BLOCKER #4: scope to the current project BEFORE any mutation. When
+    // `--all-projects` is absent we resolve the current project_id up front and
+    // pass it into GC as `only_project_id`, so the deletion scan only ever
+    // considers the current project's DB. We never run an unscoped GC and then
+    // filter the output after the fact (which would delete other projects'
+    // DBs before hiding them).
+    let only_project_id = if args.all_projects {
+        None
+    } else {
+        Some(load_project_id_or_fail()?)
+    };
+
     let options = GcOptions {
         older_than_days: args.older_than_days,
         dry_run: !args.force,
         force: args.force,
         ignore_active_lock: args.ignore_active_lock,
+        mode: if args.prune_missing_root {
+            GcMode::OrphansMissingRoot
+        } else {
+            GcMode::Ttl
+        },
+        only_project_id: only_project_id.clone(),
     };
 
     let mut output = run_gc(options).map_err(AgentError::Validation)?;
 
-    if !args.all_projects {
-        let project_id = load_project_id_or_fail()?;
-        filter_to_project_id(&mut output, &project_id);
+    // Defense-in-depth: the GC scan was already scoped to `only_project_id`
+    // above (so nothing outside the current project could have been deleted).
+    // Re-applying the project filter here is a redundant safety net that
+    // guarantees the rendered output can never list another project's DB even
+    // if the upstream scoping ever regressed.
+    if let Some(project_id) = only_project_id.as_deref() {
+        filter_to_project_id(&mut output, project_id);
     }
 
     if args.json {

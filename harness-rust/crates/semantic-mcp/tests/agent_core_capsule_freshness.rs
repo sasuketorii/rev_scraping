@@ -48,7 +48,12 @@ fn agent_core_capsule_freshness_changes_rollup_and_sha() {
     tree_sitter_index::incremental::index_files(
         &mut conn,
         "proj",
-        &[(file_path.clone(), "rust".to_string(), "hash-1".to_string())],
+        &[(
+            file_path.clone(),
+            std::path::PathBuf::from("src/lib.rs"),
+            "rust".to_string(),
+            "hash-1".to_string(),
+        )],
         &IndexConfig::default(),
         false, // gc_orphans: test does not exercise snapshot diff
     )
@@ -59,13 +64,10 @@ fn agent_core_capsule_freshness_changes_rollup_and_sha() {
         .unwrap();
     assert!(!first.file_sha_rollup.is_empty());
 
+    // file_parse_cache is now keyed by the repo-relative index_key.
     conn.execute(
         "UPDATE file_parse_cache SET file_hash = ?1 WHERE project_id = ?2 AND file_path = ?3",
-        rusqlite::params![
-            "hash-2",
-            "proj",
-            file_path.to_string_lossy().replace('\\', "/")
-        ],
+        rusqlite::params!["hash-2", "proj", "src/lib.rs"],
     )
     .unwrap();
 
