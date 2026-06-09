@@ -462,7 +462,7 @@ timeout_run "secs" "command" [args...]
 }
 ```
 
-**動作:** Edit/Write ツール使用後、hook ingress は Rust で repo-relative 正規化・repo 外 skip・拡張子 allowlist を判定し、その後 caller-facing shell adapter `scripts/semantic-review-queue.sh enqueue` へ委譲する。public 契約としてサポートする queue ingress は実行ビット付きの `./scripts/semantic-review-queue.sh ...` で、absolute shebang から起動する。`bash scripts/semantic-review-queue.sh ...` のような明示 interpreter override は shebang hardening を迂回するため public contract ではない。queue ingress / hook ingress は unsafe runtime resolution を検出した時点で fail-closed とする。shell は `harness-rust/` workspace、`harness-rust/Cargo.toml`、`harness-rust/crates/semantic-mcp/src/main.rs` の 3 path が存在し、かつ各 path が repo-local real-path validation を通る場合に限って repo-local semantic-mcp backend の Rust CLI を優先する。manifest 不在に限らず、この 3 path のいずれかが欠ける場合や、これらの path が symlink component を含む、または repo 外へ解決されるため repo-local real-path validation を通らない場合は Node compatibility surface へ fallback する。fallback 側でも `scripts/semantic-mcp-server/dist/cli.js` が repo-local real file でなければ fail-closed とする。runtime 解決は空 PATH 要素、`.`、相対 PATH entry を候補に含めず、built-in の trusted runtime dir allowlist 上で canonical path matching により最初に見つかった実行候補だけを対象にする。trusted runtime dir allowlist の trust root は real-user canonical home に固定し、caller-overridden な `HOME` では widen しない。symlink 済み trusted dir と symlink binary は reject する。`$HOME/.local/bin/<bin>` と mise path は real-user canonical home trust root 配下にある場合だけ trusted とし、temp/fixture `HOME` は trusted root を広げない。shim 扱いは manager-owned path（`<real-user-canonical-home>/.local/share/mise/shims/<bin>`、`<real-user-canonical-home>/.mise/shims/<bin>`、`<real-user-canonical-home>/.cargo/bin/cargo`）に限定する。先頭候補が rustup/mise shim の場合は manager-authoritative lookup（`rustup which cargo` / `mise which <bin>`）で active に選択された concrete executable を引き、install/toolchain の走査で別バージョンを推測しない。hook は bare `command -v cargo` / bare `cargo build` を使わず、trusted cargo resolution を用いる。lookup に失敗する、shim/proxy しか返せない、または manager が allowlist 外の binary を返す先頭候補は後続 PATH へ逃がさず fail-closed とする。さらに、enqueue-eligible な repo-local allowlist file が authoritative helper path で project_id 解決に到達した際に、malformed / control-byte（CR byte 含む） / multiline な `.shared/project_id` を reject した場合も fail-closed とする。poison-PATH behavior の主張は focused repro に裏付けられた範囲に限る。`.claude/tmp/review_queue.json` への compatibility export も authority には昇格させない
+**動作:** Edit/Write ツール使用後、hook ingress は Rust で repo-relative 正規化・repo 外 skip・拡張子 allowlist を判定し、その後 caller-facing shell adapter `scripts/semantic-review-queue.sh enqueue` へ委譲する。public 契約としてサポートする queue ingress は実行ビット付きの `./scripts/semantic-review-queue.sh ...` で、absolute shebang から起動する。`bash scripts/semantic-review-queue.sh ...` のような明示 interpreter override は shebang hardening を迂回するため public contract ではない。queue ingress / hook ingress は unsafe runtime resolution を検出した時点で fail-closed とする。shell は `harness-rust/` workspace、`harness-rust/Cargo.toml`、`harness-rust/crates/semantic-mcp/src/main.rs` の 3 path が存在し、かつ各 path が repo-local real-path validation を通る場合に限って repo-local semantic-mcp backend の Rust CLI を起動する。semantic-mcp backend は Rust 専用で、旧 Node compatibility surface は de-overkill S3-B3 で削除済み。manifest 不在に限らず、この 3 path のいずれかが欠ける場合や、これらの path が symlink component を含む、または repo 外へ解決されるため repo-local real-path validation を通らない場合は fail-closed とする（"Rust semantic backend required"）。escape env `REV_HARNESS_ALLOW_NODE_SEMANTIC` は no-op となり、設定されても "Node backend removed; Rust required" で fail-closed となる。runtime 解決は空 PATH 要素、`.`、相対 PATH entry を候補に含めず、built-in の trusted runtime dir allowlist 上で canonical path matching により最初に見つかった実行候補だけを対象にする。trusted runtime dir allowlist の trust root は real-user canonical home に固定し、caller-overridden な `HOME` では widen しない。symlink 済み trusted dir と symlink binary は reject する。`$HOME/.local/bin/<bin>` と mise path は real-user canonical home trust root 配下にある場合だけ trusted とし、temp/fixture `HOME` は trusted root を広げない。shim 扱いは manager-owned path（`<real-user-canonical-home>/.local/share/mise/shims/<bin>`、`<real-user-canonical-home>/.mise/shims/<bin>`、`<real-user-canonical-home>/.cargo/bin/cargo`）に限定する。先頭候補が rustup/mise shim の場合は manager-authoritative lookup（`rustup which cargo` / `mise which <bin>`）で active に選択された concrete executable を引き、install/toolchain の走査で別バージョンを推測しない。hook は bare `command -v cargo` / bare `cargo build` を使わず、trusted cargo resolution を用いる。lookup に失敗する、shim/proxy しか返せない、または manager が allowlist 外の binary を返す先頭候補は後続 PATH へ逃がさず fail-closed とする。さらに、enqueue-eligible な repo-local allowlist file が authoritative helper path で project_id 解決に到達した際に、malformed / control-byte（CR byte 含む） / multiline な `.shared/project_id` を reject した場合も fail-closed とする。poison-PATH behavior の主張は focused repro に裏付けられた範囲に限る。`.claude/tmp/review_queue.json` への compatibility export も authority には昇格させない
 
 ---
 
@@ -695,20 +695,15 @@ command = "./scripts/launch-semantic-mcp.sh"
 ### 新コマンド（Semantic/MCP運用）
 
 ```bash
-# semantic-mcp-server 依存取得
-npm --prefix scripts/semantic-mcp-server install
-
+# semantic-mcp backend は Rust 専用（旧 Node ツリーは de-overkill S3-B3 で削除）。
 # ビルド
-npm --prefix scripts/semantic-mcp-server run build
+cargo build -p semantic-mcp --manifest-path harness-rust/Cargo.toml
 
-# 開発起動（stdio）
-npm --prefix scripts/semantic-mcp-server run dev -- --project-id demo_project
-
-# 本番相当起動（dist）
-npm --prefix scripts/semantic-mcp-server run start -- --project-id demo_project
+# 開発起動（stdio, canonical launcher 経由）
+bash scripts/launch-semantic-mcp.sh --project-id demo_project
 
 # 単体テスト
-npm --prefix scripts/semantic-mcp-server run test
+( cd harness-rust && cargo test -p semantic-mcp )
 ```
 
 ### モデルルーティング（Coder）
