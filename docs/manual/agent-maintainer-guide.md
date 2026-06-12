@@ -45,7 +45,7 @@ trust しない:
 
 - common task contract Slice A は implemented
 - non-interactive automatic flow の session continuation は fail-closed
-- semantic MCP auto-start parity は Claude / Codex で implemented
+- semantic MCP auto-start parity は retired。Core は semantic MCP を自動起動せず、addon を明示 enable した場合だけ `addon-absent-or-compliant-check.sh --semantic` で config を検証する
 - semantic preflight / capsule / registry protections は implemented
 - Claude/Opus review の `--bare` は API-key auth (`ANTHROPIC_API_KEY` / `apiKeyHelper`) が明示された場合だけ許可する。OAuth/keychain 認証の非対話 review では `--bare` を省き、`--no-session-persistence`、明示 tools、`--permission-mode dontAsk`、budget を使う
 - browser stack rollout は roadmap 段階であり、current stable flow ではない

@@ -374,14 +374,14 @@ test_effort_lane_regression_guards() {
 test_docs_contract_runtime_mirrors() {
   assert_contains 'scripts/codex-wrapper.sh --role <standard|research|coder|high-coder|reviewer>' \
     "$PROJECT_ROOT/.agent/PROJECT_CONTEXT.md"
-  assert_contains 'high.sh -> high-coder' "$PROJECT_ROOT/CLAUDE.md"
+  assert_contains 'high.sh -> high-coder' "$PROJECT_ROOT/.agent_rules/shared-delegation.md"
   assert_contains 'high.sh -> high-coder' "$PROJECT_ROOT/docs/manual/agent_review_loop.md"
-  assert_contains 'high.sh -> high-coder' "$PROJECT_ROOT/docs/roles/orchestrator.md"
+  assert_contains '.agent_rules/shared-delegation.md' "$PROJECT_ROOT/docs/roles/orchestrator.md"
   assert_contains 'high-coder -> high/cached' "$PROJECT_ROOT/.claude/commands/README.md"
 
   if grep -Fq 'scripts/codex-wrapper.sh --role <standard|research|coder|reviewer>' \
     "$PROJECT_ROOT/.agent/PROJECT_CONTEXT.md" \
-    "$PROJECT_ROOT/CLAUDE.md" \
+    "$PROJECT_ROOT/.agent_rules/shared-delegation.md" \
     "$PROJECT_ROOT/docs/manual/agent_review_loop.md" \
     "$PROJECT_ROOT/docs/roles/orchestrator.md" \
     "$PROJECT_ROOT/.claude/commands/README.md"; then
@@ -389,7 +389,7 @@ test_docs_contract_runtime_mirrors() {
   fi
 
   if grep -Fq 'high.sh -> coder' \
-    "$PROJECT_ROOT/CLAUDE.md" \
+    "$PROJECT_ROOT/.agent_rules/shared-delegation.md" \
     "$PROJECT_ROOT/docs/manual/agent_review_loop.md" \
     "$PROJECT_ROOT/docs/roles/orchestrator.md"; then
     fail "stale high.sh shim mapping found in runtime docs"

@@ -19,8 +19,10 @@ SCHEMA="rev-harness-state/v1"
 PATHS_SCHEMA="rev-harness-paths/v1"
 REPORT_SCHEMA="rev-harness-adopter-setup-report/v1"
 # `semantic_node` is retained as the stable legacy state key/exit-code slot.
-# The command it runs is now Rust-only semantic-bootstrap.sh.
-PHASES="init semantic_node semantic_rust hooks doctor"
+# The command it runs is now Rust-only semantic-bootstrap.sh, and it is
+# executed only when the semantic addon is explicitly enabled.
+CORE_PHASES="init hooks doctor"
+SEMANTIC_ADDON_PHASES="init semantic_node semantic_rust hooks doctor"
 
 DRY_RUN=false
 JSON_OUTPUT=false
@@ -32,8 +34,10 @@ SUBCOMMAND=""
 RUN_ID=""
 EXIT_CODE=0
 WITH_MCP_WIRE=false
+WITH_SEMANTIC_ADDON=false
 export REVHARNESS_PARALLEL_QUIESCE="${REVHARNESS_PARALLEL_QUIESCE:-1}"
 [[ "${REV_HARNESS_WITH_MCP_WIRE:-0}" == "1" ]] && WITH_MCP_WIRE=true
+[[ "${REVHARNESS_ENABLE_SEMANTIC_ADDON:-0}" == "1" ]] && WITH_SEMANTIC_ADDON=true
 
 usage() {
   cat <<'EOF'
@@ -42,7 +46,7 @@ Usage:
 
 Subcommands:
   init      Run init phase only (.shared/project_id creation)
-  setup     Run all phases: init -> semantic_node (Rust bootstrap) -> semantic_rust -> hooks -> doctor
+  setup     Run core phases: init -> hooks -> doctor
   verify    Run harness-doctor only
   resume    Resume from the first failed or pending phase
   status    Display .shared/rev-harness-adopter-setup.state.json
@@ -53,7 +57,8 @@ Options:
   --verbose             Print phase commands to stderr
   --strict              Run doctor in strict mode
   --target <path>       Install into the adopter project at <path>
-  --with-mcp-wire       Merge semantic-mcp into <target>/.mcp.json after setup
+  --with-semantic-addon Run semantic_node and semantic_rust addon phases
+  --with-mcp-wire       Enable semantic addon and merge semantic-mcp into <target>/.mcp.json after setup
   --resume              Resume within setup/init/verify
   --rollback <step>|all Restore owner-token files from a pre-step snapshot
   --help, -h            Show this help
@@ -62,8 +67,8 @@ Exit codes:
   0 success
   2 prerequisite missing or CLI misuse
   10 phase_init failed
-  11 phase_semantic_node failed
-  12 phase_semantic_rust failed
+  11 phase_semantic_node failed (only when semantic addon was explicitly enabled)
+  12 phase_semantic_rust failed (only when semantic addon was explicitly enabled)
   13 phase_hooks failed
   14 phase_doctor failed
   15 state.json corruption
@@ -158,16 +163,17 @@ resolve_setup_roots() {
 
 initial_state_json() {
   local ts="$1"
-  jq -nc --arg schema "$SCHEMA" --arg run_id "$RUN_ID" --arg ts "$ts" '
+  jq -nc --arg schema "$SCHEMA" --arg run_id "$RUN_ID" --arg ts "$ts" --argjson semantic_enabled "$WITH_SEMANTIC_ADDON" '
     {
       schema: $schema,
       run_id: $run_id,
+      semantic_addon_enabled: $semantic_enabled,
       phase: "init",
       current_phase: "init",
       phases: {
         init: {status:"pending", exit_code:0, started_at:null, ended_at:null, input_sha256:null},
-        semantic_node: {status:"pending", exit_code:0, started_at:null, ended_at:null, input_sha256:null},
-        semantic_rust: {status:"pending", exit_code:0, started_at:null, ended_at:null, input_sha256:null},
+        semantic_node: {status:(if $semantic_enabled then "pending" else "skipped" end), exit_code:0, started_at:null, ended_at:null, input_sha256:null},
+        semantic_rust: {status:(if $semantic_enabled then "pending" else "skipped" end), exit_code:0, started_at:null, ended_at:null, input_sha256:null},
         hooks: {status:"pending", exit_code:0, started_at:null, ended_at:null, input_sha256:null},
         doctor: {status:"pending", exit_code:0, started_at:null, ended_at:null, input_sha256:null}
       },
@@ -184,6 +190,7 @@ canonicalize_state_json() {
   jq -c --arg schema "$SCHEMA" --arg run_id "$RUN_ID" --arg ts "$ts" '
     .schema = $schema
     | .run_id = (.run_id // $run_id)
+    | .semantic_addon_enabled = (.semantic_addon_enabled // false)
     | .phase = (.phase // .current_phase // "init")
     | .current_phase = .phase
     | .phases = (.phases // {})
@@ -283,6 +290,7 @@ rust_db_path_for_project() {
 
 emit_paths_manifest() {
   local project_id semantic_db rust_db tmp
+  [[ "$WITH_SEMANTIC_ADDON" == true ]] || return 0
   project_id="$(project_id_value)"
   [[ -n "$project_id" ]] || return 0
   rust_db="$(rust_db_path_for_project "$project_id")"
@@ -405,7 +413,13 @@ run_phase_command() {
 phase_sequence() {
   case "$SUBCOMMAND" in
     init) printf 'init\n' ;;
-    setup|resume) printf '%s\n' $PHASES ;;
+    setup|resume)
+      if [[ "$WITH_SEMANTIC_ADDON" == true ]]; then
+        printf '%s\n' $SEMANTIC_ADDON_PHASES
+      else
+        printf '%s\n' $CORE_PHASES
+      fi
+      ;;
     verify) printf 'doctor\n' ;;
   esac
 }
@@ -423,6 +437,9 @@ run_phases() {
   local state phase input rc phase_code
   state="$(load_state_json)"
   RUN_ID="$(jq -r '.run_id' <<<"$state")"
+  if [[ "$RESUME" == true && "$(jq -r '.semantic_addon_enabled // false' <<<"$state")" == "true" ]]; then
+    WITH_SEMANTIC_ADDON=true
+  fi
   for phase in $(phase_sequence); do
     if [[ "$DRY_RUN" == true ]]; then
       input="$(phase_input_sha "$phase")"
@@ -435,7 +452,7 @@ run_phases() {
       event verified-skip "$phase" ok 0 "$input"
       continue
     fi
-    if [[ "$phase" == "doctor" && ! -f "$PATHS_FILE" ]]; then
+    if [[ "$WITH_SEMANTIC_ADDON" == true && "$phase" == "doctor" && ! -f "$PATHS_FILE" ]]; then
       emit_paths_manifest
     fi
     input="$(phase_input_sha "$phase")"
@@ -450,7 +467,7 @@ run_phases() {
     input="$(phase_input_sha "$phase")"
     if [[ "$rc" -eq 0 ]]; then
       state="$(state_update_phase "$state" "$phase" ok 0 "$input")"; write_state_json "$state"
-      [[ "$phase" != "init" ]] || emit_paths_manifest
+      [[ "$phase" != "init" || "$WITH_SEMANTIC_ADDON" != true ]] || emit_paths_manifest
       event phase_ok "$phase" ok 0 "$input"
     else
       phase_code="$(phase_exit_code "$phase")"
@@ -498,7 +515,8 @@ while [[ $# -gt 0 ]]; do
     --verbose) VERBOSE=true; shift ;;
     --strict) STRICT=true; shift ;;
     --target) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; TARGET_ARG="$2"; shift 2 ;;
-    --with-mcp-wire) WITH_MCP_WIRE=true; shift ;;
+    --with-semantic-addon) WITH_SEMANTIC_ADDON=true; shift ;;
+    --with-mcp-wire) WITH_MCP_WIRE=true; WITH_SEMANTIC_ADDON=true; shift ;;
     --resume) RESUME=true; shift ;;
     --rollback) [[ $# -ge 2 ]] || { usage >&2; exit 2; }; ROLLBACK="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
@@ -507,6 +525,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$SUBCOMMAND" ]] || { usage >&2; exit 2; }
+[[ "$WITH_MCP_WIRE" != true ]] || WITH_SEMANTIC_ADDON=true
 resolve_setup_roots
 require_tools
 

@@ -62,12 +62,5 @@
         ]
       }
     ]
-  },
-  "mcpServers": {
-    "semantic-mcp": {
-      "command": "./scripts/launch-semantic-mcp.sh",
-      "args": [],
-      "env": {}
-    }
   }
 }

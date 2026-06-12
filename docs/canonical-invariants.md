@@ -1,4 +1,4 @@
-# Canonical Invariants (13)
+# Canonical Invariants
 
 `Revharness` の正規不変条件。各 invariant は `AGENTS.md` (inline anchor) と
 `docs/manual/verification-truth-matrix.md` (row-level enforce) に対応する
@@ -7,22 +7,25 @@
 
 本書は AGENTS.md inline section + verification-truth-matrix の散在 row を
 **1 箇所に統合する on-disk canonical anchor** であり、reviewer / orchestrator /
-adopter が「13 invariant の完全集合」を 1 read で得るための index として機能する。
+adopter が canonical invariant set を 1 read で得るための index として機能する。
 
-- 更新方針: 新規 invariant は必ず (1) AGENTS.md inline anchor、
-  (2) `docs/manual/verification-truth-matrix.md` row、(3) 本書 section、の 3 か所同時更新。
-- どれか欠けた状態は I-9 (dispatch-topology lint) / I-12 (smoke-gated dual-LGTM)
-  の双方で reject される構造的不整合とみなす。
-- 13 番目以降の invariant が追加された場合、本書 §Index と §Per-invariant detail
-  を同 commit で同期する。
+- Numbering policy: retired core IDs are tombstoned and never reused.
+- Cross-references to retired IDs keep resolving to tombstone sections.
+- New, retired, and addon invariants update (1) AGENTS.md invariant index,
+  (2) `docs/manual/verification-truth-matrix.md` row, and (3) this document in
+  one slice.
+- Missing synchronization is a structural inconsistency rejected by
+  `scripts/ci/invariant-sync-check.sh --strict`.
+- Transitional clause: the existing I-2, I-2b, and I-13 gate scripts remain
+  blocking until the P7/P8 slices land.
 
 ## Index
 
 | ID | 名前 | canonical surface | deterministic check | severity |
 |---|---|---|---|---|
 | I-1 | Privacy hard gate (pre-commit) | `scripts/rev-harness-path-leak-guard.sh` | `bash scripts/rev-harness-path-leak-guard.sh` exit 0 | blocks commit |
-| I-2 | Tier 1 capsule byte-stable | `harness-rust/crates/semantic-mcp/src/capsule.rs` | `bash scripts/ci/tier1-scope-guard.sh` exit 0 | blocks release |
-| I-2b | Shipped binary privacy stable | `harness-rust/target/release/semantic-mcp` | `bash scripts/ci/release-binary-privacy-scan.sh` exit 0 | blocks release tag |
+| I-2 | Tombstone: retired semantic capsule core invariant | tombstone section below | `bash scripts/ci/tier1-scope-guard.sh` remains transitional blocker until P7/P8 | blocks release during transition |
+| I-2b | Shipped-artifact privacy stable | `docs/SHIPPED_ARTIFACTS.md` | `bash scripts/ci/shipped-artifact-privacy-scan.sh --manifest docs/SHIPPED_ARTIFACTS.md` exit 0 | blocks release tag |
 | I-3 | Dual LGTM on-disk evidence | `.agent/state/dual_lgtm_state.json` | `bash scripts/dual-lgtm-validate.sh --strict` exit 0 | blocks phase_advance |
 | I-4 | Graceful-shutdown fail-open | `.claude/hooks/agent-graceful-shutdown.sh` | `bash .claude/hooks/agent-graceful-shutdown.sh --self-test` exit 0 | runtime safety |
 | I-5 | Wrapper help / behavior parity | `test/golden/{codex,claude}-wrapper-help.txt` | `bash scripts/ci/check-wrapper-help-parity.sh` exit 0 | blocks tag |
@@ -33,7 +36,7 @@ adopter が「13 invariant の完全集合」を 1 read で得るための index
 | I-10 | Call out, never absorb | `scripts/rev-harness` facade + adopter lifecycle | sha256 immutable check (4 child untouched) | governance |
 | I-11 | Destructive opt-in | `--apply --ack-rebuild-cost` 等 explicit flag | janitor build-cleanup test exit 0 | runtime safety |
 | I-12 | Smoke-gated dual-LGTM | `scripts/state-transition-guard.sh` joint axis | `phase-done-smoke.sh --phase <X>` exit 0 → `lgtm_stage=final` allow | blocks phase_advance |
-| I-13 | Semantic MCP wire contract | `.mcp.json.template` + MCP configs | `bash scripts/ci/mcp-wire-contract-check.sh --strict` exit 0 | blocks release |
+| I-13 | Tombstone: retired mandatory semantic MCP core wiring | tombstone section below | `bash scripts/ci/mcp-wire-contract-check.sh --strict` remains transitional blocker until P7/P8 | blocks release during transition |
 
 ## Per-invariant detail
 
@@ -49,27 +52,38 @@ adopter が「13 invariant の完全集合」を 1 read で得るための index
 **AC anchor**: AGENTS.md privacy section / verification-truth-matrix.md
 "path leak / privacy" rows.
 
-### I-2 Tier 1 capsule byte-stable
-**Surface**: `harness-rust/crates/semantic-mcp/src/capsule.rs` (Tier 1 capsule emitter).
-**Trigger**: every Rust workspace change that touches semantic-mcp.
-**Check**: `bash scripts/ci/tier1-scope-guard.sh` exit 0. The script enforces
-byte-stable Tier 1 capsule output and rejects scope creep into Tier 2.
-**Failure mode**: any non-additive change to Tier 1 capsule schema, content order,
-or formatting fails the gate; release blocked.
-**Origin**: Wave 21 Phase F; codified Tier 1 vs Tier 2 boundary.
-**AC anchor**: AGENTS.md semantic-mcp section; `docs/sem/tier2-markdown-medium.md` §1.
+### I-2 Tombstone: retired semantic capsule core invariant
+**State**: retired from the core invariant set; ID is tombstoned and never reused.
+**Core replacement**: INDEX validation plus source reads and deterministic-check
+evidence. Core acceptance must never depend on semantic capsule output.
+**Cross-reference behavior**: existing references to I-2 resolve here.
+**Transitional check**: `bash scripts/ci/tier1-scope-guard.sh` remains blocking
+until the P7/P8 slices land, because the current release gate still enforces it.
+**Addon successor**: `Addon-I-2` preserves semantic capsule byte-stability for
+the opt-in semantic addon.
+**Origin**: Wave 21 Phase F; retired from core by the index-first migration.
 
-### I-2b Shipped binary privacy stable
-**Surface**: `harness-rust/target/release/semantic-mcp` (compiled artifact),
-configured by `harness-rust/Cargo.toml [profile.release]` and
-`harness-rust/.cargo/config.toml`.
-**Trigger**: every release tag candidate; runs after `cargo build --release`.
-**Check**: `bash scripts/ci/release-binary-privacy-scan.sh` exit 0.
-Internally: `strings target/release/semantic-mcp | grep -E '/Users/|/home/|contact_dev|.cargo/registry/src|.rustup/toolchains'` = 0 hits.
+### I-2b Shipped-artifact privacy stable
+**Surface**: every shipped core executable/archive listed in
+`docs/SHIPPED_ARTIFACTS.md`.
+**Trigger**: every release tag candidate.
+**Check**: `bash scripts/ci/shipped-artifact-privacy-scan.sh --manifest docs/SHIPPED_ARTIFACTS.md`
+exit 0. The scan uses the same leak pattern class as
+`scripts/ci/release-binary-privacy-scan.sh`: `/Users/`, `/home/`,
+`contact_dev`, `.cargo/registry/src/`, and `.rustup/toolchains/`.
+**Conditional activation**: if a release ships no core executable/archive, this
+gate fails unless the manifest records `no shipped core artifact` with reviewer
+evidence. Empty implicit success is forbidden.
 **Failure mode**: source-level `path-leak-guard` (I-1) does NOT cover compiled
-strings, debug symbols, or panic-message line-info. I-2b closes that hole.
-**Origin**: HSDI Phase H T-H-4 / T-H-4a / T-H-4b.
-**AC anchor**: AGENTS.md §I-2b; `docs/manual/verification-truth-matrix.md` row 1.
+strings, debug symbols, panic-message line-info, or packaged archive contents.
+I-2b closes that hole for shipped artifacts.
+**Transitional check**: the current `semantic-mcp` scan via
+`bash scripts/ci/release-binary-privacy-scan.sh` remains blocking until addon CI
+has an equally blocking gate; this split does not weaken the release tag gate.
+**Addon companion**: `Addon-I-2b` keeps the semantic-mcp binary scan while the
+semantic binary is addon-pending or addon-shipped.
+**Origin**: HSDI Phase H T-H-4 / T-H-4a / T-H-4b; generalized by the
+index-first migration.
 
 ### I-3 Dual LGTM on-disk evidence
 **Surface**: `.agent/state/dual_lgtm_state.json` (paths-manifest schema,
@@ -191,30 +205,65 @@ structural gap observed across HSDI Phases A-G where agent dual-LGTM missed
 production smoke failures.
 **AC anchor**: AGENTS.md §I-12; `docs/manual/verification-truth-matrix.md` row 2.
 
-### I-13 Semantic MCP wire contract
+### I-13 Tombstone: retired mandatory semantic MCP core wiring
 
-**Required**: Adopter MCP server config (either `.claude/settings.json` or `.mcp.json`) that wires the harness's semantic-mcp MUST use:
-- server name (key): `semantic-mcp` (NOT legacy `semantic`)
-- command: ABSOLUTE path to harness launcher (`<harness-root>/scripts/launch-semantic-mcp.sh`) substituted from the canonical `.mcp.json.template`
-- env: no `SEMANTIC_MCP_PROJECT_ID` sentinel (project_id auto-resolves via adopter-PWD per 0.0.23)
+**State**: retired from the core invariant set; ID is tombstoned and never reused.
+**Core rule**: normal core operation requires no mandatory semantic autostart,
+launcher path, MCP server config, semantic-mcp key, or project_id sentinel.
+**Core proof direction**: core-only smoke coverage must prove representative
+docs, wrapper, and gate tasks can run with semantic MCP absent or disabled.
+**Cross-reference behavior**: existing references to I-13 resolve here.
+**Transitional check**: `bash scripts/ci/mcp-wire-contract-check.sh --strict`
+remains blocking until the P7/P8 slices land, because current configs and
+release gates still enforce semantic MCP wiring.
+**Addon successor**: `Addon-I-13` governs opt-in semantic addon wiring.
 
-**Escape valve**: If the harness launcher is unavailable as an absolute path (e.g., future `homebrew install rev-harness` exposes `semantic-mcp` on PATH), command MAY be the bare binary name `semantic-mcp` PROVIDED the runtime `which semantic-mcp` resolves to a canonical install. The escape valve is OPT-IN per adopter via `_BARE_BINARY_OK: true` marker in the same `.mcp.json` block. Default contract is absolute path.
+## Addon invariants (semantic addon)
 
-**Forbidden**: Legacy `semantic` key, relative `./scripts/launch-semantic-mcp.sh` path, or `SEMANTIC_MCP_PROJECT_ID` env entry MUST NOT appear in adopter MCP config.
+Addon invariants are not core requirements. They are authoritative when the
+semantic addon is enabled, shipped, or release-gated.
 
-**Self-applies**: rev_harness's OWN `.claude/settings.json` and `.codex/config.toml` MUST satisfy this contract on every tagged release.
+### Addon-I-2 Semantic capsule byte-stability
+**Surface**: `harness-rust/crates/semantic-mcp/src/capsule.rs` and semantic
+capsule golden output.
+**Check**: `bash scripts/ci/tier1-scope-guard.sh` exit 0 until replaced by an
+addon gate with equal blocking strength.
+**Rule**: the semantic addon preserves byte-stable Tier 1 capsule output and
+keeps Tier 2 scope creep out of Tier 1 payloads.
+**Non-core boundary**: semantic capsule output is discovery acceleration only
+and is never core acceptance evidence.
 
-**Enforcement**: `scripts/ci/mcp-wire-contract-check.sh` (warn-only in 0.0.24, --strict in 0.0.25+).
+### Addon-I-2b Semantic-mcp binary privacy stable
+**Surface**: `harness-rust/target/release/semantic-mcp` while it is
+addon-pending or addon-shipped.
+**Check**: `bash scripts/ci/release-binary-privacy-scan.sh` exit 0 until
+`semantic-addon-gate.sh --strict` or an equivalent addon release gate supersedes
+it.
+**Rule**: shipped semantic addon binaries must scan clean for the same leak
+pattern class as I-2b.
+
+### Addon-I-13 Opt-in semantic MCP wiring governance
+**Surface**: opt-in semantic MCP config in `.claude/settings.json`,
+`.codex/config.toml`, `.mcp.json.template`, and adopter MCP config when the
+addon is enabled.
+**Rule**: enabled semantic addon wiring must use the `semantic-mcp` key, a valid
+launcher/binary contract, no `SEMANTIC_MCP_PROJECT_ID` legacy sentinel, and
+explicit legacy key detection.
+**Planned check**: `scripts/ci/addon-absent-or-compliant-check.sh --semantic`
+is the P8 deliverable. Do not create it before P8.
+**Transitional check**: `bash scripts/ci/mcp-wire-contract-check.sh --strict`
+remains blocking until the P7/P8 slices land.
 
 ## Cross-references
 
-- `AGENTS.md` — inline invariant anchors (I-2b §128, I-12 §133).
-- `docs/manual/verification-truth-matrix.md` — row-level enforce table
-  (I-2b + I-12 rows).
+- `AGENTS.md` — invariant index and addon invariant reference table.
+- `docs/manual/verification-truth-matrix.md` — row-level enforce table.
 - `scripts/state-transition-guard.sh` — I-3 + I-12 joint enforcement.
-- `scripts/ci/release-binary-privacy-scan.sh` — I-2b runtime gate.
+- `scripts/ci/shipped-artifact-privacy-scan.sh` — I-2b shipped-artifact gate.
+- `scripts/ci/release-binary-privacy-scan.sh` — Addon-I-2b transitional gate.
 - `scripts/ci/phase-done-smoke.sh` — I-12 smoke gate.
-- `scripts/ci/mcp-wire-contract-check.sh` — I-13 MCP wire contract gate.
+- `scripts/ci/tier1-scope-guard.sh` — Addon-I-2 transitional gate.
+- `scripts/ci/mcp-wire-contract-check.sh` — I-13 / Addon-I-13 transitional gate.
 - `scripts/ci/check-execplan-topology.sh` — I-6 + I-9 (shared).
 - `scripts/dual-lgtm-validate.sh` — I-3 reviewer artifact validator.
 - `.claude/hooks/agent-graceful-shutdown.sh` — I-4 + I-7 runtime hook.
@@ -225,13 +274,12 @@ production smoke failures.
 
 ## Update protocol
 
-新規 invariant を追加するときは、必ず同一 commit 内で:
+新規 invariant、addon invariant、または tombstone を追加するときは、必ず同一
+commit 内で:
 
-1. `AGENTS.md` に inline `### I-N (名前)` anchor を追加する。
+1. `AGENTS.md` の invariant index または addon invariant reference table を更新する。
 2. `docs/manual/verification-truth-matrix.md` の Invariant Acceptance Gates
-   table に 1 row 追加する。
+   table に対応 row を追加する。
 3. 本書の §Index と §Per-invariant detail に新規 section を追加する。
 
-3 か所の同期は `scripts/ci/check-execplan-topology.sh` 拡張版または専用
-lint で自動検知することが推奨される (Wave 22 候補 →
-`docs/manual/roadmap-wave-22.md`)。
+3 か所の同期は `scripts/ci/invariant-sync-check.sh --strict` で検知する。

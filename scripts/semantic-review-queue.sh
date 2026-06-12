@@ -1,6 +1,40 @@
 #!/bin/bash
 set -euo pipefail
 
+# Review queue backend contract:
+# - Default backend: core JSONL at
+#   `.agent/state/review_queue/events.jsonl`, protected by a repo-local
+#   `mkdir` lock directory. This keeps queue authority inspectable and
+#   diffable, avoids sqlite3 availability assumptions, and removes
+#   semantic-mcp/tree-sitter/cargo from the default enqueue write path.
+# - Rollback backend: set `REVHARNESS_REVIEW_QUEUE_BACKEND=semantic` to route
+#   the unchanged public CLI through the prior semantic-mcp queue backend.
+# - Unknown backend values fail closed.
+# - Public core identifiers preserve the legacy backend validation class:
+#   `source` is `[A-Za-z0-9_-]` up to 32 chars, lease owners are
+#   `[A-Za-z0-9-]` up to 128 chars, and lease run IDs are
+#   `[A-Za-z0-9._:-]` up to 128 chars.
+# - Re-enqueue while a file is actively leased records the enqueue event but
+#   keeps the leased state and owner so the current lease can complete.
+# - Core stores `lease_run_id` in internal reducer events/state, but public
+#   item objects intentionally omit it to match the legacy Rust `QueueItem`
+#   shape. Lease responses keep top-level `lease_run_id`; empty leases echo the
+#   requested run id.
+# - Finalize `--expected-file` inputs use the same repo-relative normalization
+#   as enqueue before matching and before append-only event emission.
+# - The core lock is a `mkdir` lock with `pid` metadata. A lock older than
+#   `REVHARNESS_REVIEW_QUEUE_LOCK_TTL_SECONDS` (default 30s) is reclaimed only
+#   when no recorded PID is live, or when no valid PID was recorded.
+# - Optional test/ops overrides:
+#   `REVHARNESS_REVIEW_QUEUE_STATE_DIR`, `REVHARNESS_REVIEW_QUEUE_METRICS`.
+# - Compatibility export remains caller-controlled through `--export-json`;
+#   hook ingress still passes `.claude/tmp/review_queue.json`.
+#
+# Metrics schema (`.agent/metrics/review_queue_events.jsonl`, append-only):
+# {"schema_version":1,"ts":"RFC3339Z","event":"enqueue-ok|enqueue-skipped|backend-unavailable|lock-reclaimed","backend":"core|semantic|unknown","project_id":"...","file_path":"repo/relative/or-empty","source":"...","reason":"...","fail_behavior":"fail-closed"}
+# Rows intentionally contain repo-relative paths only; absolute state/host paths
+# are not emitted.
+
 usage() {
   printf '%s\n' \
     'Usage:' \
@@ -101,7 +135,7 @@ assert_no_symlink_components() {
   [[ "$path_value" == "$normalized_root" || "$path_value" == "$normalized_root/"* ]] \
     || die "path escapes repo-local identity root: $path_value"
 
-  relative_path="${path_value#$normalized_root}"
+  relative_path="${path_value#"$normalized_root"}"
   relative_path="${relative_path#/}"
 
   current="$normalized_root"
@@ -305,6 +339,7 @@ runtime_path_matches_trusted_pattern() {
 
   while IFS= read -r pattern; do
     [[ -n "$pattern" ]] || continue
+    # shellcheck disable=SC2053
     if [[ "$candidate_path" == $pattern ]]; then
       return 0
     fi
@@ -365,7 +400,7 @@ resolve_mise_binary_from_shim() {
 
   case "$shim_path" in
     */.local/share/mise/shims/"$binary_name"|*/.mise/shims/"$binary_name")
-      data_root="${shim_path%/shims/$binary_name}"
+      data_root="${shim_path%/shims/"$binary_name"}"
       case "$data_root" in
         */.local/share/mise)
           manager_home="${data_root%/.local/share/mise}"
@@ -392,6 +427,7 @@ resolve_mise_binary_from_shim() {
     local IFS=':'
     local -a path_entries=()
     if [[ -n "$sanitized_path" ]]; then
+      # shellcheck disable=SC2206
       path_entries=($sanitized_path)
     fi
     for path_dir in "${path_entries[@]}"; do
@@ -1230,8 +1266,10 @@ resolve_rust_semantic_backend() {
     return 4
   fi
 
+  # shellcheck disable=SC2034
   RUST_SEMANTIC_BACKEND_ROOT="$workspace_root"
   RUST_SEMANTIC_BACKEND_MANIFEST="$manifest_path"
+  # shellcheck disable=SC2034
   RUST_SEMANTIC_BACKEND_MAIN="$main_path"
   return 0
 }
@@ -1410,7 +1448,8 @@ validate_command_flags() {
 
 resolve_project_id() {
   local repo_root="$1"
-  local resolver="$(script_dir)/resolve-semantic-project-id.sh"
+  local resolver=""
+  resolver="$(script_dir)/resolve-semantic-project-id.sh"
   [[ -x "$resolver" ]] || die "project_id resolver not found or not executable: $resolver"
   /bin/bash "$resolver" --repo-root "$repo_root" --print
 }
@@ -1506,6 +1545,43 @@ validate_project_id() {
   [[ "$project_id" != "agent_base" ]] || die "legacy project_id 'agent_base' is not allowed on DB-authoritative paths"
 }
 
+validate_queue_source() {
+  local source="${1:-}"
+  local normalized=""
+
+  normalized="$(trim_ascii_whitespace "$source")"
+  [[ -n "$normalized" ]] || die "source must contain only letters, numbers, '_' or '-' and be <= 32 characters"
+  [[ ${#normalized} -le 32 ]] || die "source must contain only letters, numbers, '_' or '-' and be <= 32 characters"
+  [[ "$normalized" =~ ^[A-Za-z0-9_-]+$ ]] || die "source must contain only letters, numbers, '_' or '-' and be <= 32 characters"
+  printf '%s\n' "$normalized"
+}
+
+validate_queue_lease_owner() {
+  local lease_owner="${1:-}"
+  local normalized=""
+
+  normalized="$(trim_ascii_whitespace "$lease_owner")"
+  [[ -n "$normalized" ]] || die "lease_owner must contain only letters, numbers, or '-'"
+  [[ ${#normalized} -le 128 ]] || die "lease_owner must contain only letters, numbers, or '-'"
+  [[ "$normalized" =~ ^[A-Za-z0-9-]+$ ]] || die "lease_owner must contain only letters, numbers, or '-'"
+  printf '%s\n' "$normalized"
+}
+
+validate_optional_queue_lease_run_id() {
+  local lease_run_id="${1:-}"
+  local normalized=""
+
+  [[ -n "$lease_run_id" ]] || {
+    printf '\n'
+    return 0
+  }
+  normalized="$(trim_ascii_whitespace "$lease_run_id")"
+  [[ -n "$normalized" ]] || die "lease_run_id must contain only letters, numbers, '.', '_', ':' or '-' and be <= 128 characters"
+  [[ ${#normalized} -le 128 ]] || die "lease_run_id must contain only letters, numbers, '.', '_', ':' or '-' and be <= 128 characters"
+  [[ "$normalized" =~ ^[A-Za-z0-9._:-]+$ ]] || die "lease_run_id must contain only letters, numbers, '.', '_', ':' or '-' and be <= 128 characters"
+  printf '%s\n' "$normalized"
+}
+
 resolve_effective_project_id() {
   local repo_root="$1"
   local requested_project_id="${2:-}"
@@ -1522,55 +1598,599 @@ resolve_effective_project_id() {
   printf '%s\n' "$resolved_project_id"
 }
 
-enqueue_file() {
+json_array_from_args() {
+  jq -n '$ARGS.positional' --args "$@"
+}
+
+core_queue_public_snapshot_json() {
+  jq '.items |= map(del(.lease_run_id))'
+}
+
+utc_now() {
+  /bin/date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+new_queue_id() {
+  local prefix="${1:-id}"
+  local now=""
+  now="$(/bin/date -u '+%Y%m%dT%H%M%SZ')"
+  printf '%s-%s-%s-%s\n' "$prefix" "$now" "$$" "$RANDOM"
+}
+
+review_queue_backend() {
+  local backend="${REVHARNESS_REVIEW_QUEUE_BACKEND:-core}"
+  case "$backend" in
+    core|semantic)
+      printf '%s\n' "$backend"
+      ;;
+    *)
+      printf 'unknown\n'
+      ;;
+  esac
+}
+
+review_queue_unknown_backend_token() {
+  local raw_value="${REVHARNESS_REVIEW_QUEUE_BACKEND:-}"
+  local token=""
+
+  token="$(printf '%s' "$raw_value" | LC_ALL=C tr -cd 'A-Za-z0-9._-' | cut -c 1-32)"
+  [[ -n "$token" ]] || token="invalid"
+  printf '%s\n' "$token"
+}
+
+review_queue_state_dir() {
+  local repo_root="$1"
+  if [[ -n "${REVHARNESS_REVIEW_QUEUE_STATE_DIR:-}" ]]; then
+    printf '%s\n' "$REVHARNESS_REVIEW_QUEUE_STATE_DIR"
+    return 0
+  fi
+  printf '%s/.agent/state/review_queue\n' "$repo_root"
+}
+
+review_queue_metrics_path() {
+  local repo_root="$1"
+  if [[ -n "${REVHARNESS_REVIEW_QUEUE_METRICS:-}" ]]; then
+    printf '%s\n' "$REVHARNESS_REVIEW_QUEUE_METRICS"
+    return 0
+  fi
+  printf '%s/.agent/metrics/review_queue_events.jsonl\n' "$repo_root"
+}
+
+repo_relative_or_empty() {
+  local repo_root="$1"
+  local value="${2:-}"
+  [[ -n "$value" ]] || {
+    printf '\n'
+    return 0
+  }
+  case "$value" in
+    "$repo_root"/*)
+      printf '%s\n' "${value#"$repo_root"/}"
+      ;;
+    /*)
+      printf '<external>\n'
+      ;;
+    *)
+      printf '%s\n' "$value"
+      ;;
+  esac
+}
+
+emit_review_queue_metric() {
+  local repo_root="$1"
+  local event="$2"
+  local backend="$3"
+  local project_id="${4:-}"
+  local file_path="${5:-}"
+  local source="${6:-}"
+  local reason="${7:-}"
+  local metrics_path=""
+  local metrics_dir=""
+  local ts=""
+  local rel_file=""
+  local payload=""
+
+  metrics_path="$(review_queue_metrics_path "$repo_root")"
+  metrics_dir="$(path_parent_dir "$metrics_path")"
+  mkdir -p "$metrics_dir" 2>/dev/null || return 0
+  ts="$(utc_now)"
+  rel_file="$(repo_relative_or_empty "$repo_root" "$file_path")"
+  payload="$(
+    jq -nc \
+      --arg ts "$ts" \
+      --arg event "$event" \
+      --arg backend "$backend" \
+      --arg project_id "$project_id" \
+      --arg file_path "$rel_file" \
+      --arg source "$source" \
+      --arg reason "$reason" \
+      '{
+        schema_version: 1,
+        ts: $ts,
+        event: $event,
+        backend: $backend,
+        project_id: $project_id,
+        file_path: $file_path,
+        source: $source,
+        reason: $reason,
+        fail_behavior: (if $event == "backend-unavailable" then "fail-closed" else "" end)
+      }'
+  )" || return 0
+  printf '%s\n' "$payload" >> "$metrics_path" 2>/dev/null || true
+}
+
+CORE_QUEUE_LOCK_DIR=""
+CORE_QUEUE_LOCK_RECLAIM_REASON=""
+
+core_queue_lock_ttl_seconds() {
+  local ttl="${REVHARNESS_REVIEW_QUEUE_LOCK_TTL_SECONDS:-30}"
+  [[ "$ttl" =~ ^[1-9][0-9]*$ ]] || ttl="30"
+  printf '%s\n' "$ttl"
+}
+
+path_mtime_epoch() {
+  local path_value="${1:-}"
+  local mtime=""
+
+  mtime="$(stat -f %m "$path_value" 2>/dev/null || stat -c %Y "$path_value" 2>/dev/null || true)"
+  [[ "$mtime" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$mtime"
+}
+
+pid_is_live() {
+  local pid="${1:-}"
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+core_queue_maybe_reclaim_stale_lock() {
+  local lock_dir="$1"
+  local ttl=""
+  local now=""
+  local mtime=""
+  local pid=""
+
+  [[ -d "$lock_dir" && ! -L "$lock_dir" ]] || return 1
+  ttl="$(core_queue_lock_ttl_seconds)"
+  now="$(/bin/date +%s)"
+  mtime="$(path_mtime_epoch "$lock_dir")" || return 1
+  (( now - mtime >= ttl )) || return 1
+
+  if [[ -f "$lock_dir/pid" && ! -L "$lock_dir/pid" ]]; then
+    pid="$(head -n 1 "$lock_dir/pid" 2>/dev/null | tr -cd '0-9')"
+    if [[ -n "$pid" ]] && pid_is_live "$pid"; then
+      return 1
+    fi
+  fi
+
+  /bin/rm -rf "$lock_dir" 2>/dev/null || return 1
+  CORE_QUEUE_LOCK_RECLAIM_REASON="stale-lock-reclaimed"
+  return 0
+}
+
+core_queue_prepare() {
+  local repo_root="$1"
+  local state_dir=""
+  local events_file=""
+
+  state_dir="$(review_queue_state_dir "$repo_root")"
+  events_file="$state_dir/events.jsonl"
+
+  mkdir -p "$state_dir" || {
+    CORE_QUEUE_ERROR="failed to create core review queue state dir"
+    return 1
+  }
+  [[ -d "$state_dir" && ! -L "$state_dir" ]] || {
+    CORE_QUEUE_ERROR="core review queue state path is not a trusted directory"
+    return 1
+  }
+  : >> "$events_file" || {
+    CORE_QUEUE_ERROR="failed to write core review queue events file"
+    return 1
+  }
+  [[ -f "$events_file" && ! -L "$events_file" ]] || {
+    CORE_QUEUE_ERROR="core review queue events path is not a trusted file"
+    return 1
+  }
+}
+
+core_queue_events_file() {
+  local repo_root="$1"
+  printf '%s/events.jsonl\n' "$(review_queue_state_dir "$repo_root")"
+}
+
+core_queue_acquire_lock() {
+  local repo_root="$1"
+  local project_id="${2:-}"
+  local file_path="${3:-}"
+  local source="${4:-}"
+  local state_dir=""
+  local lock_dir=""
+  local start=""
+  local now=""
+
+  state_dir="$(review_queue_state_dir "$repo_root")"
+  lock_dir="$state_dir/queue.lock.d"
+  CORE_QUEUE_LOCK_RECLAIM_REASON=""
+  start="$(/bin/date +%s)"
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    if core_queue_maybe_reclaim_stale_lock "$lock_dir"; then
+      emit_review_queue_metric "$repo_root" "lock-reclaimed" "core" "$project_id" "$file_path" "$source" "$CORE_QUEUE_LOCK_RECLAIM_REASON"
+      continue
+    fi
+    now="$(/bin/date +%s)"
+    if (( now - start >= 10 )); then
+      CORE_QUEUE_ERROR="timed out acquiring core review queue lock"
+      return 1
+    fi
+    sleep 0.1
+  done
+  {
+    printf '%s\n' "$$" > "$lock_dir/pid"
+    printf '%s\n' "$(utc_now)" > "$lock_dir/acquired_at"
+  } 2>/dev/null || {
+    /bin/rm -f "$lock_dir/pid" "$lock_dir/acquired_at" 2>/dev/null || true
+    rmdir "$lock_dir" 2>/dev/null || true
+    CORE_QUEUE_ERROR="failed to write core review queue lock metadata"
+    return 1
+  }
+  CORE_QUEUE_LOCK_DIR="$lock_dir"
+}
+
+core_queue_release_lock() {
+  if [[ -n "${CORE_QUEUE_LOCK_DIR:-}" ]]; then
+    /bin/rm -f "$CORE_QUEUE_LOCK_DIR/pid" "$CORE_QUEUE_LOCK_DIR/acquired_at" 2>/dev/null || true
+    rmdir "$CORE_QUEUE_LOCK_DIR" 2>/dev/null || true
+    CORE_QUEUE_LOCK_DIR=""
+  fi
+}
+
+trap 'core_queue_release_lock' EXIT
+
+core_queue_enter_or_die() {
+  local repo_root="$1"
+  local project_id="$2"
+  local file_path="${3:-}"
+  local source="${4:-}"
+
+  CORE_QUEUE_ERROR=""
+  if ! core_queue_prepare "$repo_root"; then
+    emit_review_queue_metric "$repo_root" "backend-unavailable" "core" "$project_id" "$file_path" "$source" "$CORE_QUEUE_ERROR"
+    die "core review queue backend unavailable: $CORE_QUEUE_ERROR"
+  fi
+  if ! core_queue_acquire_lock "$repo_root" "$project_id" "$file_path" "$source"; then
+    emit_review_queue_metric "$repo_root" "backend-unavailable" "core" "$project_id" "$file_path" "$source" "$CORE_QUEUE_ERROR"
+    die "core review queue backend unavailable: $CORE_QUEUE_ERROR"
+  fi
+}
+
+core_queue_snapshot_json() {
+  local repo_root="$1"
+  local project_id="$2"
+  local now="$3"
+  local events_file=""
+
+  events_file="$(core_queue_events_file "$repo_root")"
+  jq -s --arg project_id "$project_id" --arg exported_at "$now" '
+    def empty_item:
+      {
+        event_id: null,
+        dedupe_key: "",
+        file_path: "",
+        source: "",
+        queue_state: "",
+        first_enqueued_at: "",
+        last_enqueued_at: "",
+        lease_owner: null,
+        lease_run_id: null,
+        leased_at: null,
+        lease_expires_at: null,
+        acknowledged_at: null,
+        retry_count: 0,
+        last_error: null
+      };
+    def state_map:
+      reduce .[] as $e ({};
+        if $e.project_id != $project_id then
+          .
+        elif $e.op == "enqueue" then
+          .[$e.file_path] as $old
+          | if (($old.queue_state // "") == "pending") then
+              .
+            elif (($old.queue_state // "") == "leased") then
+              .[$e.file_path] = ($old + {
+                event_id: $e.event_id,
+                dedupe_key: $e.file_path,
+                file_path: $e.file_path,
+                source: $e.source,
+                queue_state: "leased",
+                first_enqueued_at: ($old.first_enqueued_at // $e.at),
+                last_enqueued_at: $e.at,
+                acknowledged_at: null,
+                last_error: null
+              })
+            else
+              .[$e.file_path] = (empty_item + {
+                event_id: $e.event_id,
+                dedupe_key: $e.file_path,
+                file_path: $e.file_path,
+                source: $e.source,
+                queue_state: "pending",
+                first_enqueued_at: (if (($old.queue_state // "") == "done") or ($old == null) then $e.at else ($old.first_enqueued_at // $e.at) end),
+                last_enqueued_at: $e.at,
+                retry_count: (if (($old.queue_state // "") == "done") or ($old == null) then 0 else ($old.retry_count // 0) end)
+              })
+            end
+        elif $e.op == "lease" then
+          reduce (($e.items // [])[]) as $file (.;
+            if .[$file] then
+              .[$file].queue_state = "leased"
+              | .[$file].lease_owner = $e.lease_owner
+              | .[$file].lease_run_id = $e.lease_run_id
+              | .[$file].leased_at = $e.leased_at
+              | .[$file].lease_expires_at = $e.lease_expires_at
+              | .[$file].acknowledged_at = null
+              | .[$file].last_error = null
+            else
+              .
+            end)
+        elif $e.op == "complete" then
+          reduce (($e.items // [])[]) as $file (.;
+            if .[$file] then
+              .[$file].queue_state = "done"
+              | .[$file].lease_owner = $e.lease_owner
+              | .[$file].lease_run_id = null
+              | .[$file].lease_expires_at = null
+              | .[$file].acknowledged_at = $e.completed_at
+              | .[$file].last_error = null
+            else
+              .
+            end)
+        elif $e.op == "requeue" then
+          reduce (($e.items // [])[]) as $file (.;
+            if .[$file] then
+              .[$file].queue_state = "pending"
+              | .[$file].lease_owner = null
+              | .[$file].lease_run_id = null
+              | .[$file].leased_at = null
+              | .[$file].lease_expires_at = null
+              | .[$file].acknowledged_at = null
+              | .[$file].retry_count = ((.[$file].retry_count // 0) + 1)
+              | .[$file].last_error = ($e.error // null)
+            else
+              .
+            end)
+        else
+          .
+        end);
+    (state_map
+      | to_entries
+      | map(.value)
+      | map(select(.queue_state == "pending" or .queue_state == "leased"))
+      | sort_by(.first_enqueued_at, .file_path)) as $items
+    | {
+        project_id: $project_id,
+        exported_at: $exported_at,
+        pending_count: ($items | map(select(.queue_state == "pending")) | length),
+        leased_count: ($items | map(select(.queue_state == "leased")) | length),
+        pending_review: (($items | length) > 0),
+        changed_files: ($items | map(.file_path)),
+        last_change: (($items | map(if ((.leased_at // "") > .last_enqueued_at) then (.leased_at // "") else .last_enqueued_at end) | max) // ""),
+        items: $items
+      }
+  ' "$events_file"
+}
+
+core_queue_write_export() {
+  local repo_root="$1"
+  local project_id="$2"
+  local output_path="$3"
+  local snapshot=""
+  local output_dir=""
+
+  [[ -n "$output_path" ]] || return 0
+  snapshot="$(core_queue_snapshot_json "$repo_root" "$project_id" "$(utc_now)")"
+  output_dir="$(path_parent_dir "$output_path")"
+  mkdir -p "$output_dir" || die "failed to create queue export directory: $output_dir"
+  core_queue_public_snapshot_json <<< "$snapshot" > "$output_path" || die "failed to write queue export: $output_path"
+}
+
+core_queue_append_event() {
+  local repo_root="$1"
+  local event_json="$2"
+  local events_file=""
+
+  events_file="$(core_queue_events_file "$repo_root")"
+  printf '%s\n' "$event_json" >> "$events_file" || die "failed to append core review queue event"
+}
+
+core_enqueue_file() {
   local repo_root="$1"
   local file_path="$2"
   local source="$3"
   local export_json_path="$4"
   local canonical_file_path=""
+  local project_id=""
+  local snapshot=""
+  local existing_item=""
+  local existing_state=""
+  local event_json=""
+  local item_json=""
+  local output_json=""
+  local now=""
+
+  [[ -n "$file_path" ]] || die "enqueue requires --file-path"
+  [[ -n "$source" ]] || die "enqueue requires --source"
+  source="$(validate_queue_source "$source")"
+  canonical_file_path="$(canonicalize_queue_enqueue_file_path "$repo_root" "$file_path")"
+
+  project_id="$(resolve_project_id "$repo_root")" \
+    || die "failed to resolve project_id for repo: $repo_root"
+
+  core_queue_enter_or_die "$repo_root" "$project_id" "$canonical_file_path" "$source"
+  now="$(utc_now)"
+  snapshot="$(core_queue_snapshot_json "$repo_root" "$project_id" "$now")"
+  existing_item="$(jq -c --arg file_path "$canonical_file_path" '.items[]? | select(.file_path == $file_path)' <<< "$snapshot")"
+  existing_state="$(jq -r 'select(. != null) | .queue_state // empty' <<< "${existing_item:-null}")"
+  if [[ "$existing_state" == "pending" ]]; then
+    output_json="$(jq -nc --argjson item "$existing_item" '{queued:false, duplicate:true, item:($item|del(.lease_run_id))}')"
+    core_queue_write_export "$repo_root" "$project_id" "$export_json_path"
+    core_queue_release_lock
+    emit_review_queue_metric "$repo_root" "enqueue-skipped" "core" "$project_id" "$canonical_file_path" "$source" "duplicate-pending"
+    printf '%s\n' "$output_json"
+    return 0
+  fi
+
+  event_json="$(
+    jq -nc \
+      --arg op "enqueue" \
+      --arg project_id "$project_id" \
+      --arg event_id "$(new_queue_id evt)" \
+      --arg file_path "$canonical_file_path" \
+      --arg source "$source" \
+      --arg at "$now" \
+      '{schema_version:1, op:$op, project_id:$project_id, event_id:$event_id, file_path:$file_path, source:$source, at:$at}'
+  )"
+  core_queue_append_event "$repo_root" "$event_json"
+  snapshot="$(core_queue_snapshot_json "$repo_root" "$project_id" "$now")"
+  item_json="$(jq -c --arg file_path "$canonical_file_path" '.items[] | select(.file_path == $file_path)' <<< "$snapshot")"
+  output_json="$(jq -nc --argjson item "$item_json" '{queued:true, duplicate:false, item:($item|del(.lease_run_id))}')"
+  core_queue_write_export "$repo_root" "$project_id" "$export_json_path"
+  core_queue_release_lock
+  emit_review_queue_metric "$repo_root" "enqueue-ok" "core" "$project_id" "$canonical_file_path" "$source" ""
+  printf '%s\n' "$output_json"
+}
+
+semantic_enqueue_file() {
+  local repo_root="$1"
+  local file_path="$2"
+  local source="$3"
+  local export_json_path="$4"
+  local canonical_file_path=""
+  local project_id=""
+  local enqueue_output=""
   local -a enqueue_args=()
 
   [[ -n "$file_path" ]] || die "enqueue requires --file-path"
   [[ -n "$source" ]] || die "enqueue requires --source"
+  source="$(validate_queue_source "$source")"
   canonical_file_path="$(canonicalize_queue_enqueue_file_path "$repo_root" "$file_path")"
-
-  local project_id=""
   project_id="$(resolve_project_id "$repo_root")" \
     || die "failed to resolve project_id for repo: $repo_root"
 
-  enqueue_args=(
-    queue enqueue
-    --project-id "$project_id"
-    --repo-root "$repo_root"
-    --file-path "$canonical_file_path"
-    --source "$source"
-  )
+  enqueue_args=(queue enqueue --project-id "$project_id" --repo-root "$repo_root" --file-path "$canonical_file_path" --source "$source")
   if [[ -n "$export_json_path" ]]; then
     enqueue_args+=(--export-json "$export_json_path")
   fi
 
-  local enqueue_output=""
-  if ! enqueue_output="$(
-    run_cli \
-      "$repo_root" \
-      "${enqueue_args[@]}"
-  )"; then
+  if ! enqueue_output="$(run_cli "$repo_root" "${enqueue_args[@]}")"; then
+    emit_review_queue_metric "$repo_root" "backend-unavailable" "semantic" "$project_id" "$canonical_file_path" "$source" "semantic-backend-failed"
     die "queue enqueue failed for ${file_path}"
   fi
 
+  if jq -e '.duplicate == true' >/dev/null 2>&1 <<< "$enqueue_output"; then
+    emit_review_queue_metric "$repo_root" "enqueue-skipped" "semantic" "$project_id" "$canonical_file_path" "$source" "duplicate-pending"
+  else
+    emit_review_queue_metric "$repo_root" "enqueue-ok" "semantic" "$project_id" "$canonical_file_path" "$source" ""
+  fi
   printf '%s\n' "$enqueue_output"
 }
 
-lease_work() {
+enqueue_file() {
+  local repo_root="$1"
+  local file_path="$2"
+  local source="$3"
+  local export_json_path="$4"
+  local backend=""
+
+  backend="$(review_queue_backend)"
+  case "$backend" in
+    core)
+      core_enqueue_file "$repo_root" "$file_path" "$source" "$export_json_path"
+      ;;
+    semantic)
+      semantic_enqueue_file "$repo_root" "$file_path" "$source" "$export_json_path"
+      ;;
+    *)
+      emit_review_queue_metric "$repo_root" "backend-unavailable" "unknown" "" "$file_path" "$source" "unknown-backend:$(review_queue_unknown_backend_token)"
+      die "unknown REVHARNESS_REVIEW_QUEUE_BACKEND: $(review_queue_unknown_backend_token)"
+      ;;
+  esac
+}
+
+core_lease_work() {
   local repo_root="$1"
   local lease_run_id="$2"
   local lease_seconds="$3"
+  local project_id=""
+  local now=""
+  local expires=""
+  local snapshot=""
+  local lease_owner=""
+  local items_json=""
+  local files_json=""
+  local event_json=""
+  local output_json=""
 
   [[ -n "$lease_run_id" ]] || die "lease requires --lease-run-id"
   [[ -n "$lease_seconds" ]] || die "lease requires --lease-seconds"
   [[ "$lease_seconds" =~ ^[1-9][0-9]*$ ]] || die "--lease-seconds must be a positive integer"
+  lease_run_id="$(validate_optional_queue_lease_run_id "$lease_run_id")"
 
+  project_id="$(resolve_project_id "$repo_root")" \
+    || die "failed to resolve project_id for repo: $repo_root"
+  core_queue_enter_or_die "$repo_root" "$project_id" "" "lease"
+  now="$(utc_now)"
+  expires="$(/bin/date -u -v+"${lease_seconds}"S '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || /bin/date -u -d "+${lease_seconds} seconds" '+%Y-%m-%dT%H:%M:%SZ')"
+  snapshot="$(core_queue_snapshot_json "$repo_root" "$project_id" "$now")"
+  items_json="$(jq -c --arg now "$now" '[.items[] | select(.queue_state == "pending" or (.queue_state == "leased" and (.lease_expires_at // "") <= $now))]' <<< "$snapshot")"
+  files_json="$(jq -c '[.[].file_path]' <<< "$items_json")"
+
+  if [[ "$(jq -r 'length' <<< "$items_json")" == "0" ]]; then
+    core_queue_release_lock
+    jq -nc --arg project_id "$project_id" --arg leased_at "$now" --arg lease_run_id "$lease_run_id" --argjson items "$items_json" --argjson expected "$files_json" \
+      '{project_id:$project_id, lease_owner:null, leased_at:$leased_at, lease_expires_at:null, leased_count:0, items:($items|map(del(.lease_run_id))), lease_run_id:$lease_run_id, expected_files:$expected}'
+    return 0
+  fi
+
+  lease_owner="$(new_queue_id lease)"
+  event_json="$(
+    jq -nc \
+      --arg project_id "$project_id" \
+      --arg lease_owner "$lease_owner" \
+      --arg lease_run_id "$lease_run_id" \
+      --arg leased_at "$now" \
+      --arg lease_expires_at "$expires" \
+      --argjson items "$files_json" \
+      '{schema_version:1, op:"lease", project_id:$project_id, lease_owner:$lease_owner, lease_run_id:$lease_run_id, leased_at:$leased_at, lease_expires_at:$lease_expires_at, items:$items}'
+  )"
+  core_queue_append_event "$repo_root" "$event_json"
+  output_json="$(
+    jq -nc \
+      --arg project_id "$project_id" \
+      --arg lease_owner "$lease_owner" \
+      --arg lease_run_id "$lease_run_id" \
+      --arg leased_at "$now" \
+      --arg lease_expires_at "$expires" \
+      --argjson items "$items_json" \
+      --argjson expected "$files_json" \
+      '{project_id:$project_id, lease_owner:$lease_owner, leased_at:$leased_at, lease_expires_at:$lease_expires_at, leased_count:($items|length), items:($items|map(.queue_state="leased"|.lease_owner=$lease_owner|.lease_run_id=$lease_run_id|.leased_at=$leased_at|.lease_expires_at=$lease_expires_at|del(.lease_run_id))), lease_run_id:$lease_run_id, expected_files:$expected}'
+  )"
+  core_queue_release_lock
+  printf '%s\n' "$output_json"
+}
+
+semantic_lease_work() {
+  local repo_root="$1"
+  local lease_run_id="$2"
+  local lease_seconds="$3"
   local project_id=""
+
+  [[ -n "$lease_run_id" ]] || die "lease requires --lease-run-id"
+  [[ -n "$lease_seconds" ]] || die "lease requires --lease-seconds"
+  [[ "$lease_seconds" =~ ^[1-9][0-9]*$ ]] || die "--lease-seconds must be a positive integer"
+  lease_run_id="$(validate_optional_queue_lease_run_id "$lease_run_id")"
+
   project_id="$(resolve_project_id "$repo_root")" \
     || die "failed to resolve project_id for repo: $repo_root"
 
@@ -1582,7 +2202,28 @@ lease_work() {
     --lease-seconds "$lease_seconds"
 }
 
-finalize_work() {
+lease_work() {
+  local repo_root="$1"
+  local lease_run_id="$2"
+  local lease_seconds="$3"
+  local backend=""
+
+  backend="$(review_queue_backend)"
+  case "$backend" in
+    core)
+      core_lease_work "$repo_root" "$lease_run_id" "$lease_seconds"
+      ;;
+    semantic)
+      semantic_lease_work "$repo_root" "$lease_run_id" "$lease_seconds"
+      ;;
+    *)
+      emit_review_queue_metric "$repo_root" "backend-unavailable" "unknown" "" "" "lease" "unknown-backend:$(review_queue_unknown_backend_token)"
+      die "unknown REVHARNESS_REVIEW_QUEUE_BACKEND: $(review_queue_unknown_backend_token)"
+      ;;
+  esac
+}
+
+core_finalize_work() {
   local action="$1"
   local repo_root="$2"
   local lease_owner="$3"
@@ -1591,28 +2232,112 @@ finalize_work() {
   local requested_project_id="$6"
   shift 6
   local expected_files=("$@")
+  local normalized_expected_files=()
+  local project_id=""
+  local now=""
+  local snapshot=""
+  local expected_json=""
+  local matched_items_json=""
+  local matched_count=""
+  local expected_count=""
+  local op=""
+  local event_json=""
+  local output_json=""
 
   [[ "$action" == "complete" || "$action" == "requeue" ]] || die "unsupported finalize action: $action"
   [[ -n "$lease_owner" ]] || die "$action requires --lease-owner"
   [[ "${#expected_files[@]}" -gt 0 ]] || die "$action requires at least one --expected-file"
+  lease_owner="$(validate_queue_lease_owner "$lease_owner")"
+  lease_run_id="$(validate_optional_queue_lease_run_id "$lease_run_id")"
+  for file_path in "${expected_files[@]}"; do
+    normalized_expected_files+=("$(canonicalize_queue_enqueue_file_path "$repo_root" "$file_path")")
+  done
   if [[ "$action" == "requeue" ]]; then
     [[ -n "$error_message" ]] || die "requeue requires --error"
   fi
 
+  project_id="$(resolve_effective_project_id "$repo_root" "$requested_project_id")" \
+    || die "failed to resolve effective project_id for repo: $repo_root"
+  core_queue_enter_or_die "$repo_root" "$project_id" "" "$action"
+  now="$(utc_now)"
+  expected_json="$(json_array_from_args "${normalized_expected_files[@]}")"
+  snapshot="$(core_queue_snapshot_json "$repo_root" "$project_id" "$now")"
+  matched_items_json="$(
+    jq -c \
+      --arg owner "$lease_owner" \
+      --arg run_id "$lease_run_id" \
+      --argjson expected "$expected_json" \
+      '[.items[]
+        | select((.file_path as $f | $expected | index($f)) != null)
+        | select(.queue_state == "leased")
+        | select(.lease_owner == $owner)
+        | select(if $run_id == "" then ((.lease_run_id // "") == "") else (.lease_run_id == $run_id) end)]' <<< "$snapshot"
+  )"
+  matched_count="$(jq -r 'length' <<< "$matched_items_json")"
+  expected_count="$(jq -r 'length' <<< "$expected_json")"
+  if [[ "$matched_count" != "$expected_count" ]]; then
+    core_queue_release_lock
+    die "$action failed: expected files are not all leased by owner"
+  fi
+
+  if [[ "$action" == "complete" ]]; then
+    op="complete"
+    event_json="$(
+      jq -nc --arg project_id "$project_id" --arg owner "$lease_owner" --arg run_id "$lease_run_id" --arg at "$now" --argjson items "$expected_json" \
+        '{schema_version:1, op:"complete", project_id:$project_id, lease_owner:$owner, lease_run_id:$run_id, completed_at:$at, items:$items}'
+    )"
+    core_queue_append_event "$repo_root" "$event_json"
+    output_json="$(
+      jq -nc --arg project_id "$project_id" --arg owner "$lease_owner" --arg at "$now" --argjson items "$matched_items_json" \
+        '{project_id:$project_id, lease_owner:$owner, completed_at:$at, completed_count:($items|length), items:($items|map(.queue_state="done"|.acknowledged_at=$at|.lease_expires_at=null|del(.lease_run_id)))}'
+    )"
+  else
+    op="requeue"
+    event_json="$(
+      jq -nc --arg project_id "$project_id" --arg owner "$lease_owner" --arg run_id "$lease_run_id" --arg at "$now" --arg error "$error_message" --argjson items "$expected_json" \
+        '{schema_version:1, op:"requeue", project_id:$project_id, lease_owner:$owner, lease_run_id:$run_id, requeued_at:$at, error:$error, items:$items}'
+    )"
+    core_queue_append_event "$repo_root" "$event_json"
+    output_json="$(
+      jq -nc --arg project_id "$project_id" --arg owner "$lease_owner" --arg at "$now" --arg error "$error_message" --argjson items "$matched_items_json" \
+        '{project_id:$project_id, lease_owner:$owner, requeued_at:$at, requeued_count:($items|length), items:($items|map(.queue_state="pending"|.lease_owner=null|.lease_run_id=null|.leased_at=null|.lease_expires_at=null|.last_error=$error|del(.lease_run_id)))}'
+    )"
+  fi
+  [[ -n "$op" ]] || die "invalid finalize operation"
+  core_queue_release_lock
+  printf '%s\n' "$output_json"
+}
+
+semantic_finalize_work() {
+  local action="$1"
+  local repo_root="$2"
+  local lease_owner="$3"
+  local lease_run_id="$4"
+  local error_message="$5"
+  local requested_project_id="$6"
+  shift 6
+  local expected_files=("$@")
   local project_id=""
+  local args=()
+  local file_path=""
+
+  [[ "$action" == "complete" || "$action" == "requeue" ]] || die "unsupported finalize action: $action"
+  [[ -n "$lease_owner" ]] || die "$action requires --lease-owner"
+  [[ "${#expected_files[@]}" -gt 0 ]] || die "$action requires at least one --expected-file"
+  lease_owner="$(validate_queue_lease_owner "$lease_owner")"
+  lease_run_id="$(validate_optional_queue_lease_run_id "$lease_run_id")"
+  if [[ "$action" == "requeue" ]]; then
+    [[ -n "$error_message" ]] || die "requeue requires --error"
+  fi
+
   project_id="$(resolve_effective_project_id "$repo_root" "$requested_project_id")" \
     || die "failed to resolve effective project_id for repo: $repo_root"
 
-  local args=(
-    queue "$action"
-    --project-id "$project_id"
-    --lease-owner "$lease_owner"
-  )
+  args=(queue "$action" --project-id "$project_id" --lease-owner "$lease_owner")
   if [[ -n "$lease_run_id" ]]; then
     args+=(--lease-run-id "$lease_run_id")
   fi
 
-  local file_path=""
   for file_path in "${expected_files[@]}"; do
     [[ -n "$file_path" ]] || die "$action received an empty --expected-file"
     args+=(--expected-file "$file_path")
@@ -1625,7 +2350,54 @@ finalize_work() {
   run_cli "$repo_root" "${args[@]}"
 }
 
-export_queue_json() {
+finalize_work() {
+  local action="$1"
+  local repo_root="$2"
+  local lease_owner="$3"
+  local lease_run_id="$4"
+  local error_message="$5"
+  local requested_project_id="$6"
+  shift 6
+  local expected_files=("$@")
+  local backend=""
+
+  backend="$(review_queue_backend)"
+  case "$backend" in
+    core)
+      core_finalize_work "$action" "$repo_root" "$lease_owner" "$lease_run_id" "$error_message" "$requested_project_id" "${expected_files[@]}"
+      ;;
+    semantic)
+      semantic_finalize_work "$action" "$repo_root" "$lease_owner" "$lease_run_id" "$error_message" "$requested_project_id" "${expected_files[@]}"
+      ;;
+    *)
+      emit_review_queue_metric "$repo_root" "backend-unavailable" "unknown" "" "" "$action" "unknown-backend:$(review_queue_unknown_backend_token)"
+      die "unknown REVHARNESS_REVIEW_QUEUE_BACKEND: $(review_queue_unknown_backend_token)"
+      ;;
+  esac
+}
+
+core_export_queue_json() {
+  local repo_root="$1"
+  local requested_project_id="$2"
+  local output_path="$3"
+  local project_id=""
+  local snapshot=""
+  local output_dir=""
+
+  [[ -n "$output_path" ]] || die "export-json requires --output"
+  project_id="$(resolve_effective_project_id "$repo_root" "$requested_project_id")" \
+    || die "failed to resolve effective project_id for repo: $repo_root"
+  core_queue_enter_or_die "$repo_root" "$project_id" "" "export-json"
+  snapshot="$(core_queue_snapshot_json "$repo_root" "$project_id" "$(utc_now)")"
+  output_dir="$(path_parent_dir "$output_path")"
+  mkdir -p "$output_dir" || die "failed to create queue export directory: $output_dir"
+  core_queue_public_snapshot_json <<< "$snapshot" > "$output_path" || die "failed to write queue export: $output_path"
+  core_queue_release_lock
+  jq -nc --arg project_id "$project_id" --arg output "$output_path" --argjson snapshot "$snapshot" \
+    '{project_id:$project_id, output:$output, pending_count:$snapshot.pending_count, leased_count:$snapshot.leased_count}'
+}
+
+semantic_export_queue_json() {
   local repo_root="$1"
   local requested_project_id="$2"
   local output_path="$3"
@@ -1641,6 +2413,27 @@ export_queue_json() {
     queue export-json \
     --project-id "$project_id" \
     --output "$output_path"
+}
+
+export_queue_json() {
+  local repo_root="$1"
+  local requested_project_id="$2"
+  local output_path="$3"
+  local backend=""
+
+  backend="$(review_queue_backend)"
+  case "$backend" in
+    core)
+      core_export_queue_json "$repo_root" "$requested_project_id" "$output_path"
+      ;;
+    semantic)
+      semantic_export_queue_json "$repo_root" "$requested_project_id" "$output_path"
+      ;;
+    *)
+      emit_review_queue_metric "$repo_root" "backend-unavailable" "unknown" "" "" "export-json" "unknown-backend:$(review_queue_unknown_backend_token)"
+      die "unknown REVHARNESS_REVIEW_QUEUE_BACKEND: $(review_queue_unknown_backend_token)"
+      ;;
+  esac
 }
 
 main() {

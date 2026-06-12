@@ -11,9 +11,10 @@ TMP_RUNTIME=""
 TMP_RUNTIME_DIAG=""
 TMP_REVIEW=""
 TMP_QUEUE=""
+TMP_ADDON_OPTIN=""
 
 cleanup() {
-  rm -rf -- "${TMP_INIT:-}" "${TMP_RUNTIME:-}" "${TMP_RUNTIME_DIAG:-}" "${TMP_REVIEW:-}" "${TMP_QUEUE:-}" 2>/dev/null || true
+  rm -rf -- "${TMP_INIT:-}" "${TMP_RUNTIME:-}" "${TMP_RUNTIME_DIAG:-}" "${TMP_REVIEW:-}" "${TMP_QUEUE:-}" "${TMP_ADDON_OPTIN:-}" 2>/dev/null || true
   return 0
 }
 trap cleanup EXIT
@@ -1536,15 +1537,49 @@ if command -v cargo >/dev/null 2>&1; then
   )
 fi
 
-[[ "$(jq -r '.mcpServers["semantic-mcp"].command' "$REPO_ROOT/.claude/settings.json")" == "./scripts/launch-semantic-mcp.sh" ]] \
-  || fail "settings semantic-mcp command did not point to ./scripts/launch-semantic-mcp.sh"
-[[ "$(jq -r '.mcpServers["semantic-mcp"].args | length' "$REPO_ROOT/.claude/settings.json")" == "0" ]] \
-  || fail "settings semantic-mcp args should be empty when launch wrapper owns argv"
-if grep -q 'agent_base' "$REPO_ROOT/.claude/settings.json"; then
-  fail "settings.json still contains legacy literal agent_base"
+if ! bash "$REPO_ROOT/scripts/ci/addon-absent-or-compliant-check.sh" --semantic --root "$REPO_ROOT" \
+    >"$TMP_RUNTIME/addon_absent_or_compliant.root.stdout" \
+    2>"$TMP_RUNTIME/addon_absent_or_compliant.root.stderr"; then
+  cat "$TMP_RUNTIME/addon_absent_or_compliant.root.stderr" >&2
+  fail "root semantic addon config should be absent or compliant"
 fi
-python3 -c 'import sys, tomllib; data = tomllib.load(open(sys.argv[1], "rb")); command = data.get("mcp_servers", {}).get("semantic-mcp", {}).get("command"); raise SystemExit(0 if command == "./scripts/launch-semantic-mcp.sh" else 1)' \
-  "$REPO_ROOT/.codex/config.toml" >/dev/null || fail "Codex semantic-mcp command did not point to ./scripts/launch-semantic-mcp.sh"
+
+TMP_ADDON_OPTIN="$(mktemp -d "${TMPDIR:-/tmp}/semantic_project_id_addon_optin.XXXXXX")"
+ADDON_OPTIN_ROOT="$TMP_ADDON_OPTIN/repo"
+mkdir -p "$ADDON_OPTIN_ROOT/.claude" "$ADDON_OPTIN_ROOT/.codex" "$ADDON_OPTIN_ROOT/scripts"
+/bin/cp "$REPO_ROOT/scripts/launch-semantic-mcp.sh" "$ADDON_OPTIN_ROOT/scripts/launch-semantic-mcp.sh"
+chmod +x "$ADDON_OPTIN_ROOT/scripts/launch-semantic-mcp.sh"
+jq -n '{
+  mcpServers: {
+    "semantic-mcp": {
+      command: "./scripts/launch-semantic-mcp.sh",
+      args: [],
+      env: {}
+    }
+  }
+}' > "$ADDON_OPTIN_ROOT/.claude/settings.json"
+jq -n '{
+  mcpServers: {
+    "semantic-mcp": {
+      command: "./scripts/launch-semantic-mcp.sh",
+      args: [],
+      env: {}
+    }
+  }
+}' > "$ADDON_OPTIN_ROOT/.mcp.json.template"
+cat > "$ADDON_OPTIN_ROOT/.codex/config.toml" <<'TOML'
+[mcp_servers.semantic-mcp]
+command = "./scripts/launch-semantic-mcp.sh"
+args = []
+TOML
+if ! bash "$REPO_ROOT/scripts/ci/addon-absent-or-compliant-check.sh" --semantic --root "$ADDON_OPTIN_ROOT" \
+    >"$TMP_RUNTIME/addon_absent_or_compliant.optin.stdout" \
+    2>"$TMP_RUNTIME/addon_absent_or_compliant.optin.stderr"; then
+  cat "$TMP_RUNTIME/addon_absent_or_compliant.optin.stderr" >&2
+  fail "explicit semantic addon opt-in config should satisfy launcher contract"
+fi
+grep -q 'compliant enabled_entries=3' "$TMP_RUNTIME/addon_absent_or_compliant.optin.stdout" \
+  || fail "explicit semantic addon opt-in should validate all three config surfaces"
 
 # 3. reviewer live state remains scratch only.
 TMP_REVIEW="$(mktemp -d "${TMPDIR:-/tmp}/semantic_project_id_review_state.XXXXXX")"

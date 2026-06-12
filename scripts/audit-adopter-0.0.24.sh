@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Deprecated historical audit for 0.0.24 adopters. It intentionally detects the
+# legacy `mcpServers.semantic` key; current addon opt-in uses `semantic-mcp`.
+
 usage() {
   cat >&2 <<'USAGE'
 usage: bash scripts/audit-adopter-0.0.24.sh [--target <adopter-path>]

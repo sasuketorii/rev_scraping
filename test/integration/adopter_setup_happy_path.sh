@@ -17,11 +17,6 @@ mkdir -p .shared
 printf 'adopter-happy\n' > .shared/project_id
 touch .gitignore
 EOF
-cat >"$TMP/scripts/semantic-bootstrap.sh" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-mkdir -p .semantic-node
-EOF
 cat >"$TMP/scripts/install-rev-harness-hooks.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -44,8 +39,11 @@ OUT="$TMP/out.jsonl"
 )
 
 test ! -e "$TARGET/.shared/rev-harness-adopter-setup.state.json"
-test "$(grep -c '"event":"phase_started"' "$OUT")" -eq 5
-test "$(grep -c '"event":"phase_ok"' "$OUT")" -eq 5
+test "$(grep -c '"event":"phase_started"' "$OUT")" -eq 3
+test "$(grep -c '"event":"phase_ok"' "$OUT")" -eq 3
+! grep -q '"phase":"semantic_node"' "$OUT"
+! grep -q '"phase":"semantic_rust"' "$OUT"
+test ! -e "$TARGET/.rev-harness-state/paths.json"
 grep -q '"event":"run_summary".*"status":"ok"' "$OUT"
 printf 'adopter_setup_happy_path: ok\n'
 exit 0

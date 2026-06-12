@@ -27,6 +27,8 @@ assert_not_contains() {
 assert_file AGENTS.md
 assert_file CLAUDE.md
 assert_file .claude/CLAUDE-LOCAL.md
+assert_file .agent_rules/shared-semantic.md
+assert_file .cursor/rules/revharness-detailed.mdc
 
 head -n 12 CLAUDE.md | grep -qi 'vendor-neutral' || fail "CLAUDE.md lacks vendor-neutral disclosure near top"
 head -n 15 AGENTS.md | grep -q 'RevHarness invariants' || fail "AGENTS.md lacks RevHarness invariants disclosure near top"
@@ -44,4 +46,10 @@ assert_contains 'codex-wrapper.sh' .claude/CLAUDE-LOCAL.md
 assert_contains 'claude-wrapper.sh' .claude/CLAUDE-LOCAL.md
 assert_contains 'Orchestrator Hard Rules' .claude/CLAUDE-LOCAL.md
 assert_contains '役割変更ルール' .claude/CLAUDE-LOCAL.md
-assert_contains '4層コンテキスト最適化モデル' .claude/CLAUDE-LOCAL.md
+assert_contains 'Semantic coordination uses a four-layer model' .agent_rules/shared-semantic.md
+assert_contains 'Layer 0 ground' .agent_rules/shared-semantic.md
+assert_contains 'Layer 1 pre-flight' .agent_rules/shared-semantic.md
+assert_contains 'Layer 2 prompt capsule' .agent_rules/shared-semantic.md
+assert_contains 'Layer 3' .agent_rules/shared-semantic.md
+assert_contains 'execution feedback' .agent_rules/shared-semantic.md
+assert_contains 'four-layer context model is primarily orchestrator context management' .cursor/rules/revharness-detailed.mdc

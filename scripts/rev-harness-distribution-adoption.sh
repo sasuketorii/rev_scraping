@@ -247,6 +247,48 @@ validate_prerequisite_manifest_schema() {
   }
 }
 
+record_validator_debug_detail() {
+  local label="$1"
+  local path="$2"
+  local output="$3"
+  local stderr_file="$4"
+  local compact_output=""
+
+  if [[ -n "$output" ]]; then
+    compact_output="$(printf '%s\n' "$output" | jq -c '.' 2>/dev/null || printf '%s' "$output")"
+    record_failure "distribution-adoption-prerequisite" "$label validator debug output: $compact_output" "$path"
+  fi
+  if [[ -s "$stderr_file" ]]; then
+    record_failure "distribution-adoption-prerequisite" "$(tr '\n' ';' <"$stderr_file")" "$path"
+  fi
+}
+
+run_prerequisite_validator() {
+  local label="$1"
+  local path="$2"
+  local stderr_file="$3"
+  local output=""
+  local rc=0
+
+  shift 3
+  set +e
+  output="$("$@" 2>"$stderr_file")"
+  rc=$?
+  set -e
+
+  if [[ "$rc" -ne 0 ]]; then
+    record_failure "distribution-adoption-prerequisite" "$label validator failed with exit $rc" "$path"
+    record_validator_debug_detail "$label" "$path" "$output" "$stderr_file"
+    return 1
+  fi
+
+  if ! printf '%s\n' "$output" | jq -e '.status == "PASS"' >/dev/null; then
+    record_failure "distribution-adoption-prerequisite" "$label validator did not PASS" "$path"
+    record_validator_debug_detail "$label" "$path" "$output" "$stderr_file"
+    return 1
+  fi
+}
+
 validate_prerequisite_artifact_integrity() {
   local name="$1"
   local path="$2"
@@ -264,18 +306,8 @@ validate_prerequisite_artifact_integrity() {
         record_failure "distribution-adoption-prerequisite" "dirty surface artifact is empty or lacks required fields" "$path"
         return 1
       fi
-      if output="$(bash "$DIRTY_SURFACE_CHECKER" --root "$PROJECT_ROOT" --manifest "$path" --check --json 2>"$stderr_file")"; then
-        if ! printf '%s\n' "$output" | jq -e '.status == "PASS"' >/dev/null; then
-          record_failure "distribution-adoption-prerequisite" "dirty surface validator did not PASS" "$path"
-          return 1
-        fi
-      else
-        record_failure "distribution-adoption-prerequisite" "dirty surface validator failed" "$path"
-        if [[ -s "$stderr_file" ]]; then
-          record_failure "distribution-adoption-prerequisite" "$(tr '\n' ';' <"$stderr_file")" "$path"
-        fi
-        return 1
-      fi
+      run_prerequisite_validator "dirty surface" "$path" "$stderr_file" \
+        bash "$DIRTY_SURFACE_CHECKER" --root "$PROJECT_ROOT" --manifest "$path" --check --json
       ;;
     "evidence manifest")
       if ! jq -e '
@@ -287,18 +319,8 @@ validate_prerequisite_artifact_integrity() {
         record_failure "distribution-adoption-prerequisite" "evidence manifest artifact is empty or lacks required fields" "$path"
         return 1
       fi
-      if output="$(bash "$EVIDENCE_MANIFEST_CHECKER" validate --root "$PROJECT_ROOT" --manifest "$path" --json 2>"$stderr_file")"; then
-        if ! printf '%s\n' "$output" | jq -e '.status == "PASS"' >/dev/null; then
-          record_failure "distribution-adoption-prerequisite" "evidence manifest validator did not PASS" "$path"
-          return 1
-        fi
-      else
-        record_failure "distribution-adoption-prerequisite" "evidence manifest validator failed" "$path"
-        if [[ -s "$stderr_file" ]]; then
-          record_failure "distribution-adoption-prerequisite" "$(tr '\n' ';' <"$stderr_file")" "$path"
-        fi
-        return 1
-      fi
+      run_prerequisite_validator "evidence manifest" "$path" "$stderr_file" \
+        bash "$EVIDENCE_MANIFEST_CHECKER" validate --root "$PROJECT_ROOT" --manifest "$path" --json
       ;;
     "worker lifecycle manifest")
       if ! jq -e '
@@ -308,18 +330,8 @@ validate_prerequisite_artifact_integrity() {
         record_failure "distribution-adoption-prerequisite" "worker lifecycle artifact is empty or lacks required fields" "$path"
         return 1
       fi
-      if output="$(bash "$WORKER_LIFECYCLE_CHECKER" validate --root "$PROJECT_ROOT" --manifest "$path" --json 2>"$stderr_file")"; then
-        if ! printf '%s\n' "$output" | jq -e '.status == "PASS"' >/dev/null; then
-          record_failure "distribution-adoption-prerequisite" "worker lifecycle validator did not PASS" "$path"
-          return 1
-        fi
-      else
-        record_failure "distribution-adoption-prerequisite" "worker lifecycle validator failed" "$path"
-        if [[ -s "$stderr_file" ]]; then
-          record_failure "distribution-adoption-prerequisite" "$(tr '\n' ';' <"$stderr_file")" "$path"
-        fi
-        return 1
-      fi
+      run_prerequisite_validator "worker lifecycle" "$path" "$stderr_file" \
+        bash "$WORKER_LIFECYCLE_CHECKER" validate --root "$PROJECT_ROOT" --manifest "$path" --json
       ;;
     "counter admission preflight"|"schema-micro-fix admission")
       local expected_admission_type=""

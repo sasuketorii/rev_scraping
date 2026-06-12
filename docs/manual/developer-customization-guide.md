@@ -64,7 +64,7 @@ Codex Goal、Claude Code subagents、OpenAI prompt guidance のような upstrea
 - external / manual Codex runs は `scripts/codex-wrapper.sh --role ...` が canonical
 - automatic flow は non-interactive invariant を守る
 - current orchestrated coder run は `task-contract.json` を emit / validate してから進む
-- semantic MCP は Claude / Codex 両方から repo-local auto-start する
+- semantic MCP は core から auto-start しない。使う場合は semantic addon を明示 enable し、Claude / Codex の config を `scripts/ci/addon-absent-or-compliant-check.sh --semantic` で検証する
 - semantic preflight / capsule は target-lock / ambiguity / duplicate-risk を signal として出す
 
 ## 触る前に注意すること

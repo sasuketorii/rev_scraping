@@ -6,9 +6,9 @@ Reviewerは、Coderの成果物を多角的に評価し、品質を担保する�
 **固定エージェント:** Codex CLI
 - モデル: `.agent/registry/model_policy.json` の `current_model`
 - caller-facing / manual / external canonical entrypoint: `scripts/codex-wrapper.sh --role reviewer`
-- reviewer profile: `xhigh` + `cached`
+- reviewer profile is defined by `.agent_rules/shared-delegation.md`
 - native Codex multi-agent / subagent orchestration は Codex 内部で完結させ、`scripts/codex-wrapper.sh` を再帰呼び出ししない
-- **変更禁止:** `reviewer` 以外の caller-facing role を使わない。legacy `scripts/codex-wrapper-xhigh.sh` も reviewer への互換入口に限り、`--role` で別 role へ逃がさない
+- **変更禁止:** `reviewer` 以外の caller-facing role を使わない。legacy shim semantics は `.agent_rules/shared-delegation.md` を正本とする
 - plan-level review planning と initial ExecPlan design は `.agent/registry/model_policy.json` の `initial_execplan_design` lane に従い、native `plan_reviewer` / `system_planner` preset の `gpt-5.5` + `xhigh` + `cached` を使う。これは通常の consistency / performance reviewer lane (`medium`) や docs-only / light planning とは別枠
 
 ---
@@ -122,7 +122,8 @@ Reviewerは、Coderの成果物を多角的に評価し、品質を担保する�
 - reviewer は task class profile に応じた review scope・required checks・artifact integrity・class closure state を自分で追跡できない限り LGTM を出してはならない。lineage provenance と adversarial pre-closure pass は `heavy`、または defect / root-cause / same-class fix の `standard` で必須
 - reviewer は adversarial pre-closure pass の section が存在するだけで十分とみなさず、current slice / owned sink universe に対する substantive coverage を確認できない限り LGTM を出してはならない
 - Skip `wip:` commits during LGTM evaluation (graceful checkpoint commits are not part of the dual-LGTM artifact set; evaluate only non-`wip:` commits constituting the slice's reviewable diff)
-- acceptance の読み順は `user scope → reviewer role definition → verification truth matrix → runtime entrypoint` とする
+- Acceptance read order is owned by `AGENTS.md` §Read Order; reviewer-specific
+  validity details are owned by the matrix sections cited above.
 
 ### 8.5 Remaining-Issues Count Claims
 - reviewer が `remaining issues: N` を使ってよい条件は `docs/manual/verification-truth-matrix.md` の `Remaining-Issues Count / Final-LGTM Claims` を正本とする。exact count を書く場合は `closed universe basis / basis / timestamp / target scope` を report 内で追跡できなければならない
@@ -142,7 +143,7 @@ Reviewerは、Coderの成果物を多角的に評価し、品質を担保する�
 
 ### 実行ルール
 - caller-facing / manual / external な `codex exec` を直接呼ばず、必ず `scripts/codex-wrapper.sh --role reviewer` を使う
-- legacy `scripts/codex-wrapper-xhigh.sh` は移行互換 shim としてのみ扱う
+- legacy shim semantics は `.agent_rules/shared-delegation.md` を正本とする
 - `--cd` / `--add-dir` を付けて reviewer を起動しない。渡されても canonical wrapper が警告して strip する
 - native Codex multi-agent / subagent orchestration は Codex 内部に留め、reviewer 実行を wrapper 再帰起動に逃がさない
 - wrapper が無い、role 解決に失敗した、または reviewer 互換 shim から別 role への escape が検出された場合は fail-closed で停止する
@@ -476,7 +477,7 @@ agent が `sem.capsule` 経由で受け取る capsule body は以下の不変条
 - caller は `{project_id, task_id, phase, context_token}` 必須、`top_k_symbols` フィールド送信は fail-closed
 - prefix wildcard search は提供せず、FTS5 BM25 + 48h recency が既定
 
-詳細: skill `revharness-semantic-mcp-usage`、CLAUDE.md、`.agent_rules/RULES.md` の capsule discipline 節。
+詳細: `.agent_rules/shared-semantic.md` と skill `revharness-semantic-mcp-usage`。
 
 ### Reviewer 固有
 
