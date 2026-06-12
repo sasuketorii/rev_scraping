@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PREFLIGHT="$PROJECT_ROOT/scripts/rev-harness-distribution-adoption.sh"
+DEFAULT_PREFLIGHT=""
 TMP_ROOT=""
 
 cleanup() {
@@ -47,7 +48,7 @@ write_skill_tree() {
   local dir="$1"
 
   mkdir -p "$dir/references"
-  printf '%s\n' '---' 'name: rustskills-architecture' 'description: Example loader-compliant skill.' '---' '# RustSkills Architecture' \
+  printf '%s\n' '---' 'name: rustskills-architecture-legacy' 'description: Example loader-compliant skill.' '---' '# RustSkills Architecture Legacy' \
     >"$dir/SKILL.md"
   printf '%s\n' 'reference body' >"$dir/references/reference.md"
 }
@@ -70,10 +71,10 @@ setup_fixture() {
   printf '%s\n' '# Harness User Guide' >"$root/docs/manual/harness-user-guide.md"
   printf '%s\n' 'base' >"$root/owned.txt"
 
-  write_skill_tree "$root/.agent/skills/rustskills-architecture"
-  cp -R "$root/.agent/skills/rustskills-architecture" "$root/.claude/skills/rustskills-architecture"
-  cp -R "$root/.agent/skills/rustskills-architecture" "$root/.agent/generated/skills/codex/rustskills-architecture"
-  cp -R "$root/.agent/skills/rustskills-architecture" "$root/codex-home/skills/rustskills-architecture"
+  write_skill_tree "$root/.agent/skills/rustskills-architecture-legacy"
+  cp -R "$root/.agent/skills/rustskills-architecture-legacy" "$root/.claude/skills/rustskills-architecture-legacy"
+  cp -R "$root/.agent/skills/rustskills-architecture-legacy" "$root/.agent/generated/skills/codex/rustskills-architecture-legacy"
+  cp -R "$root/.agent/skills/rustskills-architecture-legacy" "$root/codex-home/skills/rustskills-architecture-legacy"
 
   printf '%s\n' \
     '{' \
@@ -84,7 +85,7 @@ setup_fixture() {
     '  "preserve_globs_semantics": "adoption-local-preserve-only",' \
     '  "preserve_globs": [".agent/PROJECT_CONTEXT.md", "src", "src/**"],' \
     '  "client_distribution": {' \
-    '    "exclude_globs": [".agent/archive/**", ".claude/tmp/**", "workspace/**", "~/.semantic-mcp/*/semantic.db"],' \
+    '    "exclude_globs": [".agent/archive/**", ".claude/tmp/**", "workspace/**", "~/.semantic-mcp/*/semantic.db", "~/.local/share/Revharness/semantic-mcp/v1/*/semantic.db", "~/Library/Application Support/Revharness/semantic-mcp/v1/*/semantic.db", "%LOCALAPPDATA%\\Revharness\\semantic-mcp\\v1\\*\\semantic.db"],' \
     '    "ship_semantic_db": false,' \
     '    "semantic_db_regeneration": "Regenerate on first use."' \
     '  },' \
@@ -104,29 +105,29 @@ setup_fixture() {
     '  },' \
     '  "skills": [' \
     '    {' \
-    '      "name": "rustskills-architecture",' \
-    '      "canonical_source": {"path": ".agent/skills/rustskills-architecture", "role": "canonical-source"},' \
+    '      "name": "rustskills-architecture-legacy",' \
+    '      "canonical_source": {"path": ".agent/skills/rustskills-architecture-legacy", "role": "canonical-source"},' \
     '      "projections": [' \
     '        {' \
     '          "provider": "claude",' \
-    '          "path": ".claude/skills/rustskills-architecture",' \
+    '          "path": ".claude/skills/rustskills-architecture-legacy",' \
     '          "projection_kind": "byte-for-byte",' \
     '          "excluded_generated_metadata": [],' \
-    '          "activation": {"status": "project-local-active", "auto_discoverable": true, "install_target": ".claude/skills/rustskills-architecture", "note": "Claude project-local skill projection."}' \
+    '          "activation": {"status": "project-local-active", "auto_discoverable": true, "install_target": ".claude/skills/rustskills-architecture-legacy", "note": "Claude project-local skill projection."}' \
     '        },' \
     '        {' \
     '          "provider": "codex-generated",' \
-    '          "path": ".agent/generated/skills/codex/rustskills-architecture",' \
+    '          "path": ".agent/generated/skills/codex/rustskills-architecture-legacy",' \
     '          "projection_kind": "byte-for-byte",' \
     '          "excluded_generated_metadata": [],' \
-    '          "activation": {"status": "install-required", "auto_discoverable": false, "install_target": "$CODEX_HOME/skills/rustskills-architecture", "note": "Generated Codex projection only."}' \
+    '          "activation": {"status": "install-required", "auto_discoverable": false, "install_target": "$CODEX_HOME/skills/rustskills-architecture-legacy", "note": "Generated Codex projection only."}' \
     '        },' \
     '        {' \
     '          "provider": "codex-installed",' \
-    '          "path": "$CODEX_HOME/skills/rustskills-architecture",' \
+    '          "path": "$CODEX_HOME/skills/rustskills-architecture-legacy",' \
     '          "projection_kind": "byte-for-byte",' \
     '          "excluded_generated_metadata": [],' \
-    '          "activation": {"status": "installed-active", "auto_discoverable": true, "install_target": "$CODEX_HOME/skills/rustskills-architecture", "note": "Actual Codex skill home projection."}' \
+    '          "activation": {"status": "installed-active", "auto_discoverable": true, "install_target": "$CODEX_HOME/skills/rustskills-architecture-legacy", "note": "Actual Codex skill home projection."}' \
     '        }' \
     '      ]' \
     '    }' \
@@ -205,11 +206,38 @@ setup_fixture() {
   printf '%s\n' 'owned adoption preflight change' >>"$root/owned.txt"
 }
 
+ensure_default_preflight_fixture() {
+  local harness="$TMP_ROOT/default-preflight-harness"
+
+  if [[ -n "$DEFAULT_PREFLIGHT" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$harness/scripts"
+  cp "$PREFLIGHT" "$harness/scripts/rev-harness-distribution-adoption.sh"
+  cp "$PROJECT_ROOT/scripts/rev-harness-skill-projection.sh" "$harness/scripts/rev-harness-skill-projection.sh"
+  cat >"$harness/scripts/rev-harness-dirty-surface.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS"}'
+EOF
+  cat >"$harness/scripts/rev-harness-evidence-manifest.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS"}'
+EOF
+  cat >"$harness/scripts/rev-harness-worker-lifecycle.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS"}'
+EOF
+  chmod +x "$harness"/scripts/*.sh
+  DEFAULT_PREFLIGHT="$harness/scripts/rev-harness-distribution-adoption.sh"
+}
+
 run_preflight_for_root() {
   local root="$1"
   shift
 
-  CODEX_HOME="$root/codex-home" bash "$PREFLIGHT" --root "$root" "$@"
+  ensure_default_preflight_fixture
+  CODEX_HOME="$root/codex-home" bash "$DEFAULT_PREFLIGHT" --root "$root" "$@"
 }
 
 write_placeholder_admission_prerequisite() {
@@ -240,7 +268,10 @@ test_fixture_passes_with_installed_codex_and_prerequisites() {
   local output=""
 
   setup_fixture "$root"
-  output="$(run_preflight_for_root "$root" --check --json)"
+  if ! output="$(run_preflight_for_root "$root" --check --json 2>"$TMP_ROOT/rev-harness-distribution-pass.err")"; then
+    printf '%s\n' "$output" >&2
+    fail "expected fixture distribution/adoption preflight to pass"
+  fi
 
   assert_json_field "$output" '.status' "PASS"
   assert_json_field "$output" '.adoption_enabled' "true"
@@ -257,11 +288,16 @@ test_fixture_passes_with_installed_codex_and_prerequisites() {
 test_missing_installed_codex_fails_closed() {
   local root="$TMP_ROOT/missing-installed"
   local output=""
+  local rc=0
 
   setup_fixture "$root"
-  rm -rf "$root/codex-home/skills/rustskills-architecture"
+  /bin/rm -rf -- "$root/codex-home/skills/rustskills-architecture-legacy"
 
-  if output="$(run_preflight_for_root "$root" --check --json 2>"$TMP_ROOT/rev-harness-distribution-missing-installed.err")"; then
+  set +e
+  output="$(run_preflight_for_root "$root" --check --json 2>"$TMP_ROOT/rev-harness-distribution-missing-installed.err")"
+  rc=$?
+  set -e
+  if [[ "$rc" -eq 0 ]]; then
     fail "missing installed Codex skill should fail distribution/adoption preflight"
   fi
 
@@ -391,7 +427,7 @@ test_prerequisite_path_symlink_parent_escape_fails_closed() {
   setup_fixture "$root"
   mkdir -p "$outside"
   cp "$root/.agent/active/sow/evidence-manifest.json" "$outside/evidence-manifest.json"
-  rm "$root/.agent/active/sow/evidence-manifest.json"
+  /bin/rm -f -- "$root/.agent/active/sow/evidence-manifest.json"
   ln -s "$outside" "$root/.agent/active/sow/linked-evidence"
   jq '
     (.prerequisites[] | select(.name == "evidence manifest") | .path) = ".agent/active/sow/linked-evidence/evidence-manifest.json"
@@ -409,6 +445,64 @@ test_prerequisite_path_symlink_parent_escape_fails_closed() {
     || fail "failure JSON should reject prerequisite symlink parent escape"
 }
 
+test_validator_nonzero_with_pass_json_fails_closed() {
+  local root="$TMP_ROOT/validator-rc-pass-json"
+  local harness="$TMP_ROOT/validator-rc-pass-json-harness"
+  local output=""
+  local messages=""
+  local rc=0
+
+  setup_fixture "$root"
+  mkdir -p "$harness/scripts"
+  cp "$PREFLIGHT" "$harness/scripts/rev-harness-distribution-adoption.sh"
+
+  cat >"$harness/scripts/rev-harness-skill-projection.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+jq -n '{
+  status: "PASS",
+  mode: "acceptance",
+  acceptance_eligible: true,
+  sources: [{skill: "rustskills-architecture-legacy", status: "PASS"}],
+  projections: [
+    {skill: "rustskills-architecture-legacy", provider: "claude", activation_status: "project-local-active", auto_discoverable: true, status: "PASS"},
+    {skill: "rustskills-architecture-legacy", provider: "codex-installed", activation_status: "installed-active", auto_discoverable: true, status: "PASS"},
+    {skill: "rustskills-architecture-legacy", provider: "codex-generated", activation_status: "install-required", auto_discoverable: false, status: "PASS"}
+  ]
+}'
+EOF
+  cat >"$harness/scripts/rev-harness-dirty-surface.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS"}'
+exit 1
+EOF
+  cat >"$harness/scripts/rev-harness-evidence-manifest.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS"}'
+EOF
+  cat >"$harness/scripts/rev-harness-worker-lifecycle.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS"}'
+EOF
+  chmod +x "$harness"/scripts/*.sh
+
+  set +e
+  output="$(CODEX_HOME="$root/codex-home" bash "$harness/scripts/rev-harness-distribution-adoption.sh" --root "$root" --check --json 2>"$TMP_ROOT/rev-harness-distribution-validator-rc-pass-json.err")"
+  rc=$?
+  set -e
+  if [[ "$rc" -eq 0 ]]; then
+    fail "validator rc=1 with PASS JSON should fail distribution/adoption preflight"
+  fi
+
+  assert_json_field "$output" '.status' "FAIL"
+  assert_json_field "$output" '.adoption_enabled' "false"
+  messages="$(printf '%s' "$output" | jq -r '.failures[].message')"
+  contains "$messages" "dirty surface validator failed with exit 1" \
+    || fail "failure JSON should report nonzero validator exit"
+  contains "$messages" 'dirty surface validator debug output: {"status":"PASS"}' \
+    || fail "failure JSON should preserve captured PASS JSON as diagnostics"
+}
+
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/rev-harness-distribution-adoption-test.XXXXXX")"
 
 test_fixture_passes_with_installed_codex_and_prerequisites
@@ -421,4 +515,5 @@ test_counter_admission_schema_only_placeholder_fails_closed
 test_schema_micro_fix_admission_schema_only_placeholder_fails_closed
 test_prerequisite_path_symlink_parent_escape_fails_closed
 
+test_validator_nonzero_with_pass_json_fails_closed
 printf 'PASS: rev_harness_distribution_adoption_test\n'

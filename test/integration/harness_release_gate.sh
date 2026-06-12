@@ -27,12 +27,13 @@ release_gate_die() {
 
 usage() {
   printf '%s\n' \
-    'Usage: bash test/integration/harness_release_gate.sh [--tier quick|local|full] [--dry-run]' \
+    'Usage: bash test/integration/harness_release_gate.sh [--tier quick|local|full|addon] [--dry-run]' \
     '' \
     'Tiers:' \
     '  quick  Delegate to scripts/harness-doctor.sh --quick before release-gate artifact initialization.' \
     '  local  Run the focused local release-gate subset.' \
     '  full   Run the full release gate. This is the default and preserves no-argument behavior.' \
+    '  addon  Run semantic addon release-gate coverage split out of the full core gate.' \
     '' \
     'Options:' \
     '  --dry-run  Print the command or step plan without creating release-gate artifacts.'
@@ -69,7 +70,7 @@ parse_args() {
   done
 
   case "$RELEASE_GATE_TIER" in
-    quick|local|full) ;;
+    quick|local|full|addon) ;;
     *) release_gate_die "invalid --tier: $RELEASE_GATE_TIER" ;;
   esac
 }
@@ -112,9 +113,6 @@ FULL_STEPS=(
   "rev_harness_dual_native|bash test/integration/rev_harness_dual_native_check_test.sh"
   "self_growth_proposal_cycle|bash test/integration/self_growth_proposal_cycle_test.sh"
   "rev_harness_static_asset_check|bash test/integration/rev_harness_static_asset_check_test.sh"
-  "semantic_rust_build|bash -c 'cd harness-rust && cargo check -p semantic-mcp -p tree-sitter-index'"
-  "semantic_cli_contract_parity|bash test/integration/semantic_cli_contract_parity_test.sh"
-  "semantic_mcp_contract_tests|bash -c 'cd harness-rust && cargo test -p semantic-mcp'"
   "native_reviewer_surface_smoke|\"$BASH_BIN\" test/integration/native_reviewer_surface_smoke.sh"
   "codex_mcp_zombie_cleanup_contract|bash test/integration/codex_mcp_zombie_cleanup_contract_test.sh"
   "codex_mcp_zombie_cleanup_live|bash test/integration/codex_mcp_zombie_cleanup_live_test.sh"
@@ -136,19 +134,35 @@ FULL_STEPS=(
   "cursor_skills_compliance|bash test/unit/test-cursor-skills-compliance.sh"
   "cursor_wrapper|bash test/unit/test-cursor-wrapper.sh"
   "rev_harness_janitor_inspect|bash scripts/rev-harness-janitor.sh inspect --json | jq -e '.schema_version == \"rev-harness-janitor/v1\" and .janitor_command == \"inspect\" and .delete_enabled == false and .archive_enabled == false and .apply_enabled == false' >/dev/null"
-  "semantic_coordination|bash test/integration/semantic_coordination_test.sh"
-  "semantic_registry_export_contract|bash test/integration/semantic_registry_export_contract_test.sh"
-  "context_capsule_help|bash .claude/commands/lib/context_capsule.sh --help"
-  "shadow_verify_help|bash .claude/commands/lib/shadow_verify.sh --help"
   "benchmark_surface_contract|bash test/integration/harness_benchmark_contract_test.sh"
   "runtime_baseline_contract|bash test/integration/harness_runtime_baseline_test.sh"
   "common_task_contract_smoke|bash test/integration/common_task_contract_smoke.sh"
-  "semantic_sync_freshness_contract|bash test/integration/semantic_sync_freshness_contract_test.sh"
-  "semantic_project_id_contract|bash test/integration/semantic_project_id_contract_test.sh"
   "coder_engine_truth_test|bash test/integration/coder_engine_truth_test.sh"
   "policy_source_consistency|bash test/integration/policy_source_consistency_test.sh"
   "orchestration_packet_validator|bash test/integration/orchestration_packet_validator_test.sh"
   "auto_orchestrate_packet_preflight|bash test/integration/auto_orchestrate_packet_preflight_test.sh"
+)
+
+# P7 semantic addon split, old FULL step -> addon tier:
+# semantic_rust_build -> addon
+# semantic_cli_contract_parity -> addon
+# semantic_mcp_contract_tests -> addon
+# semantic_coordination -> addon
+# semantic_registry_export_contract -> addon
+# context_capsule_help -> addon
+# shadow_verify_help -> addon
+# semantic_sync_freshness_contract -> addon
+# semantic_project_id_contract -> addon
+ADDON_STEPS=(
+  "semantic_rust_build|bash -c 'cd harness-rust && cargo check -p semantic-mcp -p tree-sitter-index'"
+  "semantic_cli_contract_parity|bash test/integration/semantic_cli_contract_parity_test.sh"
+  "semantic_mcp_contract_tests|bash -c 'cd harness-rust && cargo test -p semantic-mcp'"
+  "semantic_coordination|bash test/integration/semantic_coordination_test.sh"
+  "semantic_registry_export_contract|bash test/integration/semantic_registry_export_contract_test.sh"
+  "context_capsule_help|bash .claude/commands/lib/context_capsule.sh --help"
+  "shadow_verify_help|bash .claude/commands/lib/shadow_verify.sh --help"
+  "semantic_sync_freshness_contract|bash test/integration/semantic_sync_freshness_contract_test.sh"
+  "semantic_project_id_contract|bash test/integration/semantic_project_id_contract_test.sh"
 )
 
 LOCAL_STEPS=(
@@ -219,6 +233,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("minimal_probe|:")
       LOCAL_STEPS=("minimal_probe|:")
+      ADDON_STEPS=("minimal_probe|:")
       ;;
     semantic_project_id_contract)
       if is_canonical_out_root; then
@@ -226,6 +241,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("semantic_project_id_contract|bash test/integration/semantic_project_id_contract_test.sh")
       LOCAL_STEPS=("semantic_project_id_contract|bash test/integration/semantic_project_id_contract_test.sh")
+      ADDON_STEPS=("semantic_project_id_contract|bash test/integration/semantic_project_id_contract_test.sh")
       ;;
     orchestration_packet_validator)
       if is_canonical_out_root; then
@@ -233,6 +249,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("orchestration_packet_validator|bash test/integration/orchestration_packet_validator_test.sh")
       LOCAL_STEPS=("orchestration_packet_validator|bash test/integration/orchestration_packet_validator_test.sh")
+      ADDON_STEPS=("orchestration_packet_validator|bash test/integration/orchestration_packet_validator_test.sh")
       ;;
     orchestration_packet_validator_plus_preflight)
       if is_canonical_out_root; then
@@ -243,6 +260,7 @@ apply_test_steps_override() {
         "auto_orchestrate_packet_preflight|bash test/integration/auto_orchestrate_packet_preflight_test.sh"
       )
       LOCAL_STEPS=("${FULL_STEPS[@]}")
+      ADDON_STEPS=("${FULL_STEPS[@]}")
       ;;
     stall_probe)
       if is_canonical_out_root; then
@@ -250,6 +268,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("stall_probe|sleep 30")
       LOCAL_STEPS=("stall_probe|sleep 30")
+      ADDON_STEPS=("stall_probe|sleep 30")
       ;;
     auto_orchestrate_packet_preflight|post_orchestration_surface_a)
       if is_canonical_out_root; then
@@ -257,6 +276,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("auto_orchestrate_packet_preflight|bash test/integration/auto_orchestrate_packet_preflight_test.sh")
       LOCAL_STEPS=("auto_orchestrate_packet_preflight|bash test/integration/auto_orchestrate_packet_preflight_test.sh")
+      ADDON_STEPS=("auto_orchestrate_packet_preflight|bash test/integration/auto_orchestrate_packet_preflight_test.sh")
       ;;
     cross_family_artifact_smoke)
       if is_canonical_out_root; then
@@ -264,6 +284,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("cross_family_artifact_smoke|bash test/integration/cross_family_artifact_smoke_test.sh")
       LOCAL_STEPS=("cross_family_artifact_smoke|bash test/integration/cross_family_artifact_smoke_test.sh")
+      ADDON_STEPS=("cross_family_artifact_smoke|bash test/integration/cross_family_artifact_smoke_test.sh")
       ;;
     cross_family_live_smoke_preflight)
       if is_canonical_out_root; then
@@ -271,6 +292,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("cross_family_live_smoke_preflight|bash test/integration/cross_family_live_smoke_preflight_test.sh")
       LOCAL_STEPS=("cross_family_live_smoke_preflight|bash test/integration/cross_family_live_smoke_preflight_test.sh")
+      ADDON_STEPS=("cross_family_live_smoke_preflight|bash test/integration/cross_family_live_smoke_preflight_test.sh")
       ;;
     cross_family_live_artifact_smoke)
       if is_canonical_out_root; then
@@ -278,6 +300,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("cross_family_live_artifact_smoke|bash test/integration/cross_family_live_artifact_smoke_test.sh")
       LOCAL_STEPS=("cross_family_live_artifact_smoke|bash test/integration/cross_family_live_artifact_smoke_test.sh")
+      ADDON_STEPS=("cross_family_live_artifact_smoke|bash test/integration/cross_family_live_artifact_smoke_test.sh")
       ;;
     rev_harness_janitor_inspect)
       if is_canonical_out_root; then
@@ -285,6 +308,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("rev_harness_janitor_inspect|bash scripts/rev-harness-janitor.sh inspect --json | jq -e '.schema_version == \"rev-harness-janitor/v1\" and .janitor_command == \"inspect\" and .delete_enabled == false and .archive_enabled == false and .apply_enabled == false' >/dev/null")
       LOCAL_STEPS=("rev_harness_janitor_inspect|bash scripts/rev-harness-janitor.sh inspect --json | jq -e '.schema_version == \"rev-harness-janitor/v1\" and .janitor_command == \"inspect\" and .delete_enabled == false and .archive_enabled == false and .apply_enabled == false' >/dev/null")
+      ADDON_STEPS=("rev_harness_janitor_inspect|bash scripts/rev-harness-janitor.sh inspect --json | jq -e '.schema_version == \"rev-harness-janitor/v1\" and .janitor_command == \"inspect\" and .delete_enabled == false and .archive_enabled == false and .apply_enabled == false' >/dev/null")
       ;;
     rev_harness_task_classifier)
       if is_canonical_out_root; then
@@ -292,6 +316,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("rev_harness_task_classifier|bash test/integration/rev_harness_task_classifier_test.sh")
       LOCAL_STEPS=("rev_harness_task_classifier|bash test/integration/rev_harness_task_classifier_test.sh")
+      ADDON_STEPS=("rev_harness_task_classifier|bash test/integration/rev_harness_task_classifier_test.sh")
       ;;
     rev_harness_skill_routing)
       if is_canonical_out_root; then
@@ -299,6 +324,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("rev_harness_skill_routing|bash test/integration/rev_harness_skill_routing_test.sh")
       LOCAL_STEPS=("rev_harness_skill_routing|bash test/integration/rev_harness_skill_routing_test.sh")
+      ADDON_STEPS=("rev_harness_skill_routing|bash test/integration/rev_harness_skill_routing_test.sh")
       ;;
     rev_harness_static_asset_check)
       if is_canonical_out_root; then
@@ -306,6 +332,7 @@ apply_test_steps_override() {
       fi
       FULL_STEPS=("rev_harness_static_asset_check|bash test/integration/rev_harness_static_asset_check_test.sh")
       LOCAL_STEPS=("rev_harness_static_asset_check|bash test/integration/rev_harness_static_asset_check_test.sh")
+      ADDON_STEPS=("rev_harness_static_asset_check|bash test/integration/rev_harness_static_asset_check_test.sh")
       ;;
     *)
       release_gate_die "invalid HARNESS_RELEASE_GATE_TEST_STEPS: ${HARNESS_RELEASE_GATE_TEST_STEPS:-}"
@@ -326,6 +353,11 @@ selected_steps() {
         printf '%s\n' "$step"
       done
       ;;
+    addon)
+      for step in "${ADDON_STEPS[@]}"; do
+        printf '%s\n' "$step"
+      done
+      ;;
     *)
       release_gate_die "no release-gate step list for tier: $RELEASE_GATE_TIER"
       ;;
@@ -341,6 +373,9 @@ dispatch_dry_run() {
     [[ -n "$slug" ]] || continue
     printf 'DRY-RUN: step=%s command=%s\n' "$slug" "$command"
   done < <(selected_steps)
+  if [[ "$RELEASE_GATE_TIER" == "full" ]]; then
+    printf 'DRY-RUN: addon-split moved-step=semantic_rust_build target-tier=addon\n'
+  fi
 }
 
 run_delegation_metrics_smoke() {

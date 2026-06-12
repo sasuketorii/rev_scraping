@@ -31,8 +31,9 @@ running one read-only `queue export-json` through
 
 Trigger this skill when any of the following is true:
 
-- Adopting RevHarness into a new project (immediately after
-  `scripts/init-project.sh`).
+- Explicitly enabling the semantic addon in a new project after
+  core setup. New adopters are core-only by default; do not run this
+  skill as part of ordinary setup unless the operator selected the addon.
 - Syncing to a new RevHarness version that touches the Rust semantic-mcp
   schema/migrations under `harness-rust/crates/semantic-mcp/`.
 - A `sem.*` MCP call or `bash scripts/semantic-review-queue.sh ...`
@@ -96,9 +97,9 @@ cat /tmp/q.json   # should show pending_count / leased_count fields
 - **revharness-semantic-mcp-usage**: documents optional use of
   sem.context.top_k / sem.capsule once the db is bootstrapped and FRESH.
   On STALE / absent semantic state, raw-read instead.
-- **orchestrator-bootstrap**: covers higher-level harness adoption
-  (project_id artifact, registry files, role docs). Run
-  `init-project.sh` first, then `semantic-bootstrap.sh`.
+- **orchestrator-bootstrap**: covers higher-level session startup and
+  raw-read context. Run `semantic-bootstrap.sh` only after semantic addon
+  enablement.
 - **harness-official-docs-update**: when docs reference semantic-mcp
   build steps, point them at `scripts/semantic-bootstrap.sh` rather
   than describing the cargo/sqlite incantation inline.
@@ -112,4 +113,4 @@ reports Rust-side "no such table" errors, the remediation is:
 ( cd harness-rust && cargo build -p semantic-mcp )
 bash scripts/semantic-bootstrap.sh   # fires the Rust migration
 ```
-Related: `rev-harness-lifecycle` for full adopter setup (includes semantic-bootstrap as one of 5 phases).
+Related: `rev-harness-adopter-setup.sh` runs semantic-bootstrap only when `--with-semantic-addon` or `--with-mcp-wire` is selected.

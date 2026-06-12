@@ -5,16 +5,13 @@ Coderは、要件からコードを生成し、テストを通じて品質を担
 
 **推論/実行ポリシー:**
 - Claude Code: 既定 effort は `medium`。caller-facing effort は `low|medium|high|xhigh` のみ許可し、`max` は使わない
-- Codex CLI の caller-facing / manual / external 起動: `scripts/codex-wrapper.sh --role <standard|research|coder|high-coder>` を使用
-  - `standard` → `medium` + `cached`
-  - `research` → `high` + `live`
-  - `coder` → `medium` + `cached`
-  - `high-coder` → `high` + `cached`
+- Codex CLI の caller-facing / manual / external role map は
+  `.agent_rules/shared-delegation.md` を正本とする
 - native Codex multi-agent / subagent orchestration は Codex 内部で完結させ、`scripts/codex-wrapper.sh` を再帰呼び出ししない
 - `reviewer` は Reviewer 専用。Coder では使わない
 - 初回 ExecPlan 設計 / ExecPlan drafting / ExecPlan review planning は `.agent/registry/model_policy.json` の `initial_execplan_design` lane に従い、native `system_planner` / `plan_reviewer` preset の `gpt-5.5` + `xhigh` + `cached` を使う。通常の実装 coder lane (`medium`) や docs-only / light planning とは混同しない
 
-**注意:** エージェントはClaude/Codex両方可だが、Codex の caller-facing role は上記 3 種のみ
+**注意:** エージェントはClaude/Codex両方可だが、Codex の caller-facing role vocabulary is owned by `.agent_rules/shared-delegation.md`.
 
 ---
 
@@ -356,7 +353,7 @@ agent が `sem.capsule` 経由で受け取る capsule body は以下の不変条
 - caller は `{project_id, task_id, phase, context_token}` 必須、`top_k_symbols` フィールド送信は fail-closed
 - prefix wildcard search は提供せず、FTS5 BM25 + 48h recency が既定
 
-詳細: skill `revharness-semantic-mcp-usage`、CLAUDE.md、`.agent_rules/RULES.md` の capsule discipline 節。
+詳細: `.agent_rules/shared-semantic.md` と skill `revharness-semantic-mcp-usage`。
 
 ### Coder 固有
 

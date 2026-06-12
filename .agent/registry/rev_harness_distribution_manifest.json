@@ -65,7 +65,7 @@
     ],
     "exclude_assertion_dual_lgtm_never_excluded": ".agent/state/dual_lgtm_state.json is I-3 evidence and is intentionally ABSENT from exclude_globs. Only .agent/state/*.lock, *.lock.d/**, and locks/** runtime residue are excluded; the blanket .agent/state/** is never excluded so dual_lgtm_state.json always ships/preserves.",
     "ship_semantic_db": false,
-    "semantic_db_regeneration": "Regenerate on first use from .shared/project_id through scripts/launch-semantic-mcp.sh, doctor, or an explicit reindex workflow."
+    "semantic_db_regeneration": "Regenerate only after explicit semantic addon enablement from .shared/project_id through scripts/launch-semantic-mcp.sh, scripts/semantic-bootstrap.sh, or an explicit reindex workflow. Core-only setup and doctor do not create semantic DB state."
   },
   "managed_candidate_globs_semantics": "TIER-1 HARNESS-OWNED: blind-overwrite/replace on sync. These are harness-authored and carry no per-adopter state. NOTE: .codex/config.toml is deliberately EXCLUDED from this set (see managed_candidate_exclude_globs + merge_globs); a blind copy would destroy the per-adopter absolute `command =` launcher path, the §9 6-tool approval allowlist, and the I-13 canonical key.",
   "managed_candidate_globs": [

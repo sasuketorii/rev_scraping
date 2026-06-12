@@ -125,7 +125,7 @@ run the **source-first full index** once from the repo root:
 
 ```
 agent-core context index-all --apply
-# or, during adopter setup / sync:
+# or, during explicit semantic addon setup / sync:
 scripts/semantic-bootstrap.sh --index-all
 ```
 
@@ -181,7 +181,7 @@ Prefix wildcard is not provided in this release.
 - `sem.search` = **symbol-NAME lookup** over the ~129-row manually-curated `components` registry (plus a filesystem file-scan). FTS5 index covers only `name` / `semantic_id` / `module` / `kind` / `file_path` — **no description/docstring**. つまり自然言語クエリ（"the thing that validates tokens" のような文）は **0 hits** になる。クエリにはシンボル名トークン（識別子・モジュール名・パス断片）を渡すこと。`sem.search` は 31,514-row の tree-sitter `symbols` テーブルは一切引かない。
 - `sem.context.top_k` = **impact discovery** over the 31,514 tree-sitter symbols。`changed_files` 入力を要求する fan-in / impact ランキングであって、free-form な検索インターフェースではない。「変更ファイルから影響範囲を出す」用途専用。
 - `sem.registry.query` = filter the same ~129-row registry（`name_partial` / `kind` などで絞り込む）。これも自然言語検索ではない。
-- **Free-form / natural-language discovery（"X に関係するシンボルを探したい"）には現状 semantic path が無い。** sanctioned fallback は `rg` / `grep`。フルの 31k symbol index を引く専用ツール `sem.symbols.search` は **planned**（別スライスで追跡）であり、まだ存在しないものとして扱うこと。利用可能であるかのように案内しない。
+- **Free-form / natural-language discovery（"X に関係するシンボルを探したい"）には現状 semantic path が無い。** sanctioned fallback は `rg` / `grep`。`sem.symbols.search` は現在存在する read-only symbol-index lookup だが、natural-language discovery ではない。識別子、パス断片、または symbol token を渡す用途に限り、FRESH な semantic addon state がある場合だけ advisory に使う。
 
 ## sem.admin.gc usage
 

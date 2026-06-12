@@ -35,10 +35,10 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 
-case "$PHASE" in
-  [A-Z]|[A-Z][A-Z0-9_-]*) ;;
-  *) printf 'phase-done-smoke: invalid phase: %s\n' "$PHASE" >&2; exit 2 ;;
-esac
+if [[ ! "$PHASE" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+  printf 'phase-done-smoke: invalid phase: %s\n' "$PHASE" >&2
+  exit 2
+fi
 
 redact_text() {
   sed -E -e "s#${HOME%/}/#~/#g" -e 's#/Users/[^/[:space:]]+/#~/#g' -e 's#/home/[^/[:space:]]+/#~/#g'
@@ -95,8 +95,8 @@ run_cmd_path() {
 
 REV_HARNESS_CMD="$(resolve_rev_harness_bin)"
 DOCTOR_CMD="$(resolve_doctor_bin)"
-PRIVACY_SCAN_CMD="${REV_HARNESS_PRIVACY_SCAN:-$REPO_ROOT/scripts/ci/release-binary-privacy-scan.sh}"
-BINARY_PATH="${REV_HARNESS_SMOKE_BINARY:-$REPO_ROOT/harness-rust/target/release/semantic-mcp}"
+PRIVACY_SCAN_CMD="${REV_HARNESS_PRIVACY_SCAN:-$REPO_ROOT/scripts/ci/shipped-artifact-privacy-scan.sh}"
+CORE_BINARY_PATH="${REV_HARNESS_SMOKE_CORE_BINARY:-$REPO_ROOT/harness-rust/target/release/agent-core}"
 
 cleanup() {
   if [[ "$KEEP_SANDBOX" -eq 0 && -n "${SANDBOX:-}" ]]; then
@@ -149,31 +149,16 @@ step_identity() {
   [[ "$pid" != revharness-* ]] || return 1
 }
 
-step_semantic_db() {
-  local pid db paths
-  pid="$(project_id)"
-  paths="$SANDBOX/.rev-harness-state/paths.json"
-  [[ -n "$pid" ]] || return 1
-  [[ -f "$paths" ]] || return 1
-  db="$(jq -r '.semantic_db // .rust_db // empty' "$paths")"
-  [[ -n "$db" ]] || return 1
-  if [[ "$SMOKE_SKIP_HEAVY" == "1" ]]; then
-    jq -e '(.semantic_db // .rust_db) | type == "string" and length > 0' "$paths" >/dev/null
-    return $?
+step_core_binary_help() {
+  if [[ ! -x "$CORE_BINARY_PATH" ]]; then
+    (cd "$REPO_ROOT/harness-rust" && cargo build --release -p agent-core --no-default-features >/dev/null)
   fi
-  [[ -f "$db" ]]
-}
-
-step_rust_binary() {
-  if [[ ! -x "$BINARY_PATH" ]]; then
-    (cd "$REPO_ROOT/harness-rust" && cargo build --release -p semantic-mcp >/dev/null)
-  fi
-  [[ -x "$BINARY_PATH" ]] || return 1
-  "$BINARY_PATH" --help >/dev/null 2>&1
+  [[ -x "$CORE_BINARY_PATH" ]] || return 1
+  "$CORE_BINARY_PATH" --help >/dev/null 2>&1
 }
 
 step_privacy_scan() {
-  run_cmd_path "$PRIVACY_SCAN_CMD"
+  run_cmd_path "$PRIVACY_SCAN_CMD" --manifest "$REPO_ROOT/docs/SHIPPED_ARTIFACTS.md"
 }
 
 step_state_json() {
@@ -183,14 +168,32 @@ step_state_json() {
 }
 
 step_paths_json() {
+  local state="$SANDBOX/.rev-harness-state/state.json"
   local paths="$SANDBOX/.rev-harness-state/paths.json"
+  local pid addon_enabled
+  [[ -f "$state" ]] || return 1
+  pid="$(project_id)"
+  [[ "$pid" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || return 1
+  jq -e --arg pid "$pid" '
+    .schema == "rev-harness-state/v1"
+    and .phase == .current_phase
+    and ((.semantic_addon_enabled | type) == "boolean" or .semantic_addon_enabled == null)
+    and ((has("project_id") | not) or .project_id == $pid)
+    and (has("semantic_db") | not)
+    and (has("rust_db") | not)
+    and (has("node_db") | not)
+  ' "$state" >/dev/null || return 1
+  addon_enabled="$(jq -r '.semantic_addon_enabled // false' "$state")"
+  if [[ "$addon_enabled" != true && ! -f "$paths" ]]; then
+    return 0
+  fi
   [[ -f "$paths" ]] || return 1
-  jq -e '
+  jq -e --arg pid "$pid" '
     .schema == "rev-harness-paths/v1"
+    and .project_id == $pid
     and .backend == "rust"
-    and (.semantic_db | type == "string" and length > 0)
-    and (.rust_db | type == "string" and length > 0)
-    and .semantic_db == .rust_db
+    and ((.semantic_db | type) == "null" or (.semantic_db | type == "string"))
+    and ((.rust_db | type) == "null" or (.rust_db | type == "string"))
     and (.node_db | not)
   ' "$paths" >/dev/null
 }
@@ -297,9 +300,8 @@ main() {
   run_step "sandbox" step_create_sandbox
   run_step "install" step_install
   run_step "identity" step_identity
-  run_step "semantic_db" step_semantic_db
-  run_step "rust_binary" step_rust_binary
-  run_step "strings_privacy_scan" step_privacy_scan
+  run_step "core_binary_help" step_core_binary_help
+  run_step "shipped_artifact_privacy_scan" step_privacy_scan
   run_step "state_json" step_state_json
   run_step "paths_json" step_paths_json
   run_step "hooks" step_hooks

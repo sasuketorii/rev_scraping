@@ -21,6 +21,7 @@ Orchestratorは、タスクを分割し、適切なエージェントに役割�
 - `evidence destination` は slice 固有の volatile 証跡保存先であり、`truth placement` や `artifact truth destination` の代替語ではない
 - `completion boundary` を canonical field name とし、旧 `checkpoint boundary` は使わない。deprecated live alias の `checkpoint boundary` / `truth destination` / `artifact truth destination` は active schema key として受理しない
 - class-closure 非適用の sentinel は `n/a` のみ、budget subfield は `basis / start / last-progress` のみを使う
+- Shared read order is owned by `AGENTS.md` §Read Order.
 
 ## Pre-flight Classification
 
@@ -57,7 +58,7 @@ Orchestrator は handoff 前に `scripts/rev-harness-task-classifier.sh classify
 - handoff 前に pre-flight classification を完了させる
   - `light / standard / heavy` の分類と schema profile を記録する
   - heavy のときだけ matrix `Canonical Schema` の全 field を埋める
-  - truth read order: user instruction / task scope → role definition → verification truth matrix → runtime entrypoint
+  - read-order reference: `AGENTS.md` §Read Order
   - loop budget ledger は `standard` / `heavy` で使用し、`basis / start / last-progress` を含む canonical budget string を使う
 
 ### 2. 役割割当
@@ -140,12 +141,11 @@ mutation-authorizing ExecPlan は `verification-truth-matrix.md` Condition #41 �
 
 ### 役割 × エージェント マトリクス
 
-| 役割 | Claude | Codex | 推論努力 | 選定基準 |
-|-----|--------|-------|---------|---------|
-| **Coder** | 可能 | 可能 | 実行経路で解決 | Codex は既定 `coder`、delegated `light` 時のみ `standard`、外部調査時のみ `research` |
-| **Reviewer** | 不可 | **固定** | `reviewer` (`xhigh` + `cached`) | Codex reviewer profile 固定 |
-| **Orchestrator** | Claude-native | Codex-native | 既定 `medium`。caller-facing effort は `low|medium|high|xhigh` のみ許可し、`max` は使わない | top-level runtime と同じ native subagent surface を使う |
-| **Initial ExecPlan Design** | 統括 | native Codex preset | `gpt-5.5` + `xhigh` + `cached` | `system_planner` / `plan_reviewer`; 初回設計と ExecPlan review planning 専用。docs-only / light planning ではない |
+The shared wrapper role map and compatibility shim mapping are owned by
+`.agent_rules/shared-delegation.md`. This role document keeps only the
+orchestrator-specific routing responsibility: choose Coder, Reviewer, or
+Orchestrator work; then use the shared delegation contract and the applicable
+role document.
 
 ### 選定フロー
 
@@ -637,7 +637,8 @@ Orchestrator は**統括・委譲に専念**し、以下の操作を**一切行�
 
 ### `light` 直接処理例外
 
-Canonical classifier は `light` / `standard` / `heavy`。`lightweight` は historical alias のみ。
+Canonical classifier は `light` / `standard` / `heavy`。Old light-weight
+spellings are historical aliases only.
 
 Orchestrator は、non-normative typo、prompt wording、admin bookkeeping、または既存事実の参照整理のみを変更し、runtime code、role/policy/skill behavior、wrapper/model-policy、semantic MCP/index/registry/review queue、security/trust boundary、release/tag/merge、gate-runner/release-gate evidence、acceptance/final-signoff、その他 high-risk surface に触れない `light` task に限り、直接処理してよい。
 
@@ -650,8 +651,7 @@ Orchestrator は、non-normative typo、prompt wording、admin bookkeeping、ま
 3. **基盤ファイル変更禁止**: `.agent_rules/`、`scripts/`、`.claude/`、`.codex/` の変更（※`.claude/tmp/**` は状態管理の例外。non-normative な typo/prompt/admin の `light` 直接処理例外は除く）
 4. **Codex 直接呼び出し禁止**:
    - caller-facing / manual / external な `codex exec` の直接実行（必ず専用ラッパー経由）
-     - Canonical: `./scripts/codex-wrapper.sh --role <standard|research|coder|high-coder|reviewer>`
-     - 互換 shim: `medium.sh -> standard`, `high.sh -> high-coder`（historical name）, `xhigh.sh -> reviewer`
+     - Canonical role map and compatibility shims are owned by `.agent_rules/shared-delegation.md`
    - `-c model=...` `-c model_reasoning_effort=...` の指定
    - `--cd` / `--add-dir` の指定
    - reviewer 固定経路や legacy shim に対する role escape
@@ -733,11 +733,13 @@ agent が `sem.capsule` 経由で受け取る capsule body は以下の不変条
 - caller は `{project_id, task_id, phase, context_token}` 必須、`top_k_symbols` フィールド送信は fail-closed
 - prefix wildcard search は提供せず、FTS5 BM25 + 48h recency が既定
 
-詳細: skill `revharness-semantic-mcp-usage`、CLAUDE.md、`.agent_rules/RULES.md` の capsule discipline 節。
+詳細: `.agent_rules/shared-semantic.md` と skill `revharness-semantic-mcp-usage`。
 
 ### Orchestrator 固有
 
-`context_token` TTL は 30 分。phase が長い場合は token を都度再発行する。`sem.admin.gc` の dry_run=true 既定を default、実削除は `--dry-run=false --force` 両方明示。
+`context_token` TTL and capsule freshness rules are owned by
+`.agent_rules/shared-semantic.md`. `sem.admin.gc` の dry_run=true 既定を
+default、実削除は `--dry-run=false --force` 両方明示。
 
 ## Specialties
 

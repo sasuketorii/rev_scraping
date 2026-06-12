@@ -8,8 +8,8 @@ Machine-readable vocabulary mirror and consumer policy: docs/manual/matrix-vocab
 | invariant | deterministic_check | mandatory | blocking |
 |-----------|---------------------|-----------|----------|
 | I-1 Privacy hard gate | `bash scripts/rev-harness-path-leak-guard.sh` exit 0 | yes | blocks commit |
-| I-2 Tier 1 capsule byte-stable | `bash scripts/ci/tier1-scope-guard.sh` exit 0 | yes | blocks release |
-| I-2b Shipped binary privacy stable | `strings target/release/semantic-mcp \| grep -E '/Users/\|/home/\|contact_dev'` = 0 (`bash scripts/ci/release-binary-privacy-scan.sh`) | yes | blocks release tag |
+| I-2 Tombstone: retired semantic capsule core invariant | `bash scripts/ci/tier1-scope-guard.sh` remains transitional blocker until P7/P8 | yes during transition | blocks release during transition |
+| I-2b Shipped-artifact privacy stable | `bash scripts/ci/shipped-artifact-privacy-scan.sh --manifest docs/SHIPPED_ARTIFACTS.md` exit 0; empty/no-core manifests require reviewer evidence | yes | blocks release tag |
 | I-3 Dual LGTM on-disk evidence | `bash scripts/dual-lgtm-validate.sh --strict` exit 0 | yes | blocks phase_advance |
 | I-4 Graceful-shutdown fail-open | `bash .claude/hooks/agent-graceful-shutdown.sh --self-test` exit 0 | yes | runtime safety |
 | I-5 Wrapper help / behavior parity | `bash scripts/ci/check-wrapper-help-parity.sh` exit 0 | yes | blocks tag |
@@ -20,13 +20,19 @@ Machine-readable vocabulary mirror and consumer policy: docs/manual/matrix-vocab
 | I-10 Call out, never absorb | `bash test/integration/test-rev-harness-cli.sh` exit 0 | yes | governance |
 | I-11 Destructive opt-in | `bash test/unit/test-janitor-build-cleanup.sh` exit 0 | yes | runtime safety |
 | I-12 Smoke-gated dual-LGTM | `bash scripts/ci/phase-done-smoke.sh` exit 0 AND smoke_evidence_sha256 sourced from JSONL row | yes | blocks phase_advance state transition |
-| I-13 Semantic MCP wire contract | `bash scripts/ci/mcp-wire-contract-check.sh --strict` exits 0 | yes | blocks release |
+| I-13 Tombstone: retired mandatory semantic MCP core wiring | `bash scripts/ci/mcp-wire-contract-check.sh --strict` remains transitional blocker until P7/P8 | yes during transition | blocks release during transition |
+| Addon-I-2 Semantic addon capsule byte-stability | `bash scripts/ci/tier1-scope-guard.sh` exit 0 until replaced by equal addon blocker | yes when semantic addon enabled or shipped | blocks addon release |
+| Addon-I-2b Semantic-mcp addon binary privacy stable | `bash scripts/ci/release-binary-privacy-scan.sh` exit 0 until replaced by equal addon blocker | yes while semantic-mcp is addon-pending or shipped | blocks addon release |
+| Addon-I-13 Opt-in semantic MCP wiring governance | planned `scripts/ci/addon-absent-or-compliant-check.sh --semantic`; transitional `bash scripts/ci/mcp-wire-contract-check.sh --strict` until P7/P8 | yes when semantic addon enabled | blocks addon release |
+
+Transitional clause: the existing I-2, I-2b, and I-13 gate scripts remain
+blocking until the P7/P8 slices land.
 
 ## Must Read
 
 この文書は、verification / truth placement / reviewer LGTM validity の現行正本である。
 計画分解、Coder着手、Reviewer判定、最終受け入れの前に必ず読むこと。
-他文書の例や古い手順と衝突する場合は、本書と `.agent_rules/RULES.md` を優先する。
+他文書の例や古い手順と衝突する場合は、本書を優先する。
 
 ## Task Class Profiles
 
@@ -294,7 +300,7 @@ late same-class finding の責務分界:
 | prompt / context / plan など運用文書でコマンド、パス、gate、review 条件、運用例を追加・変更する | `.agent/PROJECT_CONTEXT.md`、handoff prompt、plan、SOW | `git diff --check -- <files>`、追加・変更した参照先ごとの `test -e <path>`、コマンドや script 契約に触れる場合は非破壊の help / syntax / existence probe |
 | `.github/workflows/*.yml` / `.github/workflows/*.yaml` | GitHub Actions workflow | `git diff --check -- <files>`、YAML parse、`actionlint`、変更した workflow が属する relevant gate |
 | wrapper / session / orchestrator shell | `scripts/*wrapper*.sh`、`.claude/commands/*.sh`、`.claude/commands/lib/*.sh` | `git diff --check -- <files>`、変更ファイルごとの `bash -n <file>`、`bash test/integration/cross_agent_wrapper_matrix_test.sh`、必要に応じて related smoke / coordination checks（例: phase / native-surface / semantic coordination 系の smoke） |
-| durable authority / queue backend / release-gate surface | repo-local semantic-mcp backend（`harness-rust/crates/semantic-mcp/**`）、public shell ingress / adapter（`scripts/semantic-review-queue.sh`）、`test/integration/harness_release_gate.sh` | `git diff --check -- <files>`、変更 surface の relevant subset checks、semantic preflight / registry mutation hardening では `bash test/integration/semantic_registry_mutation_flow_test.sh`、`bash test/integration/semantic_coordination_test.sh`、`bash test/integration/semantic_project_id_contract_test.sh` を含める。acceptance boundary が release / closeout をまたぐ場合は `bash test/integration/harness_release_gate.sh` |
+| durable authority / queue backend / release-gate surface | repo-local semantic addon backend（`harness-rust/crates/semantic-mcp/**`）、public shell ingress / adapter（`scripts/semantic-review-queue.sh`）、`test/integration/harness_release_gate.sh` | `git diff --check -- <files>`、変更 surface の relevant subset checks、authority preflight / registry mutation hardening では `bash test/integration/semantic_registry_mutation_flow_test.sh`、`bash test/integration/semantic_coordination_test.sh`、`bash test/integration/semantic_project_id_contract_test.sh` を含める。semantic-specific checks are addon-only unless the touched surface still uses the transitional blocker. acceptance boundary が release / closeout をまたぐ場合は `bash test/integration/harness_release_gate.sh` |
 | reviewer policy / acceptance matrix / truth matrix | acceptance policy、review 判定基準、truth placement の正本 | 該当する上記 row の checks を満たしたうえで、Reviewer は実行済み checks の証跡を確認する。reasoning-only では代替できない |
 | build / test / CI / quality gate 設定（workflow 以外） | `Makefile`、quality gate script、test harness 設定 | `git diff --check -- <files>` と、その surface が所有する deterministic validation |
 | 実装コード / テスト | `src/**`、`test/**`、アプリ実装 | `git diff --check -- <files>` と、変更 surface に対応する lint / typecheck / unit / integration などの deterministic checks |
@@ -305,6 +311,11 @@ truth, not class-closure evidence, not reviewer LGTM evidence, and not a
 replacement for deterministic checks. Any claim that depends on discovered code
 must be backed by the corresponding file diff, source read, test output, or
 other deterministic evidence required by this matrix.
+
+INDEX validation (planned P4) is navigation/freshness necessary-only. Passing an
+INDEX validator may prove that navigation maps are current enough to use, but it
+is never correctness evidence and never substitutes for source reads, diffs,
+deterministic checks, reviewer artifacts, or shipped-artifact privacy evidence.
 
 ### Frontier Phase Verification Checks
 
@@ -487,7 +498,7 @@ Evidence: Plan LGTM の reviewer 出力は `.agent/active/prompts/plan_lgtm_<sli
 4. 追加・変更したパスやコマンド参照の存在確認がない。
 5. deterministic-check surface なのに reasoning-only で accept / LGTM しようとしている。
 6. runner や環境不足で required checks を実行できないのに、そのまま先へ進めようとしている。
-7. semantic preflight が `target_lock.status == blocked` または `ambiguity.status == blocked` を返しているのに、mutation / accept / closeout へ進めようとしている。
+7. authority preflight が `target_lock.status == blocked` または `ambiguity.status == blocked` を返しているのに、mutation / accept / closeout へ進めようとしている。
 8. authoritative registry mutation が target-lock mismatch または registry ownership mismatch を返したのに、同一 slice を成功扱いしようとしている。
 9. root-cause fix / same-class fix なのに Class Closure Sheet が無い、closed universe が無い、または `unknown` sink が残っている。
 10. artifact integrity が `MISSING`、存在確認不能、または command / scope と対応付け不能である。

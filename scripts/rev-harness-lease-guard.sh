@@ -6,6 +6,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUST_MANIFEST="$PROJECT_ROOT/harness-rust/Cargo.toml"
 DEFAULT_RUST_BIN="${REV_HARNESS_LEASE_GUARD_DEFAULT_RUST_BIN:-$PROJECT_ROOT/harness-rust/target/debug/agent-core}"
 CARGO_BIN="${REV_HARNESS_LEASE_GUARD_CARGO_BIN:-cargo}"
+DEFAULT_CARGO_TARGET_DIR="$PROJECT_ROOT/harness-rust/target"
 
 usage() {
   cat <<'EOF'
@@ -109,27 +110,44 @@ normalize_validate_args() {
 rust_bin_is_fresh() {
   local bin="$1"
   local source
+  local source_dir
   local freshness_sources=(
     "$RUST_MANIFEST"
-    "$PROJECT_ROOT/harness-rust/crates/agent-core/src/cmd/lease.rs"
-    "$PROJECT_ROOT/harness-rust/crates/agent-core/src/main.rs"
-    "$PROJECT_ROOT/harness-rust/crates/agent-core/src/cmd/mod.rs"
+    "$PROJECT_ROOT/harness-rust/Cargo.lock"
+    "$PROJECT_ROOT/harness-rust/crates/agent-core/Cargo.toml"
+    "$PROJECT_ROOT/harness-rust/crates/shared/Cargo.toml"
   )
 
   [[ -x "$bin" ]] || return 1
+
+  for source_dir in \
+    "$PROJECT_ROOT/harness-rust/crates/agent-core/src" \
+    "$PROJECT_ROOT/harness-rust/crates/shared/src"; do
+    [[ -d "$source_dir" ]] || return 1
+    while IFS= read -r -d '' source; do
+      freshness_sources+=("$source")
+    done < <(find "$source_dir" -type f -name '*.rs' -print0)
+  done
+
   for source in "${freshness_sources[@]}"; do
     [[ -f "$source" && "$bin" -nt "$source" ]] || return 1
   done
-  if [[ -f "$PROJECT_ROOT/harness-rust/Cargo.lock" ]]; then
-    [[ "$bin" -nt "$PROJECT_ROOT/harness-rust/Cargo.lock" ]] || return 1
-  fi
   return 0
 }
 
 build_default_rust_bin() {
   [[ -f "$RUST_MANIFEST" ]] || return 127
   command -v "$CARGO_BIN" >/dev/null 2>&1 || return 127
-  "$CARGO_BIN" build --quiet --manifest-path "$RUST_MANIFEST" -p agent-core
+  CARGO_TARGET_DIR="$DEFAULT_CARGO_TARGET_DIR" \
+    "$CARGO_BIN" build --quiet --manifest-path "$RUST_MANIFEST" -p agent-core
+}
+
+rust_bin_supports_lease() {
+  local bin="$1"
+  local action="${2:-}"
+
+  [[ -x "$bin" ]] || return 1
+  "$bin" lease "$action" --help >/dev/null 2>&1
 }
 
 run_rust_validator() {
@@ -140,14 +158,13 @@ run_rust_validator() {
   fi
 
   if rust_bin_is_fresh "$DEFAULT_RUST_BIN" \
-    && "$DEFAULT_RUST_BIN" lease "${1:-}" --help >/dev/null 2>&1; then
+    && rust_bin_supports_lease "$DEFAULT_RUST_BIN" "${1:-}"; then
     "$DEFAULT_RUST_BIN" lease "$@"
     return $?
   fi
 
   build_default_rust_bin || return 127
-  if rust_bin_is_fresh "$DEFAULT_RUST_BIN" \
-    && "$DEFAULT_RUST_BIN" lease "${1:-}" --help >/dev/null 2>&1; then
+  if rust_bin_supports_lease "$DEFAULT_RUST_BIN" "${1:-}"; then
     "$DEFAULT_RUST_BIN" lease "$@"
     return $?
   fi

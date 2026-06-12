@@ -316,6 +316,7 @@ validate_mirror_surfaces() {
   current="$(jq -r '.current_model' "$POLICY_PATH")"
   stable="$(jq -r '.stable_default_model' "$POLICY_PATH")"
   minimum="$(jq -r '.minimum_allowed_model' "$POLICY_PATH")"
+  local shared_delegation="$PROJECT_ROOT/.agent_rules/shared-delegation.md"
 
   grep -Fq "Current model: \`$current\`" "$PROJECT_ROOT/docs/generated/codex-model-policy.md" \
     || die "docs/generated/codex-model-policy.md current model mirror drift"
@@ -325,14 +326,30 @@ validate_mirror_surfaces() {
     || die "docs/generated/codex-model-policy.md minimum model mirror drift"
   grep -Fq "model = \"$stable\"" "$PROJECT_ROOT/AGENTS.md" \
     || die "AGENTS.md config example model mirror drift"
-  grep -Fq "$current" "$PROJECT_ROOT/.agent_rules/RULES.md" \
-    || die ".agent_rules/RULES.md wrapper model mirror drift"
+  grep -Fq 'scripts/codex-wrapper.sh --role <standard|research|coder|high-coder|reviewer>' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md wrapper role list mirror drift"
+  grep -Fq '`standard` (`medium` + `cached`)' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md standard role mirror drift"
+  grep -Fq '`research` (`high` + `live`)' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md research role mirror drift"
+  grep -Fq '`coder`' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md coder role mirror drift"
+  grep -Fq '`medium` + `cached`' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md coder role mirror drift"
+  grep -Fq '`high-coder` (`high` + `cached`)' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md high-coder role mirror drift"
+  grep -Fq '`reviewer`' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md reviewer role mirror drift"
+  grep -Fq '`xhigh` + `cached`' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md reviewer role mirror drift"
+  grep -Fq 'high.sh -> high-coder' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md shim mapping mirror drift"
   grep -Fq ".agent/registry/model_policy.json" "$PROJECT_ROOT/docs/roles/reviewer.md" \
     || die "docs/roles/reviewer.md must reference model policy registry"
-  grep -Fq 'high.sh -> high-coder' "$PROJECT_ROOT/CLAUDE.md" \
-    || die "CLAUDE.md high.sh shim mapping mirror drift"
-  ! grep -Fq 'high.sh -> coder' "$PROJECT_ROOT/CLAUDE.md" \
-    || die "CLAUDE.md stale high.sh shim mapping"
+  grep -Fq 'high.sh -> high-coder' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md high.sh shim mapping mirror drift"
+  ! grep -Fq 'high.sh -> coder' "$shared_delegation" \
+    || die ".agent_rules/shared-delegation.md stale high.sh shim mapping"
   grep -Fq "contains_text \"model=$current\"" "$PROJECT_ROOT/test/integration/cross_agent_wrapper_matrix_test.sh" \
     || die "cross_agent_wrapper_matrix_test.sh model expectation mirror drift"
   ! grep -Eq 'readonly FIXED_MODEL="gpt-[0-9]+\.[0-9]+' "$PROJECT_ROOT/scripts/codex-wrapper.sh" \

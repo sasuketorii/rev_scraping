@@ -38,13 +38,21 @@ The facade records command history in `.rev-harness-state/state.json` only when
 a state file already exists and the command is not dry-run.
 `verify` and `doctor` execute doctor directly and do not use the facade envelope.
 Unknown facade sub-commands exit `2`.
-## install 5-phase FSM
+## install FSM
 `scripts/rev-harness-install.sh` is a thin composer.
 It accepts facade-compatible flags and then executes:
 ```bash
 bash scripts/rev-harness-adopter-setup.sh setup ...
 ```
-The setup FSM has five phases, in this exact order:
+The default setup FSM is core-only and has three phases, in this exact order:
+1. `phase_init`
+2. `phase_hooks`
+3. `phase_doctor`
+
+When `--with-semantic-addon`, `--with-mcp-wire`, or
+`REVHARNESS_ENABLE_SEMANTIC_ADDON=1` is selected, the setup FSM inserts the
+semantic addon phases after init:
+
 1. `phase_init`
 2. `phase_semantic_node` (legacy state key; runs Rust semantic bootstrap)
 3. `phase_semantic_rust`
@@ -71,12 +79,12 @@ Phase command mapping:
 | FSM phase | Command body |
 |---|---|
 | `phase_init` | Runs `scripts/init-project.sh adopter` in the target. |
-| `phase_semantic_node` | Runs Rust-only `scripts/semantic-bootstrap.sh` in the target unless heavy smoke skip is set. The phase key is retained for state/exit-code compatibility; it does not require the retired Node semantic tree. |
-| `phase_semantic_rust` | Runs `cargo build --release -p semantic-mcp` in target `harness-rust` when that workspace exists. |
+| `phase_semantic_node` | Opt-in only. Runs Rust-only `scripts/semantic-bootstrap.sh` in the target unless heavy smoke skip is set. The phase key is retained for state/exit-code compatibility; it does not require the retired Node semantic tree. |
+| `phase_semantic_rust` | Opt-in only. Runs `cargo build --release -p semantic-mcp` in target `harness-rust` when that workspace exists. |
 | `phase_hooks` | Runs `scripts/install-rev-harness-hooks.sh install` in the target. Installs the `pre-commit` guard hook only. The opt-in `post-commit` semantic index hook is NOT installed by setup; enable it explicitly (see below). |
 | `phase_doctor` | Runs `scripts/harness-doctor.sh --quick --json`, plus `--strict` when requested. |
 `REV_HARNESS_SMOKE_SKIP_HEAVY=1` skips Rust bootstrap under `phase_semantic_node` and
-`phase_semantic_rust`.
+`phase_semantic_rust` only when the semantic addon phases were explicitly selected.
 If the target has no `harness-rust` directory, `phase_semantic_rust` is skipped.
 Per-phase owner-token paths are limited to phases that declare owner files:
 | Phase | owner_token paths |
@@ -119,8 +127,8 @@ Per-phase failure exit codes:
 | Phase | Failure code |
 |---|---:|
 | `phase_init` | `10` |
-| `phase_semantic_node` | `11` |
-| `phase_semantic_rust` | `12` |
+| `phase_semantic_node` | `11` (only when semantic addon was explicitly selected) |
+| `phase_semantic_rust` | `12` (only when semantic addon was explicitly selected) |
 | `phase_hooks` | `13` |
 | `phase_doctor` | `14` |
 Additional setup exit codes:
@@ -136,8 +144,8 @@ With `--json`, setup emits a final report with schema version
 `rev-harness-adopter-setup-report/v1`.
 When setup reaches doctor successfully, state phase becomes `done`.
 `last_install_at` is written after a successful non-verify setup run.
-When `--with-mcp-wire` is set, setup runs MCP wiring only after all FSM phases
-complete successfully.
+When `--with-mcp-wire` is set, setup enables the semantic addon phases and then
+runs MCP wiring only after all selected FSM phases complete successfully.
 MCP wiring is skipped during dry-run.
 ## resume + rollback
 Resume is exposed by `rev-harness-adopter-setup.sh resume` and by `--resume`.
@@ -166,7 +174,7 @@ For owner-token files that were missing before the phase, rollback removes the
 post-phase file.
 If a phase has no owner-token paths and no snapshot manifest, rollback resets
 that phase to `pending` in state.
-`--rollback all` processes phases in reverse order:
+`--rollback all` processes all known phases in reverse order:
 `doctor`, `hooks`, `semantic_rust`, `semantic_node`, `init`.
 Rollback is non-mutating under `--dry-run`.
 Rollback failures exit `15`.

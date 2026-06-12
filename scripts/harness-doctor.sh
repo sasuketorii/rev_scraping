@@ -316,8 +316,12 @@ collect_semantic_paths_summary() {
   local digest=""
 
   if [[ ! -f "$paths_path" ]]; then
-    add_finding unknown "semantic paths manifest is missing: $paths_rel; semantic is optional, so raw-read required files until bootstrap/reindex restores a FRESH index"
-    SEMANTIC_PATHS_JSON="$(jq -nc '{present: false}')"
+    if [[ "${SEMANTIC_ADDON_STATE:-}" == "installed-enabled" ]]; then
+      add_finding warning "semantic addon is enabled but semantic paths manifest is missing: $paths_rel"
+      SEMANTIC_PATHS_JSON="$(jq -nc '{present: false, required: true}')"
+    else
+      SEMANTIC_PATHS_JSON="$(jq -nc --arg state "${SEMANTIC_ADDON_STATE:-unknown}" '{present: false, required: false, reason: "absent-by-design", semantic_addon_state: $state}')"
+    fi
     return 0
   fi
 
@@ -364,6 +368,64 @@ collect_semantic_paths_summary() {
     }')"
 }
 
+collect_semantic_addon_summary() {
+  local checker="$PROJECT_ROOT/scripts/ci/addon-absent-or-compliant-check.sh"
+  local output="" rc=0
+  local installed_assets="false" enabled_entries=0 state="absent-by-design"
+
+  [[ -x "$PROJECT_ROOT/scripts/launch-semantic-mcp.sh" || -d "$PROJECT_ROOT/harness-rust/crates/semantic-mcp" ]] && installed_assets="true"
+
+  if [[ ! -f "$checker" ]]; then
+    add_finding warning "semantic addon compliance checker is missing: scripts/ci/addon-absent-or-compliant-check.sh"
+    state="stale-unhealthy"
+    SEMANTIC_ADDON_STATE="$state"
+    SEMANTIC_ADDON_JSON="$(jq -nc --arg state "$state" --argjson installed "$installed_assets" '{state: $state, installed_assets: $installed, checker_present: false}')"
+    return 0
+  fi
+
+  set +e
+  output="$(bash "$checker" --semantic --root "$PROJECT_ROOT" 2>&1)"
+  rc=$?
+  set -e
+
+  if [[ "$rc" -ne 0 ]]; then
+    state="stale-unhealthy"
+    add_finding warning "semantic addon config is present but unhealthy; run addon-absent-or-compliant-check for details"
+  elif [[ "$output" =~ enabled_entries=([0-9]+) ]]; then
+    enabled_entries="${BASH_REMATCH[1]}"
+    if [[ "$enabled_entries" -gt 0 ]]; then
+      state="installed-enabled"
+    elif [[ "$installed_assets" == "true" ]]; then
+      state="installed-disabled"
+    else
+      state="absent-by-design"
+    fi
+  elif grep -q 'PASS semantic-addon-config: absent' <<<"$output"; then
+    if [[ "$installed_assets" == "true" ]]; then
+      state="installed-disabled"
+    else
+      state="absent-by-design"
+    fi
+  else
+    state="core-only"
+  fi
+
+  SEMANTIC_ADDON_STATE="$state"
+  SEMANTIC_ADDON_JSON="$(jq -nc \
+    --arg state "$state" \
+    --arg output "$output" \
+    --argjson installed "$installed_assets" \
+    --argjson enabled_entries "$enabled_entries" \
+    --argjson checker_exit "$rc" \
+    '{
+      state: $state,
+      installed_assets: $installed,
+      enabled_entries: $enabled_entries,
+      checker_exit: $checker_exit,
+      checker_summary: $output
+    }')"
+}
+
 derive_status() {
   if [[ -n "$BLOCKS" ]]; then
     printf 'BLOCK\n'
@@ -390,6 +452,7 @@ render_json() {
     --argjson release_gate "$LATEST_RELEASE_GATE_JSON" \
     --argjson model_policy "$MODEL_POLICY_JSON" \
     --argjson active_summary "$ACTIVE_SUMMARY_JSON" \
+    --argjson semantic_addon "$SEMANTIC_ADDON_JSON" \
     --argjson semantic_paths "$SEMANTIC_PATHS_JSON" \
     '{
       schema_version: "harness-doctor/v1",
@@ -415,6 +478,7 @@ render_json() {
         release_gate: $release_gate,
         model_policy: $model_policy,
         active_task: $active_summary,
+        semantic_addon: $semantic_addon,
         semantic_paths: $semantic_paths
       },
       pointers: {
@@ -439,6 +503,7 @@ render_human() {
   printf -- '- network_allowed: false\n'
   printf -- '- deep_scan: false\n'
   printf -- '- artifact_body_scan: false\n'
+  printf -- '- semantic_addon_state: %s\n' "$SEMANTIC_ADDON_STATE"
   printf -- '- latest_release_gate_run: %s\n' "$latest_pointer"
   printf -- '- caveat: advisory-only; this does not replace truth matrix, reviewer LGTM, deterministic checks, or release-gate evidence.\n'
   printf -- '- suggested_next_command: bash test/integration/harness_release_gate.sh\n'
@@ -576,6 +641,7 @@ if [[ "$MODE" == "check-vendoring" ]]; then
   run_check_vendoring "$VENDOR_PATH" "$ALLOW_VENDORED"
 fi
 
+[[ -n "$MODE" ]] || MODE="quick"
 [[ "$MODE" == "quick" ]] || die "--quick or --check-vendoring is required"
 
 # 0.0.12: --strict promotes canonical-guard from advisory to fail-close for this
@@ -602,12 +668,15 @@ LATEST_RELEASE_GATE_JSON="{}"
 MODEL_POLICY_JSON="{}"
 ACTIVE_SUMMARY_JSON="{}"
 SEMANTIC_PATHS_JSON="{}"
+SEMANTIC_ADDON_JSON="{}"
+SEMANTIC_ADDON_STATE="unknown"
 
 STARTED_MS="$(now_ms)"
 run_step "git_status_summary" "OK" collect_git_status_summary
 run_step "release_gate_latest_pointer" "OK" collect_release_gate_pointer
 run_step "model_policy_freshness" "OK" collect_model_policy_summary
 run_step "active_task_summary" "OK" collect_active_hold_summary
+run_step "semantic_addon_state" "OK" collect_semantic_addon_summary
 run_step "semantic_paths" "OK" collect_semantic_paths_summary
 ENDED_MS="$(now_ms)"
 ELAPSED_MS=$((ENDED_MS - STARTED_MS))

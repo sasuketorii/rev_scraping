@@ -5,69 +5,6 @@ model_reasoning_effort = "medium"
 
 web_search = "cached"
 
-[mcp_servers.semantic-mcp]
-command = "./scripts/launch-semantic-mcp.sh"
-# WHY: semantic-mcp operates ONLY on the project-local semantic index
-# (no network, no OAuth, no external side effects). A non-interactive
-# `codex exec` worker has no TTY to answer an approval prompt, so an
-# unapproved sem.* tool call fails with "user cancelled MCP tool call".
-# We auto-approve a MINIMUM allowlist of 7 tools whose blast radius is bounded
-# by a single, deliberate boundary: NON-DESTRUCTIVE (not "pure read-only").
-# That boundary admits two classes of tool:
-#   (a) read-only discovery: health / context.top_k / search / registry.query /
-#       symbols.search — these never write any table in their production paths
-#       (their only INSERTs live inside #[cfg(test)] blocks, never reached at
-#       runtime). symbols.search (the §4 C-b tool) is a read-only SELECT over
-#       the tree-sitter `symbols` index: it issues no INSERT/UPDATE/DELETE, is
-#       advisory_only, and so is non-destructive — hence inside the boundary.
-#   (b) append-only capsule-cache generation: capsule / preflight — these are
-#       NOT strictly read-only. capsule.rs:454 and preflight.rs:1104 each run
-#       `INSERT INTO capsules (...) VALUES (...)` against the `capsules` cache
-#       table. That INSERT is append-only: no ON CONFLICT, no UPDATE, no DELETE,
-#       and it never touches `symbols`, `components`, or any registry row. The
-#       worst case is unbounded growth of the `capsules` cache table, which is
-#       fully reclaimable via `sem.admin.gc`. Because that is non-destructive
-#       (it cannot overwrite, soft-delete, or lose any existing data), capsule
-#       and preflight are intentionally INSIDE the auto-approve boundary.
-# Everything that mutates or soft-deletes registry rows, or runs GC, stays at
-# the server default ("prompt") so it requires a human in the loop. This
-# explicitly INCLUDES registry.upsert: although upsert is often
-# used to publish newly-created symbols, its `status` field is normalized via
-# normalize_queryable_status (registry.rs ~L761) whose QUERYABLE_STATUSES
-# (registry.rs L22-29) INCLUDES "deleted" — unlike set_status's
-# normalize_mutable_status / MUTABLE_STATUSES (L21) which does NOT. Combined
-# with upsert's `ON CONFLICT(...) DO UPDATE SET status = excluded.status`
-# (registry.rs ~L264), auto-approving upsert would let a non-interactive worker
-# overwrite an existing component to status="deleted" (soft-delete) without any
-# human approval, bypassing the same boundary we deliberately keep on
-# set_status/delete/admin.gc. So registry.upsert, registry.set_status,
-# registry.delete and admin.gc all stay at "prompt".
-# DO NOT change the default to "approve" and DO NOT copy this auto-approve
-# pattern to any OAuth/network MCP server (e.g. supabase, stripe, cloudflare);
-# those have real external blast radius.
-default_tools_approval_mode = "prompt"
-
-[mcp_servers.semantic-mcp.tools."sem.preflight"]
-approval_mode = "approve"
-
-[mcp_servers.semantic-mcp.tools."sem.health"]
-approval_mode = "approve"
-
-[mcp_servers.semantic-mcp.tools."sem.context.top_k"]
-approval_mode = "approve"
-
-[mcp_servers.semantic-mcp.tools."sem.capsule"]
-approval_mode = "approve"
-
-[mcp_servers.semantic-mcp.tools."sem.search"]
-approval_mode = "approve"
-
-[mcp_servers.semantic-mcp.tools."sem.registry.query"]
-approval_mode = "approve"
-
-[mcp_servers.semantic-mcp.tools."sem.symbols.search"]
-approval_mode = "approve"
-
 # Chrome DevTools MCP — optional per-project opt-in, not in baseline release.
 # [mcp_servers.chrome_devtools]
 # command = "npx chrome-devtools-mcp@<pin>"
